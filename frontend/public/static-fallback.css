@@ -1,0 +1,71 @@
+/* static-fallback.css - shared styles for JS-off static pages */
+
+/* reset */
+* {margin:0; padding:0; box-sizing:border-box;}
+
+body {
+  font-family: 'Inter', Arial, Helvetica, sans-serif;
+  background-color: #f5f5f5; /* light gray */
+  color: #333;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+header {
+  background-color: #004080; /* deep blue */
+  color: #fff;
+  padding: 1rem 0;
+}
+header .logo {
+  height: 60px;
+}
+header .title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-top: 0.5rem;
+}
+header nav a {
+  color: #cfe2ff;
+  margin-right: 1rem;
+  text-decoration: none;
+}
+header nav a:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+section h2, section h3 {
+  color: #003366; /* dark teal */
+  margin-bottom: 0.8rem;
+}
+section ul {
+  list-style: disc inside;
+  margin-left: 1rem;
+}
+
+footer {
+  background-color: #e0e0e0;
+  text-align: center;
+  padding: 1rem 0;
+  font-size: 0.9rem;
+}
+footer a {
+  color: #004080;
+  text-decoration: none;
+  margin: 0 0.5rem;
+}
+footer a:hover {
+  text-decoration: underline;
+}
+
+/* responsive */
+@media (max-width: 768px) {
+  header .title {font-size: 1.4rem;}
+  header nav {display: block; margin-top: 0.5rem;}
+  header nav a {display: block; margin: 0.3rem 0;}
+}
