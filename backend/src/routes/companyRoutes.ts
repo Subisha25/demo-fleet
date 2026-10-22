@@ -5,9 +5,9 @@ import { uploadCompanyLogo } from "../middleware/uploadConfig";
 
 const router = express.Router();
 
-router.get("/getAllCompany",getAllCompany);
+router.get("/getAllCompany", authMiddleware, getAllCompany);
 router.get("/:seoUrl", getCompanyBySeoUrl);
-router.get("/company/:companyId/taxes", getCompanyTaxes);
+router.get("/company/:companyId/taxes", authMiddleware, getCompanyTaxes);
 router.get("/getCompanyById/:id",authMiddleware,getCompanyById);
 // router.put("/companyUpdate/:id",authMiddleware,updateCompany);
 router.put(

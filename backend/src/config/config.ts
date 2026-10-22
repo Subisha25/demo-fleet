@@ -51,10 +51,12 @@ const config = {
     loginLink: process.env.LOGIN_LINK,
   },
   sendmail: {
-    smtp_server: process.env.SMTP_SERVER || "",
-    smtp_email: process.env.SMTP_EMAIL_ADDRESS || "",
-    smtp_password: process.env.SMTP_EMAIL_PASSWORD || "",
-    smtp_port: process.env.SMTP_EMAIL_PORT ? parseInt(process.env.SMTP_EMAIL_PORT) : 587,
+    smtp_server: process.env.SMTP_SERVER || process.env.SMTP_HOST || "",
+    smtp_email: process.env.SMTP_EMAIL_ADDRESS || process.env.SMTP_USER || "",
+    smtp_password: process.env.SMTP_EMAIL_PASSWORD || process.env.SMTP_PASS || "",
+    smtp_port: parseInt(process.env.SMTP_EMAIL_PORT || process.env.SMTP_PORT || "587"),
+    smtp_secure: process.env.SMTP_SECURE === "true" || process.env.SMTP_SECURE === "1",
+    superadmin_email: process.env.SUPERADMIN_EMAIL || "subisha2002@gmail.com",
   },
   companyurl: {
     seo_base: process.env.SEO_BASE_URL || "http://gracecabs.com/Company/"

@@ -19,6 +19,7 @@ import { User } from "../models/user";
 import { formatDateTime,formatToIST } from '../utils/formatDateTime';
 import { sendSmsNotifications } from '../utils/smsNotifications';
 import moment from "moment-timezone";
+import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 
 export const confirmBooking = async (req: any, res: Response) => {
   try {
@@ -566,14 +567,18 @@ export const createDriver = async (req: any, res: Response) => {
       return res.status(403).json({ message: 'Not Authorized' });
     }
     const role = ROLES.DRIVER;
-    const existing = await Drivers.findOne({ where: { phno } });
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+
+    const existing = await Drivers.findOne({ where: { phno, tenantId } });
     if (existing) {
-      return res.status(400).json({ message: 'Phone number already exists' });
+      return res.status(400).json({ message: 'Phone number already exists in this fleet' });
     }
 
     const driver = await Drivers.create({
       driverName, driverEmail, phno, password, city, state, country, address,role: role,
-      pincode, licenseNo, licExpDate, vehicleTypeId, trackingsource:trackingSource
+      pincode, licenseNo, licExpDate, vehicleTypeId, trackingsource:trackingSource,
+      tenantId
     });
 
     const driverWithVehicle = await Drivers.findOne({
@@ -739,12 +744,16 @@ export const createVehicle = async (req: any, res: Response) => {
       return res.status(403).json({ message: 'Not Authorized' });
     }
 
-    const existing = await Vehicle.findOne({ where: { vehicleTypeId, vehicleName } });
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+
+    const existing = await Vehicle.findOne({ where: { vehicleTypeId, vehicleName, tenantId } });
     if (existing) return res.status(400).json({ message: 'Vehicle already registered' });
 
     const vehicle = await Vehicle.create({
       vehicleName, vehicleTypeId, manufacturing, vehicleImg,
-      availableStatus
+      availableStatus,
+      tenantId
     });
 
     res.status(201).json({ message: 'Registered successfully', vehicle });
@@ -786,6 +795,9 @@ export const createVehicleMaster = async (req: any, res: Response) => {
       return res.status(404).json({ message: 'Owner not found' });
     }
 
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+
     const vehicleMaster = await VehicleMaster.create({
       vehicleNumber,
       vehicleId,
@@ -793,7 +805,8 @@ export const createVehicleMaster = async (req: any, res: Response) => {
       vehicleModelName: vehicleData.vehicleName,
       vehicleTypeId: vehicleData.vehicleTypeId,
       vehicleType: vehicleData.vehicleType?.vehicleType || '',
-      vendorName: vendorData.vendorName
+      vendorName: vendorData.vendorName,
+      tenantId
     });
 
     res.status(201).json({ message: 'Registered successfully', vehicleMaster });

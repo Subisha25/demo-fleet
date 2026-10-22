@@ -1,10 +1,23 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { TenantProvider } from './context/TenantContext';
 import PrivateRoute from './routes/PrivateRoutes';
 import Login from './SuperAdmin/pages/Login/Login';
 import Sidebar from './components/Sidebar';
 import { AlertContainer } from './components/AlertBox';
+
+// SaaS Tenants
+import TenantList from './SuperAdmin/pages/Tenants/TenantList';
+import AddTenant from './SuperAdmin/pages/Tenants/AddTenant';
+import CompanyPolicies from './SuperAdmin/pages/Tenants/CompanyPolicies';
+import RegistrationsQueue from './SuperAdmin/pages/Tenants/RegistrationsQueue';
+import SubscriptionCheckout from './SuperAdmin/pages/Billing/SubscriptionCheckout';
+
+// SaaS Public Pages
+import FleetRegistration from './components/Homepage/FleetRegistration';
+import Pricing from './components/Homepage/Pricing';
+import ActivateAccount from './components/Homepage/ActivateAccount';
 
 // Dashboard
 import Dashboard from './SuperAdmin/pages/Dashboard/Dashboard';
@@ -128,7 +141,11 @@ import TravelHeader from './SuperAdmin/pages/Users/header';
 // import PrivacyPolicy from './SuperAdmin/pages/Homepage/Selections/PrivacyPolicy';
 // import CancelReservation from './SuperAdmin/pages/Homepage/Selections/CancelReservation';
 // import SimpleHeader from './SuperAdmin/pages/Homepage/Selections/simpleheader';
-import HomePage from './components/Homepage/homepage';
+import HomePage from './components/PublicSite/HomePage';
+import AboutPage from './components/PublicSite/AboutPage';
+import ServicesPage from './components/PublicSite/ServicesPage';
+import PortfolioPage from './components/PublicSite/PortfolioPage';
+import ContactPage from './components/PublicSite/ContactPage';
 import TermsAndConditions from './components/Homepage/TermsAndConditions';
 import PrivacyPolicy from './components/Homepage/PrivacyPolicy';
 import CancelReservation from './components/Homepage/CancelReservation';
@@ -162,6 +179,14 @@ const Layout = () => {
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/" element={<Dashboard />} />
+          {/* SaaS Multi-Tenant Routes */}
+          <Route path="/tenants/list" element={<TenantList />} />
+          <Route path="/tenants/add" element={<AddTenant />} />
+          <Route path="/tenants/policies" element={<CompanyPolicies />} />
+          <Route path="/tenants/registrations" element={<RegistrationsQueue />} />
+          <Route path="/admin/registrations" element={<RegistrationsQueue />} />
+          <Route path="/admin/billing" element={<SubscriptionCheckout />} />
+          <Route path="/billing" element={<SubscriptionCheckout />} />
           {/* Master Routes */}
           <Route path="/master/tax/add" element={<AddTax />} />
           <Route path="/master/tax/list" element={<ListTax />} />
@@ -257,14 +282,15 @@ const App: React.FC = () => {
   return (
     
     <AuthProvider>
-      <BrowserRouter>
+      <TenantProvider>
+        <BrowserRouter>
         <Routes>
           {/* Public Website Routes & Aliases */}
           <Route path="/" element={<HomePage />} />
-          <Route path="/about" element={<HomePage />} />
-          <Route path="/services" element={<HomePage />} />
-          <Route path="/portfolio" element={<HomePage />} />
-          <Route path="/contact" element={<HomePage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/services" element={<ServicesPage />} />
+          <Route path="/portfolio" element={<PortfolioPage />} />
+          <Route path="/contact" element={<ContactPage />} />
 
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/privacypolicy" element={<PrivacyPolicy />} />
@@ -280,8 +306,16 @@ const App: React.FC = () => {
           <Route path="/simpleheader" element={<SimpleHeader />} />
           <Route path="/fromdata" element={<PartnerRegistrationForm />} />
 
+          {/* SaaS Fleet Public Portal Routes */}
+          <Route path="/register-fleet" element={<FleetRegistration />} />
+          <Route path="/register" element={<FleetRegistration />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/activate-account" element={<ActivateAccount />} />
+          <Route path="/activate" element={<ActivateAccount />} />
+
           {/* Auth Routes */}
           <Route path="/adminlogin" element={<Login />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/forgetpasword" element={<ForgotPassword />} />
 
           <Route path="/managerusers/list/:id" element={<ManagerUserList />} />
@@ -328,6 +362,7 @@ const App: React.FC = () => {
                <Route path="*" element={<HomePage />} />
         </Routes>
       </BrowserRouter>
+      </TenantProvider>
     </AuthProvider>
   );
 };

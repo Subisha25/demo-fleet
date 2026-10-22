@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { createConfiguration, getConfiguration } from '../services/configurationService';
+import { authMiddleware } from '../middleware/authMiddleware';
 
 const router = Router();
 
-// Create or update configuration
-router.post('/createConfiguration', createConfiguration);
+// Create or update configuration (Protected: Admin / Superadmin only)
+router.post('/createConfiguration', authMiddleware, createConfiguration);
 
-// Get configuration
-router.get('/getConfiguration', getConfiguration);
+// Get configuration (Protected: Authenticated only, sensitive SMTP password redacted)
+router.get('/getConfiguration', authMiddleware, getConfiguration);
 
 export default router;

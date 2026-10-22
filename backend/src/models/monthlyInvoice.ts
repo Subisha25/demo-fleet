@@ -18,11 +18,18 @@ export class MonthlyInvoice extends Model {
   monthlyInvoiceId!: string;
 
   
-    @Column({
-      type: DataType.STRING,
-      unique: true,
-    })
-    monthlyBookingCode!: string;
+  @Column({
+    type: DataType.STRING,
+    unique: true,
+  })
+  monthlyBookingCode!: string;
+
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+    defaultValue: 'e7b8a1c0-0000-0000-0000-000000000001',
+  })
+  tenantId!: string;
   
 
   

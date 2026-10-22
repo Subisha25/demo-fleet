@@ -32,8 +32,16 @@ export class User extends Model {
     defaultValue: DataType.UUIDV4,
   })
   userId!: string;
-@Column(DataType.STRING)
-danfossuserId!: string;
+
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+    defaultValue: 'e7b8a1c0-0000-0000-0000-000000000001',
+  })
+  tenantId!: string;
+
+  @Column(DataType.STRING)
+  danfossuserId!: string;
 
 @Column(DataType.STRING)
 managerId!: string;

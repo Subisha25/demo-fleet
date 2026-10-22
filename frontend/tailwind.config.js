@@ -38,11 +38,62 @@ module.exports = {
       colors: {
         primary: {
           golden: "#DCCA87",
-          black: "#0C0C0C",
+          black: "#1C1A18",
           gray: "#545454",
           crimson: "#F5EFDB",
           gray2: "#AAAAAA",
           white: "#FFFFFF",
+          terracotta: "#C04E24",
+        },
+        terracotta: {
+          50: '#FDF6F0',
+          100: '#F9E8DE',
+          200: '#F3D0BD',
+          300: '#E9B195',
+          400: '#DE8A66',
+          500: '#D3693E',
+          600: '#C04E24',
+          700: '#A43D1A',
+          800: '#843217',
+          900: '#6C2A15',
+        },
+        charcoal: {
+          950: '#121110',
+          900: '#1C1A18',
+          800: '#262320',
+          700: '#332F2B',
+          600: '#45403C',
+          500: '#5C5752',
+        },
+        cream: {
+          50: '#FAF8F5',
+          100: '#F5F2EB',
+          200: '#EFE9DF',
+          300: '#E5DED2',
+          400: '#D5CBC0',
+        },
+        warmgrey: {
+          50: '#F7F5F2',
+          100: '#EDE9E3',
+          200: '#E0DAD1',
+          300: '#C8BFB3',
+        },
+        // Safety Aliases: Maps legacy navy utility classes to elegant charcoal
+        navy: {
+          950: '#121110',
+          900: '#1C1A18',
+          800: '#262320',
+          700: '#332F2B',
+          600: '#45403C',
+          500: '#C04E24',
+        },
+        brand: {
+          terracotta: '#C04E24',
+          charcoal: '#1C1A18',
+          canvas: '#FAF8F5',
+          border: '#E0DAD1',
+          navy: '#1C1A18', // Aliased
+          teal: '#C04E24', // Aliased
         },
       },
 

@@ -1,32 +1,80 @@
-/* @import url('https://fonts.googleapis.com/css2?family=Cormorant+Upright:wght@300;400;500;600;700&family=Open+Sans:wght@300;400;500;600;700&display=swap'); */
-/* @import url('https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;500;600;700&display=swap'); */
-
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-size: 16px;
-   /* font-family: 'Roboto Slab', serif;or whatever you're using */
-   font-family: 'Noto Sans', sans-serif;
-  line-height: 1.6;
-  color: #111827; /* Optional: default text color */
-}
-
 :root {
-  --font-base: 'Cormorant Upright', serif;
-  --font-alt: 'Open Sans', sans-serif;
-  
-  --color-golden: #DCCA87;
-  --color-black: #0C0C0C;
-  --color-gray: #545454;
-  --color-crimson: #F5EFDB;
-  --color-grey: #AAAAAA;
-  --color-white: #FFFFFF;
+  /* =========================================================================
+     GRACE CABS DESIGN SYSTEM: WARM CREAM, TERRACOTTA & CHARCOAL (NO BLUE)
+     ========================================================================= */
+
+  /* Primary Brand: Terracotta */
+  --terracotta-900: #6C2A15;
+  --terracotta-800: #843217;
+  --terracotta-700: #A43D1A;
+  --terracotta-600: #C04E24; /* Core Brand Primary */
+  --terracotta-500: #D3693E;
+  --terracotta-400: #DE8A66;
+  --terracotta-300: #E9B195;
+  --terracotta-200: #F3D0BD;
+  --terracotta-100: #F9E8DE;
+  --terracotta-50:  #FDF6F0;
+
+  /* Neutral Dark: Charcoal / Graphite */
+  --charcoal-950: #121110;
+  --charcoal-900: #1C1A18; /* Dark Surface / Sidebar */
+  --charcoal-800: #262320; /* Card Header / Accent */
+  --charcoal-700: #332F2B;
+  --charcoal-600: #45403C;
+  --charcoal-500: #5C5752;
+
+  /* Neutral Light: Warm Cream & Off-White */
+  --cream-50:  #FAF8F5; /* Canvas Background */
+  --cream-100: #F5F2EB; /* Subtle Card / Section Background */
+  --cream-200: #EFE9DF;
+  --cream-300: #E5DED2;
+
+  /* Muted Warm Grey Borders */
+  --border-warm: #E0DAD1;
+  --border-subtle: #E0DAD1;
+
+  /* Functional Tokens */
+  --bg-canvas: #FAF8F5;
+  --surface-card: #FFFFFF;
+  --text-primary: #1C1A18;
+  --text-secondary: #45403C;
+  --text-muted: #7A7570;
+
+  /* Tenant Theming Overrides (Terracotta Default) */
+  --primary-tenant-color: #C04E24;
+  --accent-tenant-color: #D3693E;
+
+  /* Safety Aliases: Maps legacy navy/blue variables to elegant charcoal */
+  --navy-950: #121110;
+  --navy-900: #1C1A18;
+  --navy-800: #262320;
+  --navy-700: #332F2B;
+  --navy-600: #45403C;
+  --navy-500: #C04E24;
+
+  --teal-700: #A43D1A;
+  --teal-600: #C04E24;
+  --teal-500: #D3693E;
+  --teal-400: #DE8A66;
+  --teal-100: #F9E8DE;
+  --teal-50:  #FDF6F0;
 }
 
+body {
+  font-size: 15px;
+  font-family: 'Plus Jakarta Sans', 'Noto Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+  color: #1C1A18;
+  background-color: #FAF8F5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
 * {
   box-sizing: border-box;
@@ -40,49 +88,110 @@ a {
   text-decoration: none;
 }
 
+/* Accessibility Focus States */
+:focus-visible {
+  outline: 2px solid #C04E24;
+  outline-offset: 2px;
+}
+
+/* Status Badges with Restrained, Harmonized Colors */
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-width: 1px;
+}
+
+.badge-status-confirmed, .badge-status-active, .badge-status-paid {
+  background-color: #E8F5E9;
+  color: #2E7D32;
+  border-color: #C8E6C9;
+}
+
+.badge-status-pending, .badge-status-confirm-pending, .badge-status-trial {
+  background-color: #FFF8E1;
+  color: #B76E00;
+  border-color: #FFE082;
+}
+
+.badge-status-payment-pending, .badge-status-close-pending {
+  background-color: #F5F2EB;
+  color: #843217;
+  border-color: #E0DAD1;
+}
+
+.badge-status-cancelled, .badge-status-suspended, .badge-status-inactive {
+  background-color: #FFEBEE;
+  color: #C62828;
+  border-color: #FFCDD2;
+}
+
+.badge-status-enterprise {
+  background-color: #FDF6F0;
+  color: #C04E24;
+  border-color: #F3D0BD;
+}
+
+.badge-status-pro {
+  background-color: #F5F2EB;
+  color: #843217;
+  border-color: #E0DAD1;
+}
+
+.badge-status-basic {
+  background-color: #FAF8F5;
+  color: #45403C;
+  border-color: #E0DAD1;
+}
+
+/* Enterprise Card Utility with Warm Cream Borders */
+.enterprise-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E0DAD1;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgba(28, 26, 24, 0.03), 0 1px 2px -1px rgba(28, 26, 24, 0.03);
+  transition: all 0.2s ease-in-out;
+}
+
+.enterprise-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(28, 26, 24, 0.06), 0 2px 4px -2px rgba(28, 26, 24, 0.04);
+}
+
+/* Custom Scrollbar in Warm Grey */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(192, 78, 36, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(192, 78, 36, 0.5);
+}
+
 .slide-bottom {
   -webkit-animation: slide-bottom 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
-	animation: slide-bottom 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+  animation: slide-bottom 0.5s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
 }
 
 @-webkit-keyframes slide-bottom {
-  0% {
-    -webkit-transform: translateY(-25%);
-            transform: translateY(-25%);
-  }
-  100% {
-    -webkit-transform: translateY(0);
-            transform: translateY(0);
-  }
+  0% { transform: translateY(-25%); }
+  100% { transform: translateY(0); }
 }
 
 @keyframes slide-bottom {
-  0% {
-    -webkit-transform: translateY(-25%);
-            transform: translateY(-25%);
-  }
-  100% {
-    -webkit-transform: translateY(0);
-            transform: translateY(0);
-  }
+  0% { transform: translateY(-25%); }
+  100% { transform: translateY(0); }
 }
-
-/* For full flip support */
-.perspective {
-  perspective: 1000px;
-}
-
-.preserve-3d {
-  transform-style: preserve-3d;
-}
-
-.backface-hidden {
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-}
-
-.rotate-y-180 {
-  transform: rotateY(180deg);
-}
-
-

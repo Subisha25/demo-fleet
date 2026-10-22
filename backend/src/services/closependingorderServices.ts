@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import axios from 'axios';
 import { ClosePending } from '../models/closepending';
 import { PackageData } from '../models/packageData';
 import { Payment } from '../models/payment';
@@ -22,8 +23,9 @@ import { Tax } from "../models/tax";
 import { MonthlyInvoice } from "../models/monthlyInvoice";
 import { MonthlyInvoiceItems } from "../models/monthlyInvoiceItems";
 import { Sequelize } from "sequelize";
-import axios from "axios";
 import { InvoiceSequence } from "../models/invoice_sequence";
+import { assertTenantOwnership, isTenantError } from "../utils/tenantGuard";
+import { getTenantContext, ROOT_TENANT_ID } from "../context/tenantContext";
 //const logoPath = path.join(__dirname, "..", "images", "logo.png");
 // const logoPath = path.join(process.cwd(), "public", "images", "logo.png");
 // const logoBase64 = fs.readFileSync(logoPath, "base64");
@@ -743,6 +745,7 @@ export const createClosePending = async (req: any, res: Response) => {
         message: 'Invalid bookingId, Booking not found'
       });
     }
+    assertTenantOwnership(booking, 'Booking');
 
 
 
@@ -838,6 +841,7 @@ export const createClosePending = async (req: any, res: Response) => {
       vehicleTypeId: booking.vehicleTypeId,
       //   companyId: booking?.user?.companyId,
       companyId: finalCompanyId,
+      tenantId: (booking as any).tenantId || ROOT_TENANT_ID,
       invoiceStatus: ORDER.STATUS.PENDING,
       startDate,
       endDate,
@@ -1208,6 +1212,9 @@ export const createClosePending = async (req: any, res: Response) => {
     });
 
   } catch (error) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: (error as Error).message });
+    }
     console.error('Error creating ClosePending:', error);
 
     if (error instanceof Error) {
@@ -1570,6 +1577,7 @@ export const createMonthlyInvoice = async (req: Request, res: Response) => {
 
     const company = await Company.findOne({ where: { companyId } });
     if (!company) return res.status(404).json({ success: false, message: "Company not found" });
+    assertTenantOwnership(company, 'Company');
 
     // Normalize input routes: if routes is array, use it; otherwise fallback to single route object from body
     let rawRoutes: any[] = [];
@@ -1711,6 +1719,7 @@ export const createMonthlyInvoice = async (req: Request, res: Response) => {
           finalTotal: grandFinalTotal,
           balanceDue: grandBalanceDue,
           closeStatus: 0,
+          tenantId: (company as any).tenantId || ROOT_TENANT_ID,
         },
         { transaction: t }
       );
@@ -1725,6 +1734,7 @@ export const createMonthlyInvoice = async (req: Request, res: Response) => {
           companyId,
           vehicleTypeId: firstRoute.vehicleTypeId,
           monthlyInvoiceId: (createdMonthly as any).monthlyInvoiceId,
+          tenantId: (company as any).tenantId || ROOT_TENANT_ID,
         },
         { transaction: t }
       );
@@ -1801,6 +1811,9 @@ export const createMonthlyInvoice = async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: error.message });
+    }
     console.error("createMonthlyInvoice error:", error);
     return res.status(500).json({
       success: false,
@@ -1833,6 +1846,7 @@ export const deleteMonthlyInvoice = async (
       if (!monthlyInvoice) {
         throw new Error("Monthly Invoice not found");
       }
+      assertTenantOwnership(monthlyInvoice);
 
       if (monthlyInvoice.invoiceId) {
         await Invoice.destroy({
@@ -1857,6 +1871,9 @@ export const deleteMonthlyInvoice = async (
       message: "Monthly Invoice deleted successfully.",
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: error.message });
+    }
     console.error("Delete Monthly Invoice Error:", error);
 
     return res.status(500).json({
@@ -1892,6 +1909,13 @@ export const deleteMonthlyInvoiceItem = async (req: Request, res: Response) => {
       }
 
       const monthlyInvoiceId = item.monthlyInvoiceId;
+      const monthlyInvoice = await MonthlyInvoice.findByPk(monthlyInvoiceId, {
+        transaction: t,
+      });
+
+      if (monthlyInvoice) {
+        assertTenantOwnership(monthlyInvoice, 'MonthlyInvoice');
+      }
 
       // 2. Query all items for this monthly invoice
       const allItems = await MonthlyInvoiceItems.findAll({
@@ -1906,10 +1930,6 @@ export const deleteMonthlyInvoiceItem = async (req: Request, res: Response) => {
       // 3. If this was the last remaining Route Card -> Delete header + invoice + item
       if (remainingItems.length === 0) {
         await item.destroy({ transaction: t });
-
-        const monthlyInvoice = await MonthlyInvoice.findByPk(monthlyInvoiceId, {
-          transaction: t,
-        });
 
         if (monthlyInvoice) {
           if (monthlyInvoice.invoiceId) {
@@ -1978,10 +1998,6 @@ export const deleteMonthlyInvoiceItem = async (req: Request, res: Response) => {
       const combinedTaxesArr = Object.values(combinedTaxMap);
 
       // 6. Update MonthlyInvoice Header
-      const monthlyInvoice = await MonthlyInvoice.findByPk(monthlyInvoiceId, {
-        transaction: t,
-      });
-
       if (monthlyInvoice) {
         await monthlyInvoice.update(
           {
@@ -2046,6 +2062,9 @@ export const deleteMonthlyInvoiceItem = async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: error.message });
+    }
     console.error("deleteMonthlyInvoiceItem Error:", error);
     return res.status(500).json({
       success: false,
@@ -2055,59 +2074,71 @@ export const deleteMonthlyInvoiceItem = async (req: Request, res: Response) => {
 };
 
 export const resendMonthlyInvoice = async (req: Request, res: Response) => {
-
-  const { monthlyInvoiceId } = req.body;
-
-  const createdMonthly = await MonthlyInvoice.findOne({ where: { monthlyInvoiceId: monthlyInvoiceId } });
-  // ✅ PDF GENERATION (optional)
-  let pdfFileName: string | null = null;
-
   try {
-    const BASE_URL = "http://localhost:5000";
-    const pdfResponse = await axios.post(
-      `${BASE_URL}/app/appInvoiceRoutes/month-generate-invoice-pdf`,
-      { monthlyInvoiceId: (createdMonthly as any).monthlyInvoiceId },
-      { headers: { Authorization: req.headers.authorization } }
-    );
-    pdfFileName = pdfResponse.data?.data?.fileName || null;
-    console.log("✅ Branded monthly PDF generated:", pdfFileName);
-  } catch (err) {
-    console.error("❌ Error calling month-generate-invoice-pdf:", err);
-  }
+    const { monthlyInvoiceId } = req.body;
 
-  // ✅ EMAIL (optional)
-  try {
-    const emailConfigs = await fetchAllEmailConfs();
-    const orderConfirmConf = emailConfigs.find((conf: any) => conf.emailCode === "MONTHLY_BOOKING");
-
-    if (orderConfirmConf && pdfFileName) {
-      const monthlyPdfPath = path.join(process.cwd(), "uploads", "invoices", "monthly", pdfFileName);
-
-      await sendEmailFromTemplate(
-        orderConfirmConf.emailCode,
-        {
-          to: "gracecabs1975@gmail.com,traveldesk@gracecabs.com",
-          OrderNumber: (createdMonthly as any).invoiceNumber,
-          BookingNumber: (createdMonthly as any).monthlyInvoiceId,
-          InvoiceTemple: "",
-        },
-        [{ path: monthlyPdfPath, filename: pdfFileName }]
-      );
-
-      console.log("✅ Monthly invoice email sent with branded PDF");
+    const createdMonthly = await MonthlyInvoice.findOne({ where: { monthlyInvoiceId: monthlyInvoiceId } });
+    if (!createdMonthly) {
+      return res.status(404).json({ success: false, message: "Monthly invoice not found" });
     }
-  } catch (e) {
-    console.error("❌ Monthly email send failed:", e);
-  }
+    assertTenantOwnership(createdMonthly, 'MonthlyInvoice');
 
-  return res.status(201).json({
-    success: true,
-    message: "Monthly invoice + Invoice created",
-    data: {
-      monthlyInvoice: createdMonthly,
-      //    invoice: inv,
-    },
-  });
+    // ✅ PDF GENERATION (optional)
+    let pdfFileName: string | null = null;
+
+    try {
+      const BASE_URL = "http://localhost:5000";
+      const pdfResponse = await axios.post(
+        `${BASE_URL}/app/appInvoiceRoutes/month-generate-invoice-pdf`,
+        { monthlyInvoiceId: (createdMonthly as any).monthlyInvoiceId },
+        { headers: { Authorization: req.headers.authorization } }
+      );
+      pdfFileName = pdfResponse.data?.data?.fileName || null;
+      console.log("✅ Branded monthly PDF generated:", pdfFileName);
+    } catch (err) {
+      console.error("❌ Error calling month-generate-invoice-pdf:", err);
+    }
+
+    // ✅ EMAIL (optional)
+    try {
+      const emailConfigs = await fetchAllEmailConfs();
+      const orderConfirmConf = emailConfigs.find((conf: any) => conf.emailCode === "MONTHLY_BOOKING");
+
+      if (orderConfirmConf && pdfFileName) {
+        const monthlyPdfPath = path.join(process.cwd(), "uploads", "invoices", "monthly", pdfFileName);
+
+        await sendEmailFromTemplate(
+          orderConfirmConf.emailCode,
+          {
+            to: "gracecabs1975@gmail.com,traveldesk@gracecabs.com",
+            OrderNumber: (createdMonthly as any).invoiceNumber,
+            BookingNumber: (createdMonthly as any).monthlyInvoiceId,
+            InvoiceTemple: "",
+          },
+          [{ path: monthlyPdfPath, filename: pdfFileName }]
+        );
+
+        console.log("✅ Monthly invoice email sent with branded PDF");
+      }
+    } catch (e) {
+      console.error("❌ Monthly email send failed:", e);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Monthly invoice + Invoice created",
+      data: {
+        monthlyInvoice: createdMonthly,
+        //    invoice: inv,
+      },
+    });
+  } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: error.message });
+    }
+    console.error("resendMonthlyInvoice error:", error);
+    return res.status(500).json({ success: false, message: error.message || "Internal server error" });
+  }
 };
 
 // export const createMonthlyInvoice = async (req: Request, res: Response) => {
@@ -2361,7 +2392,17 @@ export const getAllMonthlyInvoiceDetails = async (req: Request, res: Response) =
     const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 20));
     const offset = (pageNum - 1) * limitNum;
 
-    const whereMonthly: any = {};
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
+    const whereMonthly: any = { ...tenantCondition };
     if (companyId) whereMonthly.companyId = companyId;
     if (vehicleTypeId) whereMonthly.vehicleTypeId = vehicleTypeId;
     if (invoiceMonth) whereMonthly.invoiceMonth = invoiceMonth;
@@ -2489,7 +2530,17 @@ export const getAllMonthlyInvoice = async (req: Request, res: Response) => {
     const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 20));
     const offset = (pageNum - 1) * limitNum;
 
-    const whereMonthly: any = {};
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
+    const whereMonthly: any = { ...tenantCondition };
     if (companyId) whereMonthly.companyId = companyId;
     if (vehicleTypeId) whereMonthly.vehicleTypeId = vehicleTypeId;
     if (invoiceMonth) whereMonthly.invoiceMonth = invoiceMonth;
@@ -2615,10 +2666,20 @@ export const filterMonthlyInvoices = async (req: Request, res: Response) => {
     const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 20));
     const offset = (pageNum - 1) * limitNum;
 
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     // --------------------
     // MonthlyInvoice WHERE
     // --------------------
-    const whereMonthly: any = {};
+    const whereMonthly: any = { ...tenantCondition };
 
     // ✅ companyName filter
     if (companyName && String(companyName).trim()) {
@@ -2770,6 +2831,7 @@ export const getMonthlyInvoiceDetailsById = async (req: Request, res: Response) 
     if (!monthly) {
       return res.status(404).json({ success: false, message: "Monthly invoice not found" });
     }
+    assertTenantOwnership(monthly, 'MonthlyInvoice');
 
     const jsonMonthly = monthly.toJSON();
 
@@ -2879,6 +2941,9 @@ export const getMonthlyInvoiceDetailsById = async (req: Request, res: Response) 
       },
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: error.message });
+    }
     console.error("getMonthlyInvoiceDetailsById error:", error);
     return res.status(500).json({
       success: false,
@@ -2911,6 +2976,7 @@ export const createAppInvoice = async (req: any, res: Response) => {
         message: 'Invalid bookingId, Booking not found'
       });
     }
+    assertTenantOwnership(booking, 'Booking');
 
     const payment = await Payment.create({
       paymentMode: paymentMode.paymentmodeId,
@@ -2939,6 +3005,7 @@ export const createAppInvoice = async (req: any, res: Response) => {
       userId: booking.userId,
       vehicleTypeId: booking.vehicleTypeId,
       companyId: booking.user?.companyId,
+      tenantId: (booking as any).tenantId || ROOT_TENANT_ID,
       invoiceStatus: ORDER.STATUS.PENDING,
       startDate,
       endDate,
@@ -2967,6 +3034,9 @@ export const createAppInvoice = async (req: any, res: Response) => {
 
 
   } catch (error) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: (error as Error).message });
+    }
     console.error('Error creating ClosePending:', error);
 
     if (error instanceof Error) {
@@ -3012,6 +3082,7 @@ export const getPaymentForPendingInvoice = async (req: any, res: Response) => {
         message: 'Pending invoice not found'
       });
     }
+    assertTenantOwnership(invoiceData, 'Invoice');
 
     // Format response data
     const responseData = {
@@ -3042,6 +3113,9 @@ export const getPaymentForPendingInvoice = async (req: any, res: Response) => {
     });
 
   } catch (error) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: (error as Error).message });
+    }
     console.error('Error fetching pending invoice:', error);
     return res.status(500).json({
       success: false,
@@ -3194,8 +3268,11 @@ export const savePaymentForInvoice = async (req: Request, res: Response) => {
     let totalTax = 0;
     for (const id of invoiceIds) {
       const inv = await Invoice.findByPk(id);
-      if (inv && inv.getDataValue("totaltax")) {
-        totalTax += Number(inv.getDataValue("totaltax")) || 0;
+      if (inv) {
+        assertTenantOwnership(inv, 'Invoice');
+        if (inv.getDataValue("totaltax")) {
+          totalTax += Number(inv.getDataValue("totaltax")) || 0;
+        }
       }
     }
 
@@ -3275,12 +3352,30 @@ export const getCompletedList = async (req: any, res: any) => {
       });
     }
 
+    const company = await Company.findByPk(companyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found' });
+    }
+    assertTenantOwnership(company, 'Company');
+
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     // Build where conditions
     const whereConditions: any = {
       companyId: companyId,
       createdAt: {
         [Op.between]: [startDate, endDate]
-      }, invoiceStatus: ORDER.STATUS.PAYMENTCOMPLETED
+      },
+      invoiceStatus: ORDER.STATUS.PAYMENTCOMPLETED,
+      ...tenantCondition,
     };
 
     // Find all completed invoices with required associations
@@ -3334,6 +3429,9 @@ export const getCompletedList = async (req: any, res: any) => {
     });
 
   } catch (error) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: (error as Error).message });
+    }
     console.error('Error fetching completed orders:', error);
     return res.status(500).json({
       success: false,
@@ -3371,6 +3469,7 @@ export const editMonthlyInvoice = async (req: Request, res: Response) => {
         message: "Monthly Invoice not found",
       });
     }
+    assertTenantOwnership(existingMonthly, 'MonthlyInvoice');
 
     if (existingMonthly.closeStatus === 1) {
       return res.status(400).json({
@@ -3381,6 +3480,7 @@ export const editMonthlyInvoice = async (req: Request, res: Response) => {
 
     const company = await Company.findOne({ where: { companyId: companyId || existingMonthly.companyId } });
     if (!company) return res.status(404).json({ success: false, message: "Company not found" });
+    assertTenantOwnership(company, 'Company');
 
     // Normalize incoming routes array
     let rawRoutes: any[] = [];
@@ -3633,6 +3733,9 @@ export const editMonthlyInvoice = async (req: Request, res: Response) => {
       },
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: error.message });
+    }
     console.error("editMonthlyInvoice error:", error);
     return res.status(500).json({
       success: false,
@@ -3666,6 +3769,7 @@ export const changeMonthlyInvoiceNumber = async (req: Request, res: Response) =>
         message: "Monthly invoice not found",
       });
     }
+    assertTenantOwnership(monthly, 'MonthlyInvoice');
 
     const companyId = monthly.companyId;
 
@@ -3677,6 +3781,7 @@ export const changeMonthlyInvoiceNumber = async (req: Request, res: Response) =>
         message: "Company not found",
       });
     }
+    assertTenantOwnership(company, 'Company');
 
     const companyCode = (company as any).companyCode;
     if (!companyCode) {
@@ -3721,6 +3826,9 @@ export const changeMonthlyInvoiceNumber = async (req: Request, res: Response) =>
       newInvoiceNumber,
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: error.message });
+    }
     console.error("changeMonthlyInvoiceNumber error:", error);
     return res.status(500).json({
       success: false,

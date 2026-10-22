@@ -411,34 +411,35 @@ export default function ListCompletedOrders() {
                     if (viewType === "monthly") fetchMonthly();
                     else fetchRegular();
                   }}
-                  className="w-full h-[44px] rounded-lg font-semibold bg-[#275981] text-white hover:bg-[#1f4867]"
+                  className="w-full h-[44px] rounded-lg font-bold text-xs uppercase tracking-wider bg-teal-600 text-white hover:bg-teal-700 transition shadow-sm"
                 >
-                  Search
+                  Search Records
                 </button>
               </div>
             </div>
 
-
-            {/* ✅ Tabs (keep below filters if you want) */}
+            {/* Tabs */}
             <div className="flex gap-2 whitespace-nowrap">
               <button
                 onClick={() => setViewType("regular")}
-                className={`px-4 py-2 rounded font-semibold ${viewType === "regular"
-                    ? "bg-[#275981] text-white"
-                    : "bg-gray-200 text-gray-700"
-                  }`}
+                className={`px-4 py-2 rounded-lg font-bold text-xs transition ${
+                  viewType === "regular"
+                    ? "bg-[#0f1c3f] text-white shadow-sm border border-[#0f1c3f]"
+                    : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-300"
+                }`}
               >
-                Regular
+                Single-Trip / Regular
               </button>
 
               <button
                 onClick={() => setViewType("monthly")}
-                className={`px-4 py-2 rounded font-semibold ${viewType === "monthly"
-                    ? "bg-[#275981] text-white"
-                    : "bg-gray-200 text-gray-700"
-                  }`}
+                className={`px-4 py-2 rounded-lg font-bold text-xs transition ${
+                  viewType === "monthly"
+                    ? "bg-[#0f1c3f] text-white shadow-sm border border-[#0f1c3f]"
+                    : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-300"
+                }`}
               >
-                Monthly
+                Monthly Consolidated
               </button>
             </div>
           </div>

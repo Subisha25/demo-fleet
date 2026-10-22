@@ -57,7 +57,7 @@ const [cancelLoading, setCancelLoading] = useState(false);
       render: (row) => (
         <span
           onClick={() => handleView(row)}
-          className="hover:text-blue-800 font-bold cursor-pointer"
+          className="text-teal-700 hover:text-teal-900 font-bold cursor-pointer hover:underline transition"
         >
           {row.bookingCode}
         </span>

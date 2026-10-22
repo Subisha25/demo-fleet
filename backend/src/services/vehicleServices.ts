@@ -15,6 +15,8 @@ import { Request} from 'express';
 import { Op } from 'sequelize';
 import { Invoice } from '../models/invoice';
 import { ClosePending } from '../models/closepending';
+import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
+import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 
 
 // GET All Vehicles
@@ -29,12 +31,22 @@ export const getAllVehiclesForWeb = async (req: any, res: Response) => {
         }
 
         const { isDeleted } = req.query; // Use 'isDeleted' from the query string
+        const ctx = getTenantContext();
+        const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+        const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+        const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+          ? {}
+          : tenantId === ROOT_TENANT_ID
+            ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+            : { tenantId };
+
         let vehicles;
 
         if (isDeleted === '1') {
             // Fetch soft-deleted vehicles (trashed)
             vehicles = await Vehicle.unscoped().findAll({
-                where: { isDeleted: true },
+                where: { isDeleted: true, ...tenantCondition },
         include: [
           {
             model: Drivers,
@@ -46,6 +58,7 @@ export const getAllVehiclesForWeb = async (req: any, res: Response) => {
         } else {
             // Fetch active vehicles by default
             vehicles = await Vehicle.findAll({
+                where: { ...tenantCondition },
                 include: [
           {
             model: Drivers,
@@ -75,9 +88,6 @@ export const getAllVehicles = async (req: any, res: Response) => {
       return res.status(403).json({ message: "Not Authorized" });
     }
 
-    const { isDeleted } = req.query;
-    let vehicles;
-
     const includeOptions = [
       {
         model: VehicleType,
@@ -99,15 +109,29 @@ export const getAllVehicles = async (req: any, res: Response) => {
       },
     ];
 
+    const { isDeleted } = req.query;
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
+    let vehicles;
+
     if (isDeleted === "1") {
       // Fetch soft-deleted vehicles
       vehicles = await Vehicle.unscoped().findAll({
-        where: { isDeleted: true },
+        where: { isDeleted: true, ...tenantCondition },
         include: includeOptions,
       });
     } else {
       // Fetch active vehicles
       vehicles = await Vehicle.findAll({
+        where: { ...tenantCondition },
         include: includeOptions,
       });
     }
@@ -140,6 +164,7 @@ export const softDeleteVehicle = async (req: any, res: Response) => {
         if (!vehicle) {
             return res.status(404).json({ message: 'Vehicle not found' });
         }
+        assertTenantOwnership(vehicle);
 
         await vehicle.update({ isDeleted: true });
 
@@ -147,7 +172,10 @@ export const softDeleteVehicle = async (req: any, res: Response) => {
             message: 'Vehicle moved to trash successfully',
             vehicleId
         });
-    } catch (err) {
+    } catch (err: any) {
+        if (isTenantError(err)) {
+            return res.status(403).json({ message: err.message });
+        }
         console.error('Error soft-deleting vehicle:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
@@ -168,6 +196,7 @@ export const restoreVehicle = async (req: any, res: Response) => {
         if (!vehicle) {
             return res.status(404).json({ message: 'Vehicle not found' });
         }
+        assertTenantOwnership(vehicle);
         
         await vehicle.update({ isDeleted: false });
 
@@ -175,7 +204,10 @@ export const restoreVehicle = async (req: any, res: Response) => {
             message: 'Vehicle restored successfully',
             vehicleId
         });
-    } catch (err) {
+    } catch (err: any) {
+        if (isTenantError(err)) {
+            return res.status(403).json({ message: err.message });
+        }
         console.error('Error restoring vehicle:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
@@ -191,20 +223,22 @@ export const deleteVehicle = async (req: any, res: Response) => {
             return res.status(403).json({ message: 'Not Authorized' });
         }
 
-        // Use `destroy` to permanently delete the record
-        const rowsDeleted = await Vehicle.destroy({
-            where: { vehicleId }
-        });
-
-        if (rowsDeleted === 0) {
+        const vehicle = await Vehicle.unscoped().findByPk(vehicleId);
+        if (!vehicle) {
             return res.status(404).json({ message: 'Vehicle not found' });
         }
+        assertTenantOwnership(vehicle);
+
+        await vehicle.destroy();
 
         res.status(200).json({
             message: 'Vehicle permanently deleted successfully',
             vehicleId
         });
-    } catch (err) {
+    } catch (err: any) {
+        if (isTenantError(err)) {
+            return res.status(403).json({ message: err.message });
+        }
         console.error('Error permanently deleting vehicle:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
@@ -224,8 +258,7 @@ export const getVehicleById = async (req: any, res: Response) => {
       include: [
         {
           model: Drivers,
-          as: "drivers", 
-          //attributes: ["id", "driverName"],
+          as: "driver", 
           required: false, 
         },
       ],
@@ -234,9 +267,13 @@ export const getVehicleById = async (req: any, res: Response) => {
         if (!vehicle) {
             return res.status(404).json({ message: 'Vehicle not found' });
         }
+        assertTenantOwnership(vehicle);
 
         res.status(200).json({ message: 'Vehicle retrieved successfully', vehicle });
-    } catch (err) {
+    } catch (err: any) {
+        if (isTenantError(err)) {
+            return res.status(403).json({ message: err.message });
+        }
         console.error('Error fetching vehicle:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
@@ -261,6 +298,7 @@ export const updateVehicle = async (req: any, res: Response) => {
         if (!vehicle) {
             return res.status(404).json({ message: 'Vehicle not found' });
         }
+        assertTenantOwnership(vehicle);
 
            if (newImages.length > 0) {
       updateData.vehicleImg = newImages;
@@ -283,7 +321,10 @@ export const updateVehicle = async (req: any, res: Response) => {
             message: 'Vehicle updated successfully',
             vehicle: updatedVehicle
         });
-    } catch (err) {
+    } catch (err: any) {
+        if (isTenantError(err)) {
+            return res.status(403).json({ message: err.message });
+        }
         console.error('Error updating vehicle:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
@@ -318,6 +359,7 @@ export const updateVehicleStatus = async (req: any, res: Response) => {
     if (!vehicle) {
       return res.status(404).json({ message: 'Vehicle not found' });
     }
+    assertTenantOwnership(vehicle);
 
     await vehicle.update({ availableStatus });
 
@@ -326,7 +368,10 @@ export const updateVehicleStatus = async (req: any, res: Response) => {
       vehicleId: vehicleId,
       availableStatus,
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
     console.error('Error updating vehicle status:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -336,8 +381,18 @@ export const updateVehicleStatus = async (req: any, res: Response) => {
 // GET Available Vehicles
 export const getAvailableVehicles = async (req: any, res: Response) => {
     try {
+        const ctx = getTenantContext();
+        const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+        const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+        const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+          ? {}
+          : tenantId === ROOT_TENANT_ID
+            ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+            : { tenantId };
+
         const vehicles = await Vehicle.findAll({
-            where: { availableStatus: 'AVAILABLE' },
+            where: { availableStatus: 'AVAILABLE', ...tenantCondition },
         });
 
         res.status(200).json({
@@ -353,10 +408,19 @@ export const getAvailableVehicles = async (req: any, res: Response) => {
 
 export const getAssignedTrip = async (req: any, res: Response) => {
     try {
+        const ctx = getTenantContext();
+        const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+        const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+        const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+          ? {}
+          : tenantId === ROOT_TENANT_ID
+            ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+            : { tenantId };
      
     const bookings = await Booking.findAll({ where: { 
-       //  bookingStatus: ORDER.STATUS.CONFIRMED,
-        confirmStatus: ORDER.STATUS.CONFIRMED 
+        confirmStatus: ORDER.STATUS.CONFIRMED,
+        ...tenantCondition
     },
       include: [{
           model: Drivers,

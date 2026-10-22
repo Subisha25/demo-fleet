@@ -22,6 +22,11 @@ router.get("/download/invoice/:fileName", async (req: Request, res: Response) =>
     const { fileName } = req.params;
     const { token } = req.query;
 
+    const safeFileName = path.basename(fileName);
+    if (!safeFileName || safeFileName !== fileName || fileName.includes('..')) {
+      return res.status(400).json({ message: "Invalid file name" });
+    }
+
     if (!token || typeof token !== "string") {
       return res.status(401).json({ message: "Missing or invalid token" });
     }
@@ -41,7 +46,7 @@ router.get("/download/invoice/:fileName", async (req: Request, res: Response) =>
       return res.status(403).json({ message: "Token not valid for this file" });
     }
 
-    const filePath = path.join(process.cwd(), "uploads", "invoices", fileName);
+    const filePath = path.join(process.cwd(), "uploads", "invoices", safeFileName);
     console.log("path ",filePath," name ",fileName);
     const downloadName = payload.downloadName || fileName;
     res.setHeader('Content-Type', 'application/pdf');
@@ -70,10 +75,15 @@ router.get("/download/month-invoice/:fileName", async (req: Request, res: Respon
   try {
     const { fileName } = req.params;
     const { token } = req.query;
-   const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
+
+    const safeFileName = path.basename(fileName);
+    if (!safeFileName || safeFileName !== fileName || fileName.includes('..')) {
+      return res.status(400).json({ message: "Invalid file name" });
+    }
+
+    const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
     if (!token || typeof token !== "string") {
-      console.error("Missing or invalid token");
       return res.status(401).json({ message: "Missing or invalid token" });
     }
  
@@ -82,18 +92,16 @@ router.get("/download/month-invoice/:fileName", async (req: Request, res: Respon
     try {
       payload = jwt.verify(token, JWT_SECRET);
     } catch (err) {
-      console.error("Token verification failed:", err);
       return res.status(401).json({ message: "Invalid or expired token" });
     }
  
     // Check token matches the requested file
     if (payload.fileName !== fileName) {
-      console.error(`Token fileName mismatch. Token: ${payload.fileName}, Requested: ${fileName}`);
       return res.status(403).json({ message: "Token not valid for this file" });
     }
  
-    // ✅ FIX: Monthly invoices are in 'monthly' subfolder
-    const filePath = path.join(process.cwd(), "uploads", "invoices", "monthly", fileName);
+    // Monthly invoices are in 'monthly' subfolder
+    const filePath = path.join(process.cwd(), "uploads", "invoices", "monthly", safeFileName);
    
     console.log(`Attempting to download file from: ${filePath}`);
  
@@ -142,6 +150,11 @@ router.get("/download/oncall-invoice/:fileName", async (req: Request, res: Respo
     const { fileName } = req.params;
     const { token } = req.query;
 
+    const safeFileName = path.basename(fileName);
+    if (!safeFileName || safeFileName !== fileName || fileName.includes('..')) {
+      return res.status(400).json({ message: "Invalid file name" });
+    }
+
     if (!token || typeof token !== "string") {
       return res.status(401).json({ message: "Missing or invalid token" });
     }
@@ -159,7 +172,7 @@ router.get("/download/oncall-invoice/:fileName", async (req: Request, res: Respo
       return res.status(403).json({ message: "Token not valid for this file" });
     }
 
-    const filePath = path.join(process.cwd(), "uploads", "oncallinvoice", fileName);
+    const filePath = path.join(process.cwd(), "uploads", "oncallinvoice", safeFileName);
     
     if (!fs.existsSync(filePath)) {
       return res.status(404).send("OnCall Invoice not found");

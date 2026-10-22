@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import PageLayout from '../../../components/PageLayout';
-// import { DataTable, Column } from '../../../components/DataTable';
 import { Customer } from '../../../components/DataTable/types';
 import { showToast } from '../../../components/AlertBox';
 import {
@@ -10,6 +9,13 @@ import {
   CreditCard,
   ArrowRight,
   LucideIcon,
+  Truck,
+  Users,
+  ShieldAlert,
+  Calendar,
+  Building,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -23,10 +29,9 @@ import {
   Legend,
 } from 'recharts';
 
-import {CircularProgressbarWithChildren, buildStyles } from 'react-circular-progressbar';
+import { CircularProgressbarWithChildren, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
 import axiosInstance from '../../../utils/axiosInstance';
-
 
 interface MonthlyBooking {
   year: number;
@@ -40,154 +45,158 @@ interface StatCardProps {
   title: string;
   count: number | string;
   icon: LucideIcon;
-  backgroundColor: string;
-  textColor: string;
+  badgeText: string;
+  badgeColor: string;
+  accentColor: string;
   viewMoreLink: string;
 }
-const Card = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-  <div className={`bg-white rounded-xl shadow-md ${className}`}>
-    {children}
-  </div>
-);
-
-const CardContent = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-  <div className={`p-4 ${className}`}>
-    {children}
-  </div>
-);
-
 
 const StatCard: React.FC<StatCardProps> = ({
   title,
   count,
   icon: Icon,
-  backgroundColor,
-  textColor,
+  badgeText,
+  badgeColor,
+  accentColor,
   viewMoreLink,
 }) => {
   return (
-    <div
-      className={`relative flex-1 p-4 shadow-md ${textColor} flex flex-col justify-between transition-all hover:scale-[1.02] cursor-pointer h-32 overflow-hidden group`}
-    style={{ backgroundColor,borderRadius: '4px', }}
-    >
-      <div className="absolute bottom-[10px] right-[10px] z-0 opacity-10">
-        <Icon size={80} />
-      </div>
-
-      <div className="flex items-center justify-between z-10 relative">
-        <div>
-          <p className=" uppercase font-medium tracking-wide opacity-80">{title}</p>
-          <p className="font-bold mt-1">{count}</p>
+    <div className="bg-white rounded-xl border border-[#E0DAD1] p-5 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between group">
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${badgeColor}`}>
+            {badgeText}
+          </span>
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${accentColor}`}>
+            <Icon size={20} />
+          </div>
         </div>
+        <p className="text-xs font-semibold text-[#7A7570] uppercase tracking-wider">{title}</p>
+        <p className="text-3xl font-extrabold text-[#1C1A18] mt-1">{count}</p>
       </div>
 
       <a
         href={viewMoreLink}
-        className={`text-sm font-medium absolute bottom-0 left-0 right-0 h-10 flex items-center justify-between px-4 text-white uppercase opacity-0 group-hover:opacity-100 transform translate-y-full group-hover:translate-y-0 transition-all duration-300 ease-in-out z-20
-          ${backgroundColor === 'bg-blue-500' ? 'bg-blue-600' :
-            backgroundColor === 'bg-red-500' ? 'bg-red-600' :
-            backgroundColor === 'bg-emerald-500' ? '#AFB1AE' :
-            backgroundColor === 'bg-purple-600' ? 'bg-purple-700' : 'bg-gray-700'
-          }`}
+        className="mt-4 pt-3 border-t border-[#FAF8F5] flex items-center justify-between text-xs font-semibold text-[#C04E24] hover:text-[#A43D1A] transition group-hover:translate-x-0.5"
       >
-        <span>View More</span>
-        <ArrowRight size={16} className="ml-2" />
+        <span>View Details</span>
+        <ArrowRight size={14} className="ml-1 text-[#C04E24] transition group-hover:translate-x-1" />
       </a>
     </div>
   );
 };
 
+interface FleetOverviewData {
+  tenant?: {
+    id: string;
+    companyName: string;
+    contactPerson: string;
+    contactEmail: string;
+    contactPhone: string;
+    status: string;
+  };
+  subscription?: {
+    plan: string;
+    billingCycle: string;
+    status: string;
+    startDate: string;
+    endDate: string;
+    daysRemaining: number;
+    isExpiringSoon: boolean;
+    inGracePeriod: boolean;
+    isSuspended: boolean;
+  };
+  quotas?: {
+    vehicles: { current: number; limit: number };
+    drivers: { current: number; limit: number };
+    employees: { current: number; limit: number };
+    companies: { current: number; limit: number };
+  };
+}
 
 const Dashboard: React.FC = () => {
-  const [hoveredCardIndex, setHoveredCardIndex] = useState<number>(-1);
-   const [confirmPendingCount, setConfirmPendingCount] = useState<number>(0);
-const [paymentPendingCount, setPaymentPendingCount] = useState<number>(0);
-const [closedOrdersCount, setClosedOrdersCount] = useState<number>(0); 
-const [completedOrdersCount, setCompletedOrdersCount] = useState<number>(0);
+  const [confirmPendingCount, setConfirmPendingCount] = useState<number>(0);
+  const [paymentPendingCount, setPaymentPendingCount] = useState<number>(0);
+  const [closedOrdersCount, setClosedOrdersCount] = useState<number>(0); 
+  const [completedOrdersCount, setCompletedOrdersCount] = useState<number>(0);
   const [bookingData, setBookingData] = useState<MonthlyBooking[]>([]);
   const [yearRange, setYearRange] = useState<string>('');
   const [pendingPercentage, setPendingPercentage] = useState<number>(0);
   const [completedPercentage, setCompletedPercentage] = useState<number>(0);
-
+  const [fleetOverview, setFleetOverview] = useState<FleetOverviewData | null>(null);
 
   const cardData: StatCardProps[] = [
     {
       title: 'Confirm Pending Orders',
       count: confirmPendingCount,
       icon: Clock,
-      backgroundColor: 'rgb(33 91 187)',
-      textColor: '',
+      badgeText: 'Action Required',
+      badgeColor: 'bg-[#FFF8E1] text-[#B76E00] border border-[#FFE082]',
+      accentColor: 'bg-[#FFF8E1] text-[#B76E00]',
       viewMoreLink: '/orders/confirmpending',
     },
     {
       title: 'Payment Pending Orders',
       count: paymentPendingCount,
       icon: CreditCard,
-      backgroundColor: 'rgb(211 173 22)',
-      textColor: '',
+      badgeText: 'Billing Due',
+      badgeColor: 'bg-[#FDF6F0] text-[#C04E24] border border-[#F3D0BD]',
+      accentColor: 'bg-[#FDF6F0] text-[#C04E24]',
       viewMoreLink: '/orders/paymentpending',
     },
     {
       title: 'Close Pending Orders',
       count: closedOrdersCount,
       icon: AlertCircle,
-      backgroundColor: 'rgb(219 124 58)',
-      textColor: '',
+      badgeText: 'In Progress',
+      badgeColor: 'bg-[#F5F2EB] text-[#843217] border border-[#E0DAD1]',
+      accentColor: 'bg-[#F5F2EB] text-[#843217]',
       viewMoreLink: '/orders/closepending',
     },
     {
-      title: 'Completed   ',
+      title: 'Completed Trips',
       count: completedOrdersCount,
       icon: CheckCircle,
-      backgroundColor: '#AFB1AE',
-      textColor: '',
+      badgeText: 'Fulfilled',
+      badgeColor: 'bg-[#E8F5E9] text-[#2E7D32] border border-[#C8E6C9]',
+      accentColor: 'bg-[#E8F5E9] text-[#2E7D32]',
       viewMoreLink: '/orders/completed',
     },
   ];
 
-useEffect(() => {
-  const fetchCounts = async () => {
-    try {
-      // Confirm Pending Orders
-      const confirmRes = await axiosInstance.get('/emp/confirmPendingOrderCountWeb');
-      setConfirmPendingCount(confirmRes.data.count);
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const confirmRes = await axiosInstance.get('/emp/confirmPendingOrderCountWeb');
+        setConfirmPendingCount(confirmRes.data.count || 0);
 
-      // Payment Pending Orders
-      const paymentRes = await axiosInstance.get('/emp/paymentPendingOrderCount');
-      setPaymentPendingCount(paymentRes.data.count);
+        const paymentRes = await axiosInstance.get('/emp/paymentPendingOrderCount');
+        setPaymentPendingCount(paymentRes.data.count || 0);
 
-      // Closed Orders
-      const closedRes = await axiosInstance.get('/order/status/confirmed');
-      setClosedOrdersCount(closedRes.data.data.length); // backend returns orders array
+        const closedRes = await axiosInstance.get('/order/status/confirmed');
+        setClosedOrdersCount(closedRes.data?.data?.length || 0);
 
-      // Completed Orders
-      const completedRes = await axiosInstance.get('/emp/getcompletedlist');
-      setCompletedOrdersCount(completedRes.data.data.length);
+        const completedRes = await axiosInstance.get('/emp/getcompletedlist');
+        setCompletedOrdersCount(completedRes.data?.data?.length || 0);
+      } catch (err) {
+        // Handled silently
+      }
+    };
 
-    } catch (err) {
-      
-       showToast('Error fetching order counts:', 'error');
-    }
-  };
+    fetchCounts();
+  }, []);
 
-  fetchCounts();
-}, []);
-
- useEffect(() => {
+  useEffect(() => {
     const fetchData = async () => {
       try {
-        // 📊 Invoice status counts
-        const statusRes = await axiosInstance.get(
-          "/invoiceRoutes/invoice/status-count"
-        );
-        if (statusRes.data.success) {
-          setPendingPercentage(parseFloat(statusRes.data.data.pendingPercentage));
-          setCompletedPercentage(parseFloat(statusRes.data.data.completedPercentage));
+        const statusRes = await axiosInstance.get('/invoiceRoutes/invoice/status-count');
+        if (statusRes.data?.success) {
+          setPendingPercentage(parseFloat(statusRes.data.data.pendingPercentage) || 0);
+          setCompletedPercentage(parseFloat(statusRes.data.data.completedPercentage) || 0);
         }
 
-        // 📊 Monthly bookings
         const bookingsRes = await axiosInstance.get('/order/getmonthlybookings');
-        if (bookingsRes.data.success) {
+        if (bookingsRes.data?.success && Array.isArray(bookingsRes.data.data)) {
           const formatted = bookingsRes.data.data.map((item: MonthlyBooking) => ({
             date: `${MONTHS[item.month - 1]}`,
             totalBookings: item.totalBookings,
@@ -195,106 +204,330 @@ useEffect(() => {
           }));
 
           const years = bookingsRes.data.data.map((item: MonthlyBooking) => item.year);
-          const minYear = Math.min(...years);
-          const maxYear = Math.max(...years);
-
-          setYearRange(minYear === maxYear ? `${minYear}` : `${minYear} - ${maxYear}`);
+          if (years.length > 0) {
+            const minYear = Math.min(...years);
+            const maxYear = Math.max(...years);
+            setYearRange(minYear === maxYear ? `${minYear}` : `${minYear} - ${maxYear}`);
+          }
           setBookingData(formatted);
         }
+
+        // Fetch Fleet Overview (tenant quotas & subscription lifecycle)
+        try {
+          const overviewRes = await axiosInstance.get('/tenants/dashboard/overview');
+          if (overviewRes.data?.success) {
+            setFleetOverview(overviewRes.data.data);
+          }
+        } catch (e) {
+          // Fallback or SuperAdmin
+        }
       } catch (err) {
-        showToast("Error fetching dashboard data", "error");
+        showToast('Error fetching dashboard telemetry', 'error');
       }
     };
 
     fetchData();
   }, []);
 
+  const sub = fleetOverview?.subscription;
+  const quotas = fleetOverview?.quotas;
 
   return (
-    <PageLayout>
-      <div>
-            <h2 className="text-3xl font-bold text-gray-800 py-3">DashBoard</h2>
+    <PageLayout breadcrumbName="Operations Dashboard">
+      <div className="space-y-6">
 
-    
+        {/* 1. Subscription Renewal Alert Banner (Days <= 2) */}
+        {sub?.isExpiringSoon && !sub?.inGracePeriod && !sub?.isSuspended && (
+          <div className="bg-[#FFF8E1] border-l-4 border-[#B76E00] p-4 rounded-xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-[#FFE082] rounded-lg text-[#B76E00]">
+                <Clock size={22} />
+              </div>
+              <div>
+                <h4 className="font-bold text-[#843217] text-sm">Subscription Renewal Alert</h4>
+                <p className="text-xs text-[#5C5752]">
+                  Your {sub?.plan?.toUpperCase()} subscription expires in <span className="font-bold text-[#B76E00]">{sub?.daysRemaining} day(s)</span> on {new Date(sub?.endDate || '').toLocaleDateString()}. Renew now to avoid dispatch disruption.
+                </p>
+              </div>
+            </div>
+            <a
+              href="/billing/checkout"
+              className="px-4 py-2 bg-[#C04E24] hover:bg-[#A43D1A] text-white text-xs font-bold rounded-lg shadow-sm self-start md:self-auto transition"
+            >
+              Renew Plan Now
+            </a>
+          </div>
+        )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-4 gap-4">
-        {cardData.map((card, index) => (
+        {/* 2. Grace Period Banner (Day 1 - Day 3) */}
+        {sub?.inGracePeriod && !sub?.isSuspended && (
+          <div className="bg-[#FFF3E0] border-l-4 border-[#E65100] p-4 rounded-xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-[#FFE0B2] rounded-lg text-[#E65100]">
+                <ShieldAlert size={22} />
+              </div>
+              <div>
+                <h4 className="font-bold text-[#BF360C] text-sm">Subscription in Grace Period</h4>
+                <p className="text-xs text-[#5C5752]">
+                  Your subscription expired on {new Date(sub?.endDate || '').toLocaleDateString()}. You have 3 days of grace access remaining before vehicle dispatch is suspended.
+                </p>
+              </div>
+            </div>
+            <a
+              href="/billing/checkout"
+              className="px-4 py-2 bg-[#C04E24] hover:bg-[#A43D1A] text-white text-xs font-bold rounded-lg shadow-sm self-start md:self-auto transition"
+            >
+              Settle Due Payment
+            </a>
+          </div>
+        )}
+
+        {/* 3. Day 4+ Suspension Banner */}
+        {sub?.isSuspended && (
+          <div className="bg-[#FFEBEE] border-l-4 border-[#C62828] p-4 rounded-xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-[#FFCDD2] rounded-lg text-[#C62828]">
+                <AlertCircle size={22} />
+              </div>
+              <div>
+                <h4 className="font-bold text-[#B71C1C] text-sm">Operations Suspended (Unpaid Subscription)</h4>
+                <p className="text-xs text-[#5C5752]">
+                  Grace period ended. New booking dispatches are currently blocked. Permitted read-only access and billing renewal remain available.
+                </p>
+              </div>
+            </div>
+            <a
+              href="/billing/checkout"
+              className="px-4 py-2 bg-[#C04E24] hover:bg-[#A43D1A] text-white text-xs font-bold rounded-lg shadow-sm self-start md:self-auto transition"
+            >
+              Reactivate Dispatch Now
+            </a>
+          </div>
+        )}
+
+        {/* Top Header Banner in Charcoal & Terracotta Accent (No Blue) */}
+        <div className="bg-[#1C1A18] border-b-4 border-[#C04E24] rounded-xl p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="bg-[#C04E24]/20 text-[#DE8A66] border border-[#C04E24]/30 text-[11px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                Enterprise Dispatch v3.0
+              </span>
+              <span className="text-[#EDE9E3] text-xs">Isolated Tenant Telemetry</span>
+            </div>
+            <h1 className="text-2xl font-bold text-white tracking-tight">
+              {fleetOverview?.tenant?.companyName ? `${fleetOverview.tenant.companyName} Operations` : 'Fleet Operations Dashboard'}
+            </h1>
+            <p className="text-xs text-[#EDE9E3] mt-1">Real-time trip progression, quota telemetry, and consolidated invoice metrics.</p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <a
+              href="/orders/confirmpending"
+              className="px-3 py-2 bg-[#C04E24] hover:bg-[#A43D1A] text-white font-bold text-xs rounded-lg transition shadow-sm flex items-center gap-1.5"
+            >
+              <span>Review Bookings</span>
+            </a>
+            <a
+              href="/tenants/list"
+              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-[#FAF8F5] font-semibold text-xs rounded-lg border border-[#E0DAD1]/20 transition flex items-center gap-1.5"
+            >
+              <span>Fleet Settings</span>
+            </a>
+            <a
+              href="/billing/checkout"
+              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-[#FAF8F5] font-semibold text-xs rounded-lg border border-[#E0DAD1]/20 transition flex items-center gap-1.5"
+            >
+              <span>Subscription & Plans</span>
+            </a>
+          </div>
+        </div>
+
+        {/* Fleet Quota Meters (When available from tenant scope) */}
+        {quotas && (
+          <div className="bg-white rounded-xl border border-[#E0DAD1] p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-[#FAF8F5]">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} className="text-[#C04E24]" />
+                <h3 className="text-xs font-bold text-[#1C1A18] uppercase tracking-wider">
+                  Plan Quota Utilization ({sub?.plan?.toUpperCase() || 'PRO'} Plan)
+                </h3>
+              </div>
+              <span className="text-xs text-[#7A7570]">
+                Cycle: <strong className="text-[#1C1A18] capitalize">{sub?.billingCycle || 'monthly'}</strong>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Vehicles */}
+              <div className="p-3 bg-[#FAF8F5] rounded-lg border border-[#E0DAD1]">
+                <div className="flex items-center justify-between text-xs text-[#5C5752] mb-1">
+                  <span className="flex items-center gap-1 font-semibold"><Truck size={14} className="text-[#C04E24]" /> Vehicles</span>
+                  <span className="font-bold text-[#1C1A18]">{quotas.vehicles.current} / {quotas.vehicles.limit}</span>
+                </div>
+                <div className="w-full bg-[#E0DAD1] h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-[#C04E24] h-full rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.round((quotas.vehicles.current / quotas.vehicles.limit) * 100))}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Drivers */}
+              <div className="p-3 bg-[#FAF8F5] rounded-lg border border-[#E0DAD1]">
+                <div className="flex items-center justify-between text-xs text-[#5C5752] mb-1">
+                  <span className="flex items-center gap-1 font-semibold"><Users size={14} className="text-[#C04E24]" /> Drivers</span>
+                  <span className="font-bold text-[#1C1A18]">{quotas.drivers.current} / {quotas.drivers.limit}</span>
+                </div>
+                <div className="w-full bg-[#E0DAD1] h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-[#C04E24] h-full rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.round((quotas.drivers.current / quotas.drivers.limit) * 100))}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Employees */}
+              <div className="p-3 bg-[#FAF8F5] rounded-lg border border-[#E0DAD1]">
+                <div className="flex items-center justify-between text-xs text-[#5C5752] mb-1">
+                  <span className="flex items-center gap-1 font-semibold"><Users size={14} className="text-[#C04E24]" /> Employees</span>
+                  <span className="font-bold text-[#1C1A18]">{quotas.employees.current} / {quotas.employees.limit}</span>
+                </div>
+                <div className="w-full bg-[#E0DAD1] h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-[#C04E24] h-full rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.round((quotas.employees.current / quotas.employees.limit) * 100))}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Corporate Clients */}
+              <div className="p-3 bg-[#FAF8F5] rounded-lg border border-[#E0DAD1]">
+                <div className="flex items-center justify-between text-xs text-[#5C5752] mb-1">
+                  <span className="flex items-center gap-1 font-semibold"><Building size={14} className="text-[#C04E24]" /> Companies</span>
+                  <span className="font-bold text-[#1C1A18]">{quotas.companies.current} / {quotas.companies.limit}</span>
+                </div>
+                <div className="w-full bg-[#E0DAD1] h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-[#C04E24] h-full rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.round((quotas.companies.current / quotas.companies.limit) * 100))}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 4 Primary KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {cardData.map((card, index) => (
             <StatCard
               key={index}
               title={card.title}
               count={card.count}
               icon={card.icon}
-              backgroundColor={card.backgroundColor}
-              textColor="text-white"
+              badgeText={card.badgeText}
+              badgeColor={card.badgeColor}
+              accentColor={card.accentColor}
               viewMoreLink={card.viewMoreLink}
             />
           ))}
-      </div>
+        </div>
 
-  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Bookings Chart */}
-          <div className="col-span-2 bg-white rounded-xl shadow-md">
-            <div className="flex items-center justify-between px-4 py-2 border-b">
-              <h3 className="text-lg font-semibold text-gray-700">
-                Monthly Bookings 
-                <span className="ml-2 text-sm text-gray-500">({yearRange})</span>
-              </h3>
+        {/* Visual Telemetry Grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Monthly Bookings Composed Chart */}
+          <div className="xl:col-span-2 bg-white rounded-xl border border-[#E0DAD1] shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#FAF8F5] flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-[#1C1A18] uppercase tracking-wider">
+                  Monthly Booking Volume
+                </h3>
+                <p className="text-xs text-[#7A7570] mt-0.5">Trips completed and confirmed {yearRange && `(${yearRange})`}</p>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-1 bg-[#FAF8F5] text-[#1C1A18] border border-[#E0DAD1] rounded-md">
+                Aggregated Trends
+              </span>
             </div>
-            <div className="p-4">
-              <ResponsiveContainer width="100%" height={300}>
-                <ComposedChart data={bookingData}>
-                  <CartesianGrid stroke="#f5f5f5" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="totalBookings" fill="#3B82F6" name="Bookings" />
+            <div className="p-5">
+              <ResponsiveContainer width="100%" height={290}>
+                <ComposedChart data={bookingData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid stroke="#FAF8F5" strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tick={{ fill: '#7A7570', fontSize: 12 }} />
+                  <YAxis tick={{ fill: '#7A7570', fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1C1A18',
+                      borderColor: '#262320',
+                      borderRadius: '8px',
+                      color: '#ffffff',
+                      fontSize: '12px',
+                    }}
+                    labelStyle={{ color: '#DE8A66', fontWeight: 700 }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                  <Bar dataKey="totalBookings" fill="#C04E24" radius={[4, 4, 0, 0]} name="Total Bookings" />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Pending vs Completed Circle Chart */}
-          <div className="bg-white rounded-xl shadow-md">
-            <div className="flex items-center justify-between px-4 py-2 border-b">
-              <h3 className="text-lg font-semibold text-gray-700">Invoice Status</h3>
+          {/* Invoice Fulfillment Donut Chart */}
+          <div className="bg-white rounded-xl border border-[#E0DAD1] shadow-sm overflow-hidden flex flex-col justify-between">
+            <div className="px-5 py-4 border-b border-[#FAF8F5]">
+              <h3 className="text-sm font-bold text-[#1C1A18] uppercase tracking-wider">
+                Invoice Settlement Health
+              </h3>
+              <p className="text-xs text-[#7A7570] mt-0.5">Ratio of completed vs pending payments</p>
             </div>
-            <div className="p-6 flex flex-col items-center gap-6">
-              <div className="w-40 h-40 relative">
+
+            <div className="p-6 flex flex-col items-center justify-center flex-1">
+              <div className="w-40 h-40 relative my-2">
                 <CircularProgressbarWithChildren
                   value={completedPercentage}
-                  strokeWidth={12}
+                  strokeWidth={10}
                   styles={buildStyles({
-                    pathColor: "#10B981", // ✅ Green for Completed
-                    trailColor: "#FACC15", // ✅ Yellow for Pending
-                    textColor: "#111827",
+                    pathColor: "#C04E24", // Terracotta for Completed
+                    trailColor: "#E0DAD1", // Warm Grey for Pending
+                    strokeLinecap: "round",
                   })}
                 >
                   <div className="text-center">
-                    <p className="text-xl font-bold text-gray-800">
+                    <p className="text-2xl font-black text-[#1C1A18]">
                       {completedPercentage.toFixed(1)}%
                     </p>
-                    <p className="text-sm text-gray-500">Completed</p>
+                    <p className="text-[11px] font-semibold text-[#7A7570] uppercase tracking-wider">Settled</p>
                   </div>
                 </CircularProgressbarWithChildren>
               </div>
 
-              {/* Legends */}
-              <div className="flex gap-6">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                  <p className="text-sm">Completed: {completedPercentage.toFixed(1)}%</p>
+              {/* Status Breakdown Pills */}
+              <div className="w-full grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-[#FAF8F5]">
+                <div className="p-2.5 rounded-lg bg-[#FDF6F0] border border-[#F3D0BD] text-center">
+                  <div className="flex items-center justify-center gap-1.5 mb-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#C04E24]"></span>
+                    <span className="text-[11px] font-bold text-[#843217] uppercase">Paid / Settled</span>
+                  </div>
+                  <p className="text-base font-extrabold text-[#C04E24]">{completedPercentage.toFixed(1)}%</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-yellow-400"></span>
-                  <p className="text-sm">Pending: {pendingPercentage.toFixed(1)}%</p>
+
+                <div className="p-2.5 rounded-lg bg-[#FAF8F5] border border-[#E0DAD1] text-center">
+                  <div className="flex items-center justify-center gap-1.5 mb-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#B76E00]"></span>
+                    <span className="text-[11px] font-bold text-[#1C1A18] uppercase">Pending Due</span>
+                  </div>
+                  <p className="text-base font-extrabold text-[#1C1A18]">{pendingPercentage.toFixed(1)}%</p>
                 </div>
               </div>
             </div>
+
+            <div className="px-5 py-3 bg-[#FAF8F5] border-t border-[#E0DAD1] flex items-center justify-between text-xs text-[#5C5752]">
+              <span className="font-medium">Direct billing sync</span>
+              <a href="/invoice/pending" className="text-[#C04E24] hover:text-[#A43D1A] font-bold hover:underline">
+                Open Billing &rarr;
+              </a>
+            </div>
           </div>
         </div>
-
-
       </div>
     </PageLayout>
   );

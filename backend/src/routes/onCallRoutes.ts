@@ -4,20 +4,21 @@ import { authMiddleware } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
-router.post('/createOncallInvoice', createOncallInvoice);
-router.get('/getAll', getAllOnCallInvoices);
-router.get('/getById/:onCallBillId', getOnCallInvoiceById);
-router.put('/edit/:onCallBillId', editOnCallInvoice);
-router.post('/generatePdf', downloadOncallInvoicePDF); 
+router.post('/createOncallInvoice', authMiddleware, createOncallInvoice);
+router.get('/getAll', authMiddleware, getAllOnCallInvoices);
+router.get('/getById/:onCallBillId', authMiddleware, getOnCallInvoiceById);
+router.put('/edit/:onCallBillId', authMiddleware, editOnCallInvoice);
+router.post('/generatePdf', authMiddleware, downloadOncallInvoicePDF); 
 router.put(
   "/update-oncall-invoice/:onCallBillId",
+  authMiddleware,
   updateOnCallInvoice
 );
-router.delete('/remove-item/:onCallInvoiceItemId', removeOnCallInvoiceItem);
-
+router.delete('/remove-item/:onCallInvoiceItemId', authMiddleware, removeOnCallInvoiceItem);
 
 router.delete(
   "/onCallInvoice/:onCallBillId",
+  authMiddleware,
   deleteOnCallInvoice
 );
 

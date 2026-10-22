@@ -247,13 +247,15 @@ return (
     <span onClick={() => { scrollToSection("home"); setMenuOpen(false); }} className="py-4 border-b cursor-pointer">Home</span>
     <span onClick={() => { scrollToSection("about"); setMenuOpen(false); }} className="py-4 border-b cursor-pointer">About</span>
     <span onClick={() => { scrollToSection("services"); setMenuOpen(false); }} className="py-4 border-b cursor-pointer">Services</span>
+    <span onClick={() => { navigate("/pricing"); setMenuOpen(false); }} className="py-4 border-b cursor-pointer">Pricing</span>
+    <span onClick={() => { navigate("/register-fleet"); setMenuOpen(false); }} className="py-4 border-b cursor-pointer text-[#C04E24] font-bold">Register Fleet</span>
     <span onClick={() => { scrollToSection("portfolio"); setMenuOpen(false); }} className="py-4 border-b cursor-pointer">Portfolio</span>
     <span onClick={() => { scrollToSection("contact"); setMenuOpen(false); }} className="py-4 border-b cursor-pointer">Contact</span>
 
     <div className="mt-6">
       <button
         onClick={() => navigate("/fromdata")}
-        className="w-full px-5 py-3 rounded-full font-semibold text-[18px] bg-[#FFEC00] text-[#122163]"
+        className="w-full px-5 py-3 rounded-full font-semibold text-[18px] bg-[#C04E24] text-white shadow"
       >
         Attach Car To Company
       </button>
@@ -262,7 +264,7 @@ return (
     <div className="mt-4">
       <button
         onClick={() => navigate("/adminlogin")}
-        className="w-full px-5 py-3 rounded-full font-semibold text-[18px] border-2 border-[#122163] text-[#122163] bg-transparent"
+        className="w-full px-5 py-3 rounded-full font-semibold text-[18px] border-2 border-[#1C1A18] text-[#1C1A18] bg-transparent"
       >
         Login
       </button>
@@ -506,10 +508,12 @@ return (
 
 
         <button onClick={() => scrollToSection("home")}>Home</button>
-                  <button onClick={() => scrollToSection("about")}>About</button>
-                  <button onClick={() => scrollToSection("services")}>Services</button>
-                  <button onClick={() => scrollToSection("portfolio")}>Portfolio</button>
-                  <button onClick={() => scrollToSection("contact")}>Contact</button>
+        <button onClick={() => scrollToSection("about")}>About</button>
+        <button onClick={() => scrollToSection("services")}>Services</button>
+        <button onClick={() => { navigate("/pricing"); window.scrollTo(0, 0); }}>Pricing</button>
+        <button onClick={() => { navigate("/register-fleet"); window.scrollTo(0, 0); }} className="hover:text-yellow-300 font-bold">Register Fleet</button>
+        <button onClick={() => scrollToSection("portfolio")}>Portfolio</button>
+        <button onClick={() => scrollToSection("contact")}>Contact</button>
 
 {isScrolled && (
   <button
@@ -533,9 +537,9 @@ return (
       navigate("/fromdata");
       window.scrollTo(0, 0);
     }}
-    className={`px-4 py-1.5 rounded-md text-sm font-medium border 
+    className={`px-4 py-1.5 rounded-md text-sm font-semibold border 
       transition-all duration-300 transform
-      bg-[#FFEC00] text-blue-900 border-[#FFEC00]
+      bg-[#C04E24] text-white border-[#C04E24]
       hover:scale-105 hover:-translate-y-1 hover:shadow-lg
     `}
   >
@@ -549,9 +553,9 @@ return (
       navigate("/fromdata");
       window.scrollTo(0, 0);
     }}
-    className={`px-4 py-1.5 rounded-md text-sm font-medium border 
+    className={`px-4 py-1.5 rounded-md text-sm font-semibold border 
       transition-all duration-300 transform
-      bg-[#FFEC00] text-blue-900 border-[#FFEC00]
+      bg-[#C04E24] text-white border-[#C04E24]
       hover:scale-105 hover:-translate-y-1 hover:shadow-lg
     `}
   >
@@ -737,9 +741,9 @@ backgroundPosition: "left -80px top",  // ⭐ shifts image to left
       window.scrollTo(0, 0);
     }}
     className="
-      px-2 py-1.5 rounded-md text-[11px] font-medium border 
+      px-2 py-1.5 rounded-md text-[11px] font-semibold border 
       transition-all duration-300 transform
-      bg-[#FFEC00] text-blue-900 border-[#FFEC00]
+      bg-[#C04E24] text-white border-[#C04E24]
       hover:scale-105 hover:-translate-y-1 hover:shadow-lg
     "
   >
@@ -754,9 +758,9 @@ backgroundPosition: "left -80px top",  // ⭐ shifts image to left
       window.scrollTo(0, 0);
     }}
     className="
-      px-2 py-1.5 rounded-md text-[11px] font-medium border 
+      px-2 py-1.5 rounded-md text-[11px] font-semibold border 
       transition-all duration-300 transform
-      bg-[#FFEC00] text-blue-900 border-[#FFEC00]
+      bg-[#C04E24] text-white border-[#C04E24]
       hover:scale-105 hover:-translate-y-1 hover:shadow-lg
     "
   >

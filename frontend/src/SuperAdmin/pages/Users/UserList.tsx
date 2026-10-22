@@ -153,10 +153,10 @@ const handleSearch = () => {
       header: 'Status',
       accessor: 'status',
       render: (row) => (
-        <span className={`px-2 py-1 text-xs rounded ${
+        <span className={`badge-status ${
           row.status === 'active'
-            ? 'bg-green-100 text-green-800'
-            : 'bg-gray-200'
+            ? 'badge-status-active'
+            : 'badge-status-suspended'
         }`}>
           {row.status}
         </span>

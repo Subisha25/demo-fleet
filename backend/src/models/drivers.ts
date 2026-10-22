@@ -35,6 +35,13 @@ export class Drivers extends Model {
 })
   driverId!: string;
 
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+    defaultValue: 'e7b8a1c0-0000-0000-0000-000000000001',
+  })
+  tenantId!: string;
+
   @Column(DataType.STRING)
   driverName!: string;
 

@@ -1,16 +1,23 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-interface AuthenticatedRequest extends Request {
-  userId?: number;
+export interface AuthenticatedRequest extends Request {
+  userId?: any;
   role?: string;
+  roles?: string;
+  tenantId?: string;
+  companyId?: string;
+  email?: string;
 }
 
-export const authMiddleware = (  req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const authMiddleware = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   let token: string | undefined;
-  //console.log("jwtsecret: ",process.env.JWT_SECRET);
+
   if (req.headers.authorization?.startsWith('Bearer')) {
     token = req.headers.authorization.split(' ')[1];
+  } else if (req.query && req.query.token) {
+    // Also support ?token=... for document/PDF stream requests
+    token = String(req.query.token);
   }
 
   if (!token) {
@@ -18,15 +25,14 @@ export const authMiddleware = (  req: AuthenticatedRequest, res: Response, next:
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      userId: number;
-      roles: string;
-    };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
 
-    req.userId = decoded.userId;
-    req.role = decoded.roles;
-    //console.log("userid & role: ",req.userId,req.role);
-   
+    req.userId = decoded.userId !== undefined ? String(decoded.userId) : undefined;
+    req.role = decoded.role || decoded.roles;
+    req.roles = req.role;
+    req.tenantId = decoded.tenantId;
+    req.companyId = decoded.companyId;
+    req.email = decoded.email;
 
     next();
   } catch (err) {

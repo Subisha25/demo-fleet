@@ -7,12 +7,26 @@ import { MapCount } from '../models/mapCount';
 import XLSX from "xlsx";
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
+import bcrypt from "bcrypt";
+import crypto from "crypto";
+import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
+import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
     const { includeDeleted } = req.query;
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
 
     const query: any = {
+      where: tenantCondition,
       include: [
         {
           model: Company,
@@ -21,10 +35,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
           attributes: ["companyId", "companyName"],
         },
       ],
-    };[ 
-       
-      
-    ]
+    };
 
     const users =
       includeDeleted === "1"
@@ -49,6 +60,12 @@ export const getAllUserByCompany = async (req: Request, res: Response) => {
     const { companyId } = req.params;
     const { includeDeleted } = req.query;
 
+    const company = await Company.findByPk(companyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found' });
+    }
+    assertTenantOwnership(company);
+
     let users;
 
     if (includeDeleted === "1") {
@@ -69,6 +86,9 @@ export const getAllUserByCompany = async (req: Request, res: Response) => {
       data: users,
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     return res.status(500).json({
       success: false,
       message: "Error retrieving users",
@@ -91,6 +111,7 @@ export const getUserById = async (req: Request, res: Response) => {
         message: 'User not found',
       });
     }
+    assertTenantOwnership(user);
 
     return res.status(200).json({
       success: true,
@@ -98,6 +119,9 @@ export const getUserById = async (req: Request, res: Response) => {
       data: user,
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     return res.status(500).json({
       success: false,
       message: 'Error retrieving user',
@@ -318,23 +342,50 @@ export const uploadUsersFromExcel = async (req: Request, res: Response) => {
       userPayload.mobile = mobile;
       userPayload.companyId = companyId;
 
-      // Defaults
-      if (!userPayload.password) userPayload.password = "123456";
+      // Defaults & Secure password hashing
+      if (userPayload.password && userPayload.password !== "123456") {
+        userPayload.password = await bcrypt.hash(String(userPayload.password), 10);
+      } else {
+        const randomTempPassword = crypto.randomBytes(6).toString("hex");
+        userPayload.password = await bcrypt.hash(randomTempPassword, 10);
+      }
       if (!userPayload.role) userPayload.role = "user";
       if (!userPayload.status) userPayload.status = "active";
+
+      const ctx = getTenantContext();
+      const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+
+      // Validate company ownership to prevent attaching users to another tenant's company
+      const company = await Company.findByPk(companyId);
+      if (!company) {
+        skipped.push({ row, reason: "Company not found" });
+        continue;
+      }
+      try {
+        assertTenantOwnership(company, "Company");
+      } catch {
+        skipped.push({ row, reason: "Company belongs to another tenant" });
+        continue;
+      }
 
       const existingUser = await User.findOne({
         where: {
           [Op.or]: [{ email }, { mobile }],
+          tenantId
         },
       });
 
       if (existingUser) {
+        // Do not overwrite existing password if none was supplied in row
+        if (!normalizedRow.hasOwnProperty("password")) {
+          delete userPayload.password;
+        }
         await existingUser.update(userPayload);
         updated++;
       } else {
         await User.create({
           userId: uuidv4(),
+          tenantId,
           ...userPayload,
           isDeleted: false,
           isConfirmed: true,
@@ -391,6 +442,7 @@ export const updateUser = async (req: Request, res: Response) => {
         message: 'User not found',
       });
     }
+    assertTenantOwnership(user);
 
     // Validate gender if provided
     if (gender && !['male', 'female', 'other'].includes(gender)) {
@@ -486,6 +538,9 @@ if (companyName.toLowerCase().includes("danfoss")) {
       data: updatedUser
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     return res.status(400).json({
       success: false,
       message: 'Error updating user',
@@ -504,6 +559,7 @@ export const addNewAddress = async (req: Request, res: Response) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    assertTenantOwnership(user);
 
     //  Always fetch the latest addresses directly from DB
     const latestUser = await User.findByPk(id, { attributes: ['addresses'] });
@@ -536,7 +592,9 @@ export const addNewAddress = async (req: Request, res: Response) => {
 export const getUserAddresses = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const user = await User.findByPk(id, { attributes: ['userId', 'addresses'] });
+    const user = await User.findByPk(id, { attributes: ['userId', 'tenantId', 'addresses'] });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    assertTenantOwnership(user);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     return res.status(200).json({ success: true, data: user.addresses || [] });
   } catch (error: any) {
@@ -660,6 +718,7 @@ export const updateUserStatus = async (req: Request, res: Response) => {
         message: 'User not found',
       });
     }
+    assertTenantOwnership(user);
 
     await user.update({ status });
 
@@ -700,6 +759,7 @@ export const deleteUser = async (req: Request, res: Response) => {
         message: 'User not found',
       });
     }
+    assertTenantOwnership(user);
 
     // Check if user is already deleted
     if (user.isDeleted) {
@@ -720,6 +780,9 @@ export const deleteUser = async (req: Request, res: Response) => {
       message: 'User deleted successfully',
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     console.error('Error deleting user:', error);
     return res.status(500).json({
       success: false,
@@ -750,6 +813,7 @@ export const confirmUser = async (req: Request, res: Response) => {
         message: "User not found",
       });
     }
+    assertTenantOwnership(user);
 
     await user.update({ isConfirmed });
 
@@ -911,6 +975,7 @@ export const getUsersByCompany = async (req: Request, res: Response) => {
         message: 'Company not found',
       });
     }
+    assertTenantOwnership(company);
 
     const users = await User.findAll({
       where: { companyId },
@@ -927,6 +992,9 @@ export const getUsersByCompany = async (req: Request, res: Response) => {
       }
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     return res.status(500).json({
       success: false,
       message: 'Error retrieving users by company',
@@ -1035,6 +1103,7 @@ export const permanentDeleteUser = async (req: Request, res: Response) => {
         message: 'User not found',
       });
     }
+    assertTenantOwnership(user);
 
     await user.destroy(); // HARD DELETE
 
@@ -1178,6 +1247,7 @@ export const getManagerDetailsByUserId = async (req: Request, res: Response) => 
         message: "User not found",
       });
     }
+    assertTenantOwnership(user);
 
     return res.status(200).json({
       success: true,

@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.post('/empRegister', empRegister);
 router.post('/empLogin', empLogin);
+router.post('/login', empLogin);
 router.post('/createUser', registerUser); 
 router.post('/userLogin',userLogin)
 router.post('/companyLogin', CompanyLogin)

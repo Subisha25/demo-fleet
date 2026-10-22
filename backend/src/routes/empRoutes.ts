@@ -7,6 +7,7 @@ import { createVendor,createBooking,createCompany,confirmPendingOrderCount,payme
     createBookingForWebOnCall} from '../services/empServices';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { uploadCompanyLogo } from "../middleware/uploadConfig";
+import { requireCompanyQuota } from '../middleware/entitlementMiddleware';
 
 const router = express.Router();
 
@@ -16,7 +17,7 @@ router.post('/createVendor',authMiddleware, createVendor);
 router.post('/createBooking',authMiddleware, createBooking);
 router.post('/createBookingForWeb',authMiddleware,createBookingForWeb);
 router.post('/createBookingForWebOnCall',authMiddleware, createBookingForWebOnCall);
-router.post('/createCompany',uploadCompanyLogo.single("companyLogo"),authMiddleware, createCompany);
+router.post('/createCompany', uploadCompanyLogo.single("companyLogo"), authMiddleware, requireCompanyQuota, createCompany);
 
 // router.get('/getAllCompany',authMiddleware, getAllCompany);
 

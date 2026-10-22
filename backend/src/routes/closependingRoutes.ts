@@ -22,20 +22,21 @@ router.post('/createClosePending',authMiddleware,createClosePending);
 router.post('/createAppInvoice',authMiddleware,createAppInvoice);
 router.post("/monthlyInvoice/create", authMiddleware,createMonthlyInvoice);
 router.post("/monthlyInvoice/resend", authMiddleware,resendMonthlyInvoice);
-router.put("/monthlyInvoice/edit-monthly-invoice",editMonthlyInvoice);
+router.put("/monthlyInvoice/edit-monthly-invoice", authMiddleware, editMonthlyInvoice);
 router.get("/monthlyInvoice/getAll",authMiddleware, getAllMonthlyInvoiceDetails);
 router.get("/monthlyInvoice/getAllmonthly",authMiddleware, getAllMonthlyInvoice);
-router.get("/monthlyInvoice/filter", filterMonthlyInvoices);
+router.get("/monthlyInvoice/filter", authMiddleware, filterMonthlyInvoices);
 router.get(  "/monthlyInvoice/:monthlyInvoiceId/details", authMiddleware,  getMonthlyInvoiceDetailsById);
 router.get('/getPaymentForPendingInvoice/:invoiceId',authMiddleware,getPaymentForPendingInvoice);
 router.post('/savePaymentForInvoice',authMiddleware,savePaymentForInvoice);
-router.post('/paymentInitialise',paymentInitialise);
-router.post('/clearPaymentInitialise',clearPaymentInitialise);
-router.put("/monthly-invoice/edit", editMonthlyInvoice);
+router.post('/paymentInitialise', authMiddleware, paymentInitialise);
+router.post('/clearPaymentInitialise', authMiddleware, clearPaymentInitialise);
+router.put("/monthly-invoice/edit", authMiddleware, editMonthlyInvoice);
 router.get('/getCompletedList',authMiddleware,getCompletedList);
 
 router.delete(
   "/monthlyInvoice/:monthlyInvoiceId",
+  authMiddleware,
   deleteMonthlyInvoice
 );
 

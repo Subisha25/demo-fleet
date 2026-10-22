@@ -15,14 +15,13 @@ const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 
 // Protected routes (authentication required)
-router.post("/upload-users", upload.single("file"), uploadUsersFromExcel);
-// Protected routes (authentication required)
+router.post("/upload-users", authMiddleware, upload.single("file"), uploadUsersFromExcel);
 
-router.get('/getCurrentUser', getCurrentUser);
-router.get('/getUsersByStatus/:status', getUsersByStatus);
+router.get('/getCurrentUser', authMiddleware, getCurrentUser);
+router.get('/getUsersByStatus/:status', authMiddleware, getUsersByStatus);
 router.post('/logout', logout);
 
-router.get('/getAllUsers',authMiddleware, getAllUsers);
+router.get('/getAllUsers', authMiddleware, getAllUsers);
 
 router.get('/getAllUserByCompany/:companyId',authMiddleware, getAllUserByCompany);
 
@@ -36,22 +35,22 @@ router.put('/updateUser/:id',authMiddleware, updateUser);
 router.put('/:id/status',authMiddleware, updateUserStatus);
 router.delete('/deleteUser/:id',authMiddleware, deleteUser);
 
-router.post('/:id/address', addNewAddress);
-router.get('/:id/addresses', getUserAddresses);
-router.put('/:id/address/:idx', updateUserAddress);
-router.delete('/:id/address/:idx', deleteUserAddress);
+router.post('/:id/address', authMiddleware, addNewAddress);
+router.get('/:id/addresses', authMiddleware, getUserAddresses);
+router.put('/:id/address/:idx', authMiddleware, updateUserAddress);
+router.delete('/:id/address/:idx', authMiddleware, deleteUserAddress);
 
 
-router.get('/:userId/getUsersManager', getUserByManager);
+router.get('/:userId/getUsersManager', authMiddleware, getUserByManager);
 
 router.put('/restoreUser/:id', authMiddleware, restoreUser);
 router.delete('/permanentDeleteUser/:id', authMiddleware, permanentDeleteUser);
-router.get("/company/:companyId/managers", getCompanyManagers);
+router.get("/company/:companyId/managers", authMiddleware, getCompanyManagers);
 
 router.put("/app/appMapCount", appMapCount);
 
-router.get("/getManagerByUserId/:userId", getManagerDetailsByUserId);
-router.get("/getUsersByCompany/:companyId", getUsersByCompany);
+router.get("/getManagerByUserId/:userId", authMiddleware, getManagerDetailsByUserId);
+router.get("/getUsersByCompany/:companyId", authMiddleware, getUsersByCompany);
 
 
 export default router;

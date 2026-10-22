@@ -17,6 +17,10 @@ axiosInstance.interceptors.request.use(
     if (token && req.headers) {
       req.headers['Authorization'] = `Bearer ${token}`;
     }
+    const tenantId = localStorage.getItem('tenantId');
+    if (tenantId && req.headers) {
+      req.headers['X-Tenant-ID'] = tenantId;
+    }
     return req;
   },
 );

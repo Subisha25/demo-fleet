@@ -26,6 +26,8 @@ import {normalizeManagerEmails } from '../utils/email';
 import { sendSmsNotifications } from '../utils/smsNotifications';
 
 import crypto from "crypto";
+import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
+import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
 
 
 
@@ -33,7 +35,10 @@ export const createVendor = async (req: any, res: Response) => {
   const { vendorName, email, phno, password, address, country, state, city, vehicleId, companyId, vehicleCount, refererVendor } = req.body;
 
   try {
-    const existing = await Vendor.findOne({ where: { email } });
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+
+    const existing = await Vendor.findOne({ where: { email, tenantId } });
 
     if (req.role === ROLES.USER) {
       return res.status(403).json({ message: 'Not Authorized' });
@@ -45,7 +50,7 @@ export const createVendor = async (req: any, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const createdBy = req.user?.employeeId;
     const vendor = await Vendor.create({ vendorName, email, phno, password: hashedPassword,
-       address, country, state, city, vehicleId, companyId, vehicleCount, role, refererVendor, createdBy });
+       address, country, state, city, vehicleId, companyId, vehicleCount, role, refererVendor, createdBy, tenantId });
 
     res.status(201).json({ message: 'Registered successfully', vendor });
 
@@ -135,6 +140,9 @@ export const createBookingForWeb = async (req: any, res: Response) => {
     }
 
     
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || user?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+
     // ✅ Create booking properly
     const booking = await Booking.create({
       bookingDate,
@@ -166,19 +174,19 @@ export const createBookingForWeb = async (req: any, res: Response) => {
       dropLongitude,
       userId,
       bookingCreatedBy,
-        behalfOfName,
-        behalfOfPhone,
+      behalfOfName,
+      behalfOfPhone,
       autoApproveStatus,
       pickupArea,
       predefinedArea,
       approximatetds2,
       approximatetds1,
-        // ✅ ADD THESE
-  costCenter,
-  managerUserId,
-  driverTripStatus,
-  managerEmail,
+      costCenter,
+      managerUserId,
+      driverTripStatus,
+      managerEmail,
       createdBy,
+      tenantId,
     });
 
        // ================= DANFOSS MANAGER ALERT =================
@@ -462,6 +470,9 @@ export const createBookingForWebOnCall = async (req: any, res: Response) => {
     }
 
     
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || user?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+
     // ✅ Create booking properly
     const booking = await Booking.create({
       bookingDate,
@@ -493,20 +504,20 @@ export const createBookingForWebOnCall = async (req: any, res: Response) => {
       dropLongitude,
       userId,
       bookingCreatedBy,
-        behalfOfName,
-        behalfOfPhone,
+      behalfOfName,
+      behalfOfPhone,
       autoApproveStatus,
       pickupArea,
       predefinedArea,
       approximatetds2,
       approximatetds1,
-        // ✅ ADD THESE
-  costCenter,
-  managerUserId,
-  managerEmail,
+      costCenter,
+      managerUserId,
+      managerEmail,
       createdBy,
-        companyId,
-        selfName
+      companyId,
+      selfName,
+      tenantId,
     });
 
        // ================= DANFOSS MANAGER ALERT =================
@@ -763,15 +774,18 @@ const formattedBookingTime = parsedDateTime.format("HH:mm:ss");
      const driverTripStatus = STATUS.PENDING;
         const company = await Company.findByPk(user?.companyId);
 
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || user?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+
     // --- Create Booking ---
     const booking = await Booking.create({
-     // bookingDate: bookingDateAsDate, bookingTime: formattedBookingTime, pickupPoint, pickupCity, dropPoint, travellersCount,
       bookingDate: bookingDateAsDate, bookingTime:formattedBookingTime, pickupPoint, pickupCity, dropPoint, travellersCount,
       femaleCount, maleCount, remarks, purpose, confirmStatus, bookingStatus, vehicleId, driverId,
       vehicleTypeId, preferredType, roundTrip, pickupAirport, pickupStation, flightNo, trainNo, notes,  behalfOfName,behalfOfPhone,
       pickupLongitude, pickupLatitude, dropLatitude, dropLongitude, userId:createdBy,
       pickupArea, predefinedArea, approximatetds2, approximatetds1, createdBy, costCenter, managerUserId, managerEmail, autoApproveStatus,
-      driverTripStatus
+      driverTripStatus,
+      tenantId,
     });
 
          // ================= DANFOSS MANAGER ALERT =================
@@ -999,7 +1013,18 @@ const bookingWithVehicle = await Booking.findByPk(booking.bookingId);
 
 export const getAllBooking = async (req: Request, res: Response) => {
   try {
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     const bookings = await Booking.findAll({
+      where: { ...tenantCondition },
       include: [
         { model: VehicleType, required: false },
         { model: Vehicle, required: false },
@@ -1021,10 +1046,20 @@ export const getAllBooking = async (req: Request, res: Response) => {
 
 export const getAllPendingBooking = async (req: Request, res: Response) => {
   try {
-    console.log("hello");
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     const bookings = await Booking.findAll({
       where: {
-        bookingStatus: { [Op.in]: [STATUS.PENDING, STATUS.CONFIRMED] }
+        bookingStatus: { [Op.in]: [STATUS.PENDING, STATUS.CONFIRMED] },
+        ...tenantCondition,
       },
       attributes: [
         "bookingId",
@@ -1250,9 +1285,12 @@ export const createCompany = async (req: any, res: Response) => {
       return res.status(403).json({ message: "Not Authorized" });
     }
 
-    const existing = await Company.findOne({ where: { companyName } });
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+
+    const existing = await Company.findOne({ where: { companyName, tenantId } });
     if (existing) {
-      return res.status(400).json({ message: "Company already exists" });
+      return res.status(400).json({ message: "Company already exists in this fleet" });
     }
 
     //  normalize/split and store as array
@@ -1285,6 +1323,7 @@ export const createCompany = async (req: any, res: Response) => {
       priorMinutes,
       companyAddress, 
       managerApproval,
+      tenantId,
       isDeleted: 0,
       createdAt: new Date()
     });
@@ -1316,10 +1355,21 @@ export const confirmPendingOrderCount = async (req: any, res: Response) => {
       return res.status(403).json({ message: 'Not Authorized' });
     }
 
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     const bookings = await Booking.findAll({
       where: {
         confirmStatus: STATUS.PENDING,
-        bookingStatus: STATUS.PENDING
+        bookingStatus: STATUS.PENDING,
+        ...tenantCondition,
       },
       include: [
         { model: Vehicle, required: false },
@@ -1385,7 +1435,18 @@ export const confirmPendingOrderCountWeb = async (req: any, res: Response) => {
       return res.status(403).json({ message: 'Not Authorized' });
     }
 
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     const bookings = await Booking.findAll({
+      where: { ...tenantCondition },
       include: [
         { model: Vehicle, required: false },
         { model: VehicleType, required: false },
@@ -1447,13 +1508,28 @@ const userData = await User.findOne({ where: { userId: userId } });
 const company = await Company.findOne({ where:  { companyId: userData?.companyId } });
 console.log("company ",company?.companyName);
 if(!userData?.isManager) {
-           res.status(401).json({
+           return res.status(401).json({
         success: false,
         message: 'Please login as manager..'
       });
 }
+
+    if (company) {
+      assertTenantOwnership(company, "Company");
+    }
+
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
 const companyUsers = await User.findAll({
-      where: { companyId: company?.companyId },
+      where: { companyId: company?.companyId, ...tenantCondition },
       attributes: ["userId"],
     });
 
@@ -1464,6 +1540,7 @@ const companyUsers = await User.findAll({
         confirmStatus: STATUS.PENDING,
         bookingStatus: STATUS.PENDING,
         userId: { [Op.in]: companyUserIds },
+        ...tenantCondition,
       },
       include: [
         { model: Vehicle, required: false },
@@ -1482,6 +1559,9 @@ const companyUsers = await User.findAll({
 
   } catch (err) {
     console.error('Fetch Confirm Pending Orders Error:', err);
+    if (isTenantError(err)) {
+      return res.status(403).json({ error: (err as Error).message });
+    }
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -1495,11 +1575,21 @@ export const paymentPendingOrderCount = async (req: any, res: Response) => {
       return res.status(403).json({ message: "Not Authorized" });
     }
 
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     const { companyId, userId } = req.query;
 
-    const whereBooking: any = {};
+    const whereBooking: any = { ...tenantCondition };
     const whereUser: any = {};
-    const whereInvoice: any = {};
+    const whereInvoice: any = { ...tenantCondition };
 
     // filter only pending invoices
     whereInvoice.invoiceStatus = ORDER.STATUS.PENDING;
@@ -1689,6 +1779,12 @@ export const confirmPendingBooking = async (req: any, res: Response) => {
       return res.status(403).json({ message: 'Not Authorized' });
     }
 
+    const booking = await Booking.findByPk(bookingId);
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+    assertTenantOwnership(booking, 'Booking');
+
     const updateConfirm = await Booking.update({ pendingStatus: ORDER.STATUS.CONFIRMED },
       {
         where: {
@@ -1708,6 +1804,9 @@ export const confirmPendingBooking = async (req: any, res: Response) => {
     });
   } catch (err) {
     console.error('Update Confirm Status Error:', err);
+    if (isTenantError(err)) {
+      return res.status(403).json({ error: (err as Error).message });
+    }
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -1727,8 +1826,14 @@ export const confirmBookingByManager = async (req: any, res: Response) => {
         });
 
     if (!userAccess || userAccess.length === 0) {
-        return res.status(403).json({ message: 'Not Authorized except empManager' });
+        return res.status(403).json({ message: 'Not Authorized except empManager' });
       }
+
+    const booking = await Booking.findByPk(bookingId);
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+    assertTenantOwnership(booking, 'Booking');
 
     const updateConfirm = await Booking.update({ 
       bookingStatus: ORDER.STATUS.CONFIRMED, 
@@ -1832,6 +1937,9 @@ console.log("cancel needEmail:", needEmail);
     });
   } catch (err) {
     console.error('Update Confirm Status Error:', err);
+    if (isTenantError(err)) {
+      return res.status(403).json({ error: (err as Error).message });
+    }
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -1842,6 +1950,16 @@ export const paymentCompletedOrderCount = async (req: any, res: Response) => {
     if (role === ROLES.USER) {
       return res.status(403).json({ message: "Not Authorized" });
     }
+
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
 
     const { paymentNo, startDate, endDate } = req.query;
 
@@ -1886,6 +2004,7 @@ export const paymentCompletedOrderCount = async (req: any, res: Response) => {
           model: Invoice,
           as: "invoice", // ⚠️ If your alias is "invoices" or something else, change here
           required: true, // must have invoice
+          where: { ...tenantCondition },
           attributes: [
             "invoiceId",
             "invoiceNumber",
@@ -1914,6 +2033,7 @@ export const paymentCompletedOrderCount = async (req: any, res: Response) => {
             {
               model: Booking,
               required: false,
+              where: { ...tenantCondition },
               attributes: [
                 "bookingId",
                 "bookingCode",

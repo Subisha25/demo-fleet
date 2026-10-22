@@ -12,15 +12,17 @@ const router = express.Router();
 
 // Protected routes (authentication required)
 
+import { requireVehicleQuota, requireDriverQuota } from '../middleware/entitlementMiddleware';
+
 router.get('/getAllVendors',authMiddleware, getAllVendors);
 router.get('/:vendorId',authMiddleware, getVendorById);
 router.put('/:vendorId/update',authMiddleware,updateVendor);
 router.delete('/:vendorId/delete',authMiddleware,deleteVendor)
 
 router.post('/createVehicleType',uploadVehicleImg.array("vehicleImg", 5),authMiddleware, createVehicleType);
-router.post('/createVehicle',uploadVehicleImg.array("vehicleImg", 5),authMiddleware, createVehicle);
-router.post('/createVehicleMaster',authMiddleware, createVehicleMaster);
-router.post('/createDriver',authMiddleware, createDriver);
+router.post('/createVehicle', uploadVehicleImg.array("vehicleImg", 5), authMiddleware, requireVehicleQuota, createVehicle);
+router.post('/createVehicleMaster', authMiddleware, requireVehicleQuota, createVehicleMaster);
+router.post('/createDriver', authMiddleware, requireDriverQuota, createDriver);
 
 router.patch('/confirmBooking',authMiddleware, confirmBooking);
 router.patch('/confirmBookingforWeb',authMiddleware, confirmBookingforWeb);

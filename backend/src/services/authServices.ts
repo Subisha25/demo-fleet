@@ -10,7 +10,9 @@ import { USERS } from "../utils/costants";
 import { Op } from 'sequelize';
 import { sendEmailFromTemplate, fetchAllEmailConfs } from "../services/emailConfServices";
 const { ROLES } = USERS;
-import {normalizeManagerEmails } from '../utils/email';
+import { normalizeManagerEmails } from '../utils/email';
+import { ROOT_TENANT_ID } from '../context/tenantContext';
+import { validateRegistrationAgainstPolicy } from '../services/policyService';
 
 
 // Helper function to find user by mobile and return user data with type
@@ -110,7 +112,11 @@ export const empLogin = async (req: Request, res: Response) => {
         email: employee.email,
         role: employee.role,
         accessToken: Security.generateJwtToken(
-          { userId: employee.employeeId, roles: employee.role },
+          { 
+            userId: employee.employeeId, 
+            roles: employee.role,
+            tenantId: employee.tenantId || ROOT_TENANT_ID 
+          },
           config.security.jwtSecret,
           config.security.accessTokenExpiry
         ),
@@ -128,7 +134,11 @@ export const empLogin = async (req: Request, res: Response) => {
         email: vendor.email,
         role: vendor.role,              //admin
         accessToken: Security.generateJwtToken(
-          { userId: vendor.vendorId, roles: vendor.role },          //roles:admin
+          { 
+            userId: vendor.vendorId, 
+            roles: vendor.role,
+            tenantId: vendor.tenantId || ROOT_TENANT_ID 
+          },
           config.security.jwtSecret,
           config.security.accessTokenExpiry
         ),
@@ -156,7 +166,8 @@ export const empLogin = async (req: Request, res: Response) => {
           { 
             userId: user.userId, 
             roles: userRole, 
-            companyId: user.companyId 
+            companyId: user.companyId,
+            tenantId: user.tenantId || ROOT_TENANT_ID
           },
           config.security.jwtSecret,
           config.security.accessTokenExpiry
@@ -322,15 +333,13 @@ if (existingUserByMobile) {
       });
     }
 
-    const isDanfoss = company.companyName?.toLowerCase().includes("danfoss");
-
-    if (isDanfoss) {
-      if (!normalizedEmail.endsWith("@danfoss.com")) {
-        return res.status(400).json({
-          success: false,
-          message: "For Danfoss company, email must be @danfoss.com only."
-        });
-      }
+    // Dynamic company policy validation (backward-compatible fallback for Danfoss)
+    const policyCheck = await validateRegistrationAgainstPolicy(companyId, normalizedEmail, danfossuserId);
+    if (!policyCheck.valid) {
+      return res.status(400).json({
+        success: false,
+        message: policyCheck.message || "Registration violates company policy."
+      });
     }
 
     const managerEmails: string[] = normalizeManagerEmails(company.managerEmail as any);
@@ -351,6 +360,7 @@ if (existingUserByMobile) {
       mobile,
       password: hashedPassword,
       role: role || "user",
+      tenantId: company.tenantId || ROOT_TENANT_ID,
       gender,
       country,
       city,
@@ -364,11 +374,10 @@ if (existingUserByMobile) {
       isManager,
       state,
       pinCode,
-         danfossuserId: danfossuserId || null,
-  managerId: managerId || null,
-  managerEmail: managerEmail || null,
-  costCenter
-
+      danfossuserId: danfossuserId || null,
+      managerId: managerId || null,
+      managerEmail: managerEmail || null,
+      costCenter
     });
 
     const createdUser = await User.findByPk(newUser.userId, {
@@ -449,7 +458,9 @@ export const userLogin = async (req: Request, res: Response) => {
     const accessToken = Security.generateJwtToken(
       { 
         userId: user.userId,
-        roles: user.role
+        roles: user.role,
+        companyId: user.companyId,
+        tenantId: user.tenantId || ROOT_TENANT_ID
       },
       config.security.jwtSecret,
       config.security.accessTokenExpiry
@@ -533,6 +544,8 @@ export const CompanyLogin = async (req: Request, res: Response) => {
       {
         userId: user.userId,
         roles: updatedRole,
+        companyId: company.companyId,
+        tenantId: user.tenantId || company.tenantId || ROOT_TENANT_ID
       },
       config.security.jwtSecret,
       config.security.accessTokenExpiry
@@ -595,7 +608,8 @@ export const vendorLogin = async (req: Request, res: Response) => {
       accessToken: Security.generateJwtToken(
         { 
           userId: vendor.vendorId,
-          roles: vendor.role 
+          roles: vendor.role,
+          tenantId: vendor.tenantId || ROOT_TENANT_ID
         },
         config.security.jwtSecret,
         config.security.accessTokenExpiry
@@ -736,7 +750,8 @@ export const verifyOTPLogin = async (req: Request, res: Response) => {
     // Generate JWT token
     const tokenPayload = {
       userId: userResult.userData.id,
-      roles: userResult.userData.role
+      roles: userResult.userData.role,
+      tenantId: userResult.user?.tenantId || ROOT_TENANT_ID
     };
 
     const accessToken = Security.generateJwtToken(

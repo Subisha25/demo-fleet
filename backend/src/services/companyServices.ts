@@ -5,6 +5,8 @@ const { ROLES } = USERS;
 import { Op } from 'sequelize';
 import {normalizeManagerEmails } from '../utils/email';
 import { ORDER } from '../utils/costants';
+import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
+import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 
 
 export const getCompanyBySeoUrl = async (req: Request, res: Response) => {
@@ -36,17 +38,29 @@ export const getAllCompany = async (req: Request, res: Response) => {
   try {
 
     const { status } = req.query;
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     let company;
     if (status === '1') {
       company = await Company.unscoped().findAll({
         where: {
           isDeleted: true,
+          ...tenantCondition,
         },
       });
     } else {
       company = await Company.findAll({
         where: {
           isDeleted: false,
+          ...tenantCondition,
         },
       });
     }
@@ -104,6 +118,7 @@ export const getCompanyTaxes = async (req: Request, res: Response) => {
         message: "Company not found",
       });
     }
+    assertTenantOwnership(company);
 
     // ✅ tax only when allowTax is truthy
     let taxes: any[] = [];
@@ -124,6 +139,9 @@ export const getCompanyTaxes = async (req: Request, res: Response) => {
       taxes,
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     console.error("getCompanyWithTaxes error:", error);
     return res.status(500).json({
       success: false,
@@ -149,12 +167,16 @@ export const getCompanyById = async (req: Request, res: Response) => {
     if (!company) {
       return res.status(404).json({ message: 'Company not found' });
     }
+    assertTenantOwnership(company);
 
     res.status(200).json({
       message: 'Company retrieved successfully',
       data: company,
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     res.status(500).json({
       message: 'Error retrieving company',
       error: error.message,
@@ -289,6 +311,7 @@ export const updateCompany = async (req: any, res: Response) => {
     if (!company) {
       return res.status(404).json({ message: "Company not found" });
     }
+    assertTenantOwnership(company);
 
        const oldManagers = company.managerEmail
       ? normalizeManagerEmails(company.managerEmail)
@@ -374,6 +397,9 @@ export const updateCompany = async (req: any, res: Response) => {
 
 
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     res.status(500).json({
       message: "Error updating company",
       error: error.message
@@ -398,6 +424,7 @@ export const deleteCompany = async (req: any, res: Response) => {
     if (!company) {
       return res.status(404).json({ message: 'Company not found' });
     }
+    assertTenantOwnership(company);
 
     await company.update({ isDeleted: true });
     
@@ -434,6 +461,9 @@ export const deleteCompany = async (req: any, res: Response) => {
       },
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     console.error('Error deleting company:', error);
     return res.status(500).json({
       message: 'Error deleting company',
@@ -460,6 +490,7 @@ export const restoreCompany = async (req: any, res: Response) => {
     if (!company) {
       return res.status(404).json({ message: 'Company not found' });
     }
+    assertTenantOwnership(company);
 
     await company.update({ isDeleted: false });
 
@@ -482,6 +513,9 @@ export const restoreCompany = async (req: any, res: Response) => {
       },
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     console.error('Error restoring company:', error);
     res.status(500).json({
       message: 'Error restoring company',

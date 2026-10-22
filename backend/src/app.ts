@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from "cors";
+import { authMiddleware } from './middleware/authMiddleware';
+import { tenantMiddleware } from './middleware/tenantMiddleware';
 import authRoutes from './routes/authRoutes';
+import tenantRoutes from './routes/tenantRoutes';
 import empRoutes from './routes/empRoutes';
 import userRoutes from './routes/userRoutes';
 import vendorRoutes from './routes/vendorRoutes';
@@ -61,31 +64,34 @@ app.use(express.urlencoded({
 app.use('/', redirectRoute);
  const BASE_URL = config.baseurl.apibaseurl;
  console.log("url ap ",BASE_URL);
- const uploadsFolder = path.resolve(__dirname, '..', 'uploads'); 
-// console.log('__dirname (server):', __dirname);
-// console.log('Resolved uploadsFolder:', uploadsFolder);
-// console.log('uploadsFolder exists?', fs.existsSync(uploadsFolder));
-
-// Serve the whole uploads folder at /uploads
-app.use('/uploads', express.static(uploadsFolder));
+// Sensitive uploads locked down: only public subdirectories (/uploads/vehicleImg, /uploads/companyLogo) are served publicly below
 
  const vehiclePath = path.join(__dirname, '..', 'uploads', 'vehicleImg');
 console.log("Vehicle Static Path:", vehiclePath); // <-
 app.use(cors({
-//  origin: "http://93.127.139.232:3000",
-  //  origin: BASE_URL,
-  
-   origin:"*",
-  methods: ["GET", "POST", "PUT", "DELETE","PATCH"],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    // Dynamically allow requesting origin with credentials
+    return callback(null, true);
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   credentials: true,
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: ["Content-Type", "Authorization", "X-Tenant-ID", "x-tenant-id"]
 }));
 
+// Multi-tenant context resolution
+app.use(tenantMiddleware);
+
 app.use('/uploads/vehicleImg', express.static(path.join(__dirname, '..', '..', 'uploads', 'vehicleImg')));
-app.use('/uploads/signature', express.static(path.join(__dirname,  '..', '..', 'uploads', 'signature')));
+// Protected: Signatures require authentication (Bearer token or ?token=)
+app.use('/uploads/signature', authMiddleware, express.static(path.join(__dirname,  '..', '..', 'uploads', 'signature')));
 app.use('/uploads/companyLogo', express.static(path.join(__dirname,   '..', '..','uploads', 'companyLogo'))); 
 
 app.use('/api/auth', authRoutes);
+app.use('/api/tenants', tenantRoutes);
+app.use('/api/public', tenantRoutes);
+app.use('/api/admin', tenantRoutes);
 app.use('/api/emp', empRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/vendor', vendorRoutes);
@@ -112,6 +118,7 @@ app.use('/app/appRoutes',appRoutes);
 
 app.use(
   '/oncallinvoice',
+  authMiddleware,
   express.static(
     path.join(process.cwd(), 'uploads', 'oncallinvoice'),
     {
@@ -150,6 +157,7 @@ app.use(
 
 app.use(
   '/invoices',
+  authMiddleware,
   express.static(
     path.join(process.cwd(), 'uploads', 'invoices')
   )

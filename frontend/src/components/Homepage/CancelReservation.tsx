@@ -13,16 +13,16 @@ const CancelReservation: React.FC = () => {
         <nav className="text-sm text-gray-600 mb-3">
           <Link
             to="/"
-            className="text-green-700 font-medium hover:text-green-900 transition-colors duration-200"
+            className="text-[#C04E24] font-medium hover:text-[#A83F1A] transition-colors duration-200"
           >
             Home
           </Link>{' '}
           <span className="mx-2">›</span>{' '}
-          <span className="text-gray-700">Cancel Reservation</span>
+          <span className="text-[#2B2927]">Cancel Reservation</span>
         </nav>
 
         {/* Title */}
-        <h2 className="text-2xl md:text-3xl font-bold mb-4" style={{ color: '#003366' }}>
+        <h2 className="text-2xl md:text-3xl font-bold mb-4 text-[#1C1A18]">
           Cancel Reservation
         </h2>
         {/* Intro */}

@@ -8,6 +8,8 @@ import { Vehicle } from '../models/vehicle';
 import { VehicleType } from '../models';
 const {STATUS} = VEHICLESTATUS;
 import { Op } from "sequelize";
+import { assertTenantOwnership } from '../utils/tenantGuard';
+import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 // GET All Vehicle Masters
 export const getAllVehicleMaster = async (req: any, res: Response) => {
   try {
@@ -17,19 +19,18 @@ export const getAllVehicleMaster = async (req: any, res: Response) => {
     }
 
     const { status } = req.query;
-    let vehicles;
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
 
-   if (status === '1') {
-  // Trash view → only deleted vehicles
-  vehicles = await VehicleMaster.findAll({
-    where: { isDeleted: 1 }
-  });
-} else {
-  // Normal view → only active vehicles
-  vehicles = await VehicleMaster.findAll({
-    where: { isDeleted: 0 }
-  });
-}
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
+    const where: any = { isDeleted: status === '1' ? 1 : 0, ...tenantCondition };
+    const vehicles = await VehicleMaster.findAll({ where });
 
 
     // Map only required fields and send
@@ -72,6 +73,7 @@ export const updateVehicleMaster = async (req: any, res: Response) => {
 
     const vm = await VehicleMaster.findByPk(id);
     if (!vm) return res.status(404).json({ message: "Vehicle not found" });
+    assertTenantOwnership(vm);
 
     // Resolve names from IDs if provided (keeps both id and denormalized name columns in sync)
     let resolvedModelName = vehicleModelName ?? vm.vehicleModelName;
@@ -142,6 +144,7 @@ export const deleteVehicleMaster = async (req: any, res: Response) => {
     if (!vehicle) {
       return res.status(404).json({ message: 'Vehicle not found' });
     }
+    assertTenantOwnership(vehicle);
 
     await vehicle.update({ isDeleted: 1 });
 
@@ -170,6 +173,7 @@ export const restoreVehicleMaster = async (req: any, res: Response) => {
     if (!vehicle) {
       return res.status(404).json({ message: 'Vehicle not found' });
     }
+    assertTenantOwnership(vehicle);
 
     await vehicle.update({ isDeleted: 0 });
 

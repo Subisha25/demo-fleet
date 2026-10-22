@@ -14,6 +14,8 @@ import config from "../config/config";
 import { ORDER } from '../utils/costants';
 import { InvoiceSequence } from '../models/invoice_sequence';
 import { Sequelize } from 'sequelize';
+import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
+import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 // export const createOncallInvoice = async (
 //   req: Request,
 //   res: Response
@@ -810,6 +812,10 @@ export const createOncallInvoice = async (req: Request, res: Response) => {
     }
 
     const company = await Company.findByPk(companyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found' });
+    }
+    assertTenantOwnership(company);
 
     const companyName =
       company?.companyName || '';
@@ -879,6 +885,7 @@ export const createOncallInvoice = async (req: Request, res: Response) => {
       totalTaxAmount: JSON.stringify(taxBreakup),
       invoiceSubTotal: parseFloat(invoiceSubTotal.toFixed(2)),
       invoiceTaxBreakup: JSON.stringify(taxBreakup),
+      tenantId: company.tenantId || ROOT_TENANT_ID,
     });
 
     const commonInvoice = await Invoice.create({
@@ -887,6 +894,7 @@ export const createOncallInvoice = async (req: Request, res: Response) => {
       invoiceStatus: ORDER.STATUS.PENDING,
       startDate: new Date(),
       endDate: new Date(),
+      tenantId: company.tenantId || ROOT_TENANT_ID,
     });
 
     await invoice.update({
@@ -1013,7 +1021,10 @@ export const createOncallInvoice = async (req: Request, res: Response) => {
       onCallBillId: invoice.onCallBillId,
     });
 
-  } catch (error) {
+  } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     console.error('createOncallInvoice error:', error);
     return res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
@@ -1043,6 +1054,7 @@ export const deleteOnCallInvoice = async (
         message: "OnCall Invoice not found",
       });
     }
+    assertTenantOwnership(invoice);
 
     await invoice.update({
       isDeleted: true,
@@ -1060,6 +1072,9 @@ export const deleteOnCallInvoice = async (
       message: "OnCall Invoice deleted successfully.",
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     console.error("Delete OnCall Invoice Error:", error);
 
     return res.status(500).json({
@@ -1772,7 +1787,18 @@ const numberToWords = (num: number): string => {
 
 export const getAllOnCallInvoices = async (req: Request, res: Response) => {
   try {
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     const data = await OnCallInvoice.findAll({
+      where: { ...tenantCondition },
       include: [{ model: OnCallInvoiceItems, as: 'invoiceItems' }],
       order: [['createdAt', 'DESC']],
     });
@@ -1829,6 +1855,7 @@ export const getOnCallInvoiceById = async (
         message: 'Invoice not found',
       });
     }
+    assertTenantOwnership(invoice);
 
     return res.status(200).json({
       success: true,
@@ -1837,7 +1864,9 @@ export const getOnCallInvoiceById = async (
     });
 
   } catch (error: any) {
-
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -1856,6 +1885,7 @@ export const editOnCallInvoice = async (req: Request, res: Response) => {
     if (!invoice) {
       return res.status(404).json({ success: false, message: "Invoice not found" });
     }
+    assertTenantOwnership(invoice);
 
     // ── 2. Merge + deduplicate trip sheet numbers ──
     let existingTripSheets: string[] = [];
@@ -2020,6 +2050,9 @@ export const editOnCallInvoice = async (req: Request, res: Response) => {
     }
 
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -2039,6 +2072,12 @@ export const removeOnCallInvoiceItem = async (req: Request, res: Response) => {
     }
 
     const { onCallBillId, tripSheetNo } = item;
+
+    const parentInvoice = await OnCallInvoice.findByPk(onCallBillId);
+    if (!parentInvoice) {
+      return res.status(404).json({ success: false, message: 'Parent invoice not found' });
+    }
+    assertTenantOwnership(parentInvoice);
 
     // ── 2. Hard delete the item ──
     await item.destroy();
@@ -2145,6 +2184,9 @@ export const removeOnCallInvoiceItem = async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -2337,9 +2379,10 @@ export const updateOnCallInvoice = async (
 
       return res.status(404).json({
         success: false,
-        message: "Invoice not found",
+        message: "OnCall Invoice not found",
       });
     }
+    assertTenantOwnership(invoice);
 
     // ─────────────────────────────────────────
     // UPDATE INVOICE TABLE
@@ -2566,6 +2609,10 @@ export const updateOnCallInvoice = async (
 
     await transaction.rollback();
 
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
+
     console.log(error);
 
     return res.status(500).json({
@@ -2789,6 +2836,7 @@ export const changeOnCallInvoiceNumber = async (req: Request, res: Response) => 
         message: "OnCall invoice not found",
       });
     }
+    assertTenantOwnership(onCallInvoice);
 
     const companyId = onCallInvoice.companyId;
 
@@ -2847,6 +2895,9 @@ export const changeOnCallInvoiceNumber = async (req: Request, res: Response) => 
       newInvoiceNumber,
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     console.error("changeOnCallInvoiceNumber error:", error);
     return res.status(500).json({
       success: false,

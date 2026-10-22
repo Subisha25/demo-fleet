@@ -152,22 +152,22 @@ const handleForgetPassword = async () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+    <div className="min-h-screen bg-[#FAF8F5]">
      <SimpleHeader/>
 
       {/* Login Form */}
       <div className="flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
-          {/* Card with glassmorphism effect */}
-          <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
-            {/* Gradient Header */}
-         <div className="bg-gradient-to-r from-[#274782] to-[#352E6B] px-8 py-8 text-center">
-  <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-    <Lock className="text-white" size={32} />
-  </div>
-  <h2 className="text-2xl font-bold text-white mb-2">Welcome Back</h2>
-  <p className="text-blue-100 text-sm">Sign in to continue your journey</p>
-</div>
+          {/* Card with subtle warm shadow */}
+          <div className="bg-white rounded-2xl shadow-xl border border-[#E0DAD1] overflow-hidden">
+            {/* Charcoal & Terracotta Header */}
+            <div className="bg-[#1C1A18] border-b-4 border-[#C04E24] px-8 py-8 text-center">
+              <div className="w-16 h-16 bg-[#C04E24]/20 border border-[#C04E24]/40 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <Lock className="text-[#DE8A66]" size={30} />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Welcome Back</h2>
+              <p className="text-[#EDE9E3] text-sm">Sign in to your enterprise fleet portal</p>
+            </div>
 
 
             <form onSubmit={handleSubmit} className="px-8 py-8" noValidate>
@@ -179,13 +179,13 @@ const handleForgetPassword = async () => {
 
               {/* Email Field */}
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                <label className="block text-sm font-semibold text-[#1C1A18] mb-2">Email Address</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7A7570]" size={20} />
                   <input
                     type="email"
-                    className={`w-full pl-11 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#275981]/20 transition-all ${
-                      errors.email ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white focus:border-[#275981]'
+                    className={`w-full pl-11 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C04E24]/20 transition-all ${
+                      errors.email ? 'border-red-400 bg-red-50' : 'border-[#E0DAD1] bg-white focus:border-[#C04E24]'
                     }`}
                     value={email}
                     placeholder='Enter your email'
@@ -200,13 +200,13 @@ const handleForgetPassword = async () => {
 
               {/* Password Field */}
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+                <label className="block text-sm font-semibold text-[#1C1A18] mb-2">Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7A7570]" size={20} />
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    className={`w-full pl-11 pr-12 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#275981]/20 transition-all ${
-                      errors.password ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-white focus:border-[#275981]'
+                    className={`w-full pl-11 pr-12 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C04E24]/20 transition-all ${
+                      errors.password ? 'border-rose-400 bg-rose-50' : 'border-[#E0DAD1] bg-white focus:border-[#C04E24]'
                     }`}
                     value={password}
                     placeholder='Enter your password'
@@ -218,20 +218,20 @@ const handleForgetPassword = async () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#275981] transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7A7570] hover:text-[#C04E24] transition-colors"
                   >
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
-                {errors.password && <p className="text-red-500 text-xs mt-2 ml-1">{errors.password}</p>}
+                {errors.password && <p className="text-rose-500 text-xs mt-2 ml-1">{errors.password}</p>}
               </div>
 
               {/* Login Button */}
               <button
                 type="submit"
-className="w-full bg-gradient-to-r from-[#274782] to-[#352E6B] text-white py-3.5 px-4 rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                className="w-full bg-[#C04E24] hover:bg-[#A43D1A] text-white py-3.5 px-4 rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
               >
-                Sign In
+                Sign In to Enterprise Fleet
               </button>
 
               {/* Forgot Password */}
@@ -249,7 +249,7 @@ className="w-full bg-gradient-to-r from-[#274782] to-[#352E6B] text-white py-3.5
                     setErrors({});
                     setShowForgetModal(true);
                   }}
-                  className="text-sm text-[#275981] hover:text-[#3a7ba8] font-medium hover:underline transition-colors"
+                  className="text-sm text-[#C04E24] hover:text-[#A43D1A] font-semibold hover:underline transition-colors"
                 >
                   Forgot your password?
                 </button>
@@ -258,8 +258,8 @@ className="w-full bg-gradient-to-r from-[#274782] to-[#352E6B] text-white py-3.5
           </div>
 
           {/* Footer text */}
-          <p className="text-center text-sm text-gray-500 mt-6">
-            Protected by industry-standard encryption
+          <p className="text-center text-sm text-[#7A7570] mt-6">
+            Protected by Grace Cabs industry-standard encryption
           </p>
         </div>
       </div>
@@ -267,11 +267,11 @@ className="w-full bg-gradient-to-r from-[#274782] to-[#352E6B] text-white py-3.5
       {/* Forget Password Modal */}
    {showForgetModal && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-    <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+    <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-[#E0DAD1] animate-in fade-in zoom-in duration-200">
       {/* Modal Header */}
-      <div className="bg-gradient-to-r from-[#275981] to-[#3a7ba8] px-6 py-6">
+      <div className="bg-[#1C1A18] border-b-4 border-[#C04E24] px-6 py-6">
         <h3 className="text-xl font-bold text-white">Reset Your Password</h3>
-        <p className="text-blue-100 text-sm mt-1">Follow the steps to reset your password</p>
+        <p className="text-[#EDE9E3] text-xs mt-1">Follow the steps to reset your password securely</p>
       </div>
 
       <div className="p-6">
@@ -289,14 +289,14 @@ className="w-full bg-gradient-to-r from-[#274782] to-[#352E6B] text-white py-3.5
         {/* Step 1: Enter Email */}
         {step === 1 && (
           <>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+            <label className="block text-sm font-semibold text-[#1C1A18] mb-2">Email Address</label>
             <div className="relative mb-6">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7A7570]" size={18} />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#275981] focus:ring-2 focus:ring-[#275981]/20"
+                className="w-full pl-10 pr-4 py-2.5 border-2 border-[#E0DAD1] rounded-lg focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20"
                 placeholder="your@email.com"
               />
             </div>
@@ -304,7 +304,7 @@ className="w-full bg-gradient-to-r from-[#274782] to-[#352E6B] text-white py-3.5
             <div className="flex gap-3">
               <button
                 onClick={() => setShowForgetModal(false)}
-                className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium transition-colors"
+                className="flex-1 px-4 py-2.5 bg-[#EDE9E3] text-[#1C1A18] rounded-lg hover:bg-[#E0DAD1] font-medium transition-colors"
               >
                 Cancel
               </button>
@@ -313,8 +313,8 @@ className="w-full bg-gradient-to-r from-[#274782] to-[#352E6B] text-white py-3.5
                 disabled={!email}
                 className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
                   !email
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-[#275981] to-[#3a7ba8] text-white hover:shadow-lg hover:scale-[1.02]'
+                    ? 'bg-[#EDE9E3] text-[#7A7570] cursor-not-allowed'
+                    : 'bg-[#C04E24] hover:bg-[#A43D1A] text-white shadow hover:shadow-md'
                 }`}
               >
                 Send OTP
@@ -326,19 +326,19 @@ className="w-full bg-gradient-to-r from-[#274782] to-[#352E6B] text-white py-3.5
         {/* Step 2: Verify OTP */}
         {step === 2 && (
           <>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Enter OTP</label>
+            <label className="block text-sm font-semibold text-[#1C1A18] mb-2">Enter OTP</label>
             <input
               type="text"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
-              className="w-full mb-6 pl-3 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#275981] focus:ring-2 focus:ring-[#275981]/20"
+              className="w-full mb-6 pl-3 pr-4 py-2.5 border-2 border-[#E0DAD1] rounded-lg focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20"
               placeholder="Enter 6-digit OTP"
             />
 
             <div className="flex gap-3">
               <button
                 onClick={() => setStep(1)}
-                className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium transition-colors"
+                className="flex-1 px-4 py-2.5 bg-[#EDE9E3] text-[#1C1A18] rounded-lg hover:bg-[#E0DAD1] font-medium transition-colors"
               >
                 Back
               </button>
@@ -347,8 +347,8 @@ className="w-full bg-gradient-to-r from-[#274782] to-[#352E6B] text-white py-3.5
                 disabled={!otp}
                 className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
                   !otp
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-[#275981] to-[#3a7ba8] text-white hover:shadow-lg hover:scale-[1.02]'
+                    ? 'bg-[#EDE9E3] text-[#7A7570] cursor-not-allowed'
+                    : 'bg-[#C04E24] hover:bg-[#A43D1A] text-white shadow hover:shadow-md'
                 }`}
               >
                 Verify OTP
@@ -360,20 +360,20 @@ className="w-full bg-gradient-to-r from-[#274782] to-[#352E6B] text-white py-3.5
         {/* Step 3: New Password */}
         {step === 3 && (
           <>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">New Password</label>
+            <label className="block text-sm font-semibold text-[#1C1A18] mb-2">New Password</label>
             <div className="relative mb-6">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7A7570]" size={18} />
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full pl-10 pr-12 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#275981] focus:ring-2 focus:ring-[#275981]/20"
+                className="w-full pl-10 pr-12 py-2.5 border-2 border-[#E0DAD1] rounded-lg focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20"
                 placeholder="Enter new password"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#275981]"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7A7570] hover:text-[#C04E24]"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -382,7 +382,7 @@ className="w-full bg-gradient-to-r from-[#274782] to-[#352E6B] text-white py-3.5
             <div className="flex gap-3">
               <button
                 onClick={() => setStep(2)}
-                className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium transition-colors"
+                className="flex-1 px-4 py-2.5 bg-[#EDE9E3] text-[#1C1A18] rounded-lg hover:bg-[#E0DAD1] font-medium transition-colors"
               >
                 Back
               </button>
@@ -391,8 +391,8 @@ className="w-full bg-gradient-to-r from-[#274782] to-[#352E6B] text-white py-3.5
                 disabled={!newPassword}
                 className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
                   !newPassword
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-[#275981] to-[#3a7ba8] text-white hover:shadow-lg hover:scale-[1.02]'
+                    ? 'bg-[#EDE9E3] text-[#7A7570] cursor-not-allowed'
+                    : 'bg-[#C04E24] hover:bg-[#A43D1A] text-white shadow hover:shadow-md'
                 }`}
               >
                 Update Password

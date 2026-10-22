@@ -13,6 +13,9 @@ import {
   faFileLines
 } from '@fortawesome/free-solid-svg-icons';
 import { NavLink } from 'react-router-dom'; // ✅ Changed from Link to NavLink
+import { useTenant } from '../context/TenantContext';
+
+import GraceCabsLogo from './GraceCabsLogo';
 
 // Interface for menu items
 interface MenuItem {
@@ -28,6 +31,17 @@ const menu: MenuItem[] = [
     label: 'Dashboard',
     icon: faTachometerAlt,
     path: '/dashboard',
+  },
+  {
+    label: 'SaaS Tenants',
+    icon: faBuilding,
+    children: [
+      { label: 'Fleet Operators', path: '/tenants/list', icon: faList },
+      { label: 'Registration Queue', path: '/tenants/registrations', icon: faClipboardCheck },
+      { label: 'Provision Tenant', path: '/tenants/add', icon: faPlus },
+      { label: 'Corporate Policies', path: '/tenants/policies', icon: faClipboardList },
+      { label: 'Subscription & Billing', path: '/admin/billing', icon: faReceipt },
+    ],
   },
   {
     label: 'Master',
@@ -197,6 +211,7 @@ const menu: MenuItem[] = [
 const Sidebar: React.FC = () => {
   const [openDropdown, setOpenDropdown] = useState<string[]>([]);
   const [collapsed, setCollapsed] = useState(false);
+  const { currentTenant } = useTenant();
 
   const toggleDropdown = (label: string) => {
     setOpenDropdown((prev: any) =>
@@ -206,88 +221,101 @@ const Sidebar: React.FC = () => {
     );
   };
 
+  const tenantName = currentTenant?.brandingTokens?.portalTitle || currentTenant?.name || 'Grace Cabs';
+  const logoUrl = currentTenant?.brandingTokens?.logoUrl || '/images/favicon1.jpeg';
+
   return (
     <aside
-      className={`fixed left-0 top-0 h-screen flex flex-col shadow-lg transition-all duration-300 ease-in-out
-        ${collapsed ? 'w-20' : 'w-70'}
-        z-40 bg-[#275981] text-[#ebf4f6]
+      className={`fixed left-0 top-0 h-screen flex flex-col shadow-2xl transition-all duration-300 ease-in-out
+        ${collapsed ? 'w-20' : 'w-72'}
+        z-40 bg-[#1C1A18] text-[#E0DAD1] border-r border-[#2E2A26]
       `}
-      style={{ backdropFilter: 'blur(10px)' }}
     >
-  {/* Logo/Header */}
-<div className="sticky top-0 z-10">
-  <div className="flex items-center gap-3 px-4 pt-4 pb-2">
-    {/* Logo */}
-    <img 
-      src="/images/favicon1.jpeg" 
-      alt="Driver logo" 
-      className="h-11 w-12 rounded-full" 
-    />
+      {/* Brand Header */}
+      <div className="sticky top-0 z-10 bg-[#141312] border-b border-[#2E2A26] px-4 py-3.5">
+        <div className="flex items-center gap-3">
+          {collapsed ? (
+            <div className="w-10 h-10 rounded-xl bg-[#C04E24] flex items-center justify-center font-black text-white text-lg shadow-md">
+              GC
+            </div>
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <GraceCabsLogo size="sm" variant="light" showTagline={false} />
+            </div>
+          )}
+        </div>
+        {!collapsed && (
+          <div className="mt-2 pt-2 border-t border-[#2E2A26]/80 flex items-center justify-between">
+            <span className="text-xs font-bold text-white truncate max-w-[150px]">
+              {tenantName}
+            </span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#C04E24]/20 text-[#E9B195] border border-[#C04E24]/40 uppercase tracking-wider">
+              {currentTenant?.planTier || 'PRO'} Fleet
+            </span>
+          </div>
+        )}
+      </div>
 
-    {/* Text */}
-    <span className="text-xl font-bold text-white">
-      Grace Cabs
-    </span>
-  </div>
-</div>
-
-
-      {/* Menu */}
-      <nav className="flex-1 overflow-y-hidden hover:overflow-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent py-4 text-[#e8e9f2]">
+      {/* Navigation Menu */}
+      <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent py-3 px-2 text-slate-300">
         <ul className="space-y-1">
           {menu.map((item) => (
             <li key={item.label}>
               {item.children ? (
                 <>
-                  {/* Parent Menu */}
+                  {/* Parent Menu Item */}
                   <button
-                    className={`flex items-center w-full px-6 py-3 transition-colors duration-200 ${collapsed ? 'justify-center' : ''
-                      } hover:bg-white hover:text-black`}
+                    className={`flex items-center w-full px-3.5 py-2.5 rounded-lg transition-all duration-150 text-sm font-medium ${
+                      collapsed ? 'justify-center' : ''
+                    } hover:bg-white/10 hover:text-white ${
+                      openDropdown.includes(item.label) ? 'text-white bg-white/5' : 'text-slate-300'
+                    }`}
                     onClick={() => toggleDropdown(item.label)}
                   >
-                    <FontAwesomeIcon icon={item.icon} className={`text-lg ${collapsed ? '' : 'mr-3'}`} />
+                    <FontAwesomeIcon icon={item.icon} className={`text-base ${collapsed ? '' : 'mr-3 text-teal-400/90'}`} />
                     {!collapsed && <span className="flex-1 text-left">{item.label}</span>}
                     {!collapsed && (
                       <FontAwesomeIcon
                         icon={openDropdown.includes(item.label) ? faChevronDown : faChevronRight}
-                        className="ml-auto"
+                        className="ml-auto text-xs text-slate-400"
                       />
                     )}
                   </button>
 
-                  {/* Submenus */}
+                  {/* Submenu Dropdown */}
                   {openDropdown.includes(item.label) && !collapsed && (
-                    <ul className="ml-8 mt-1 space-y-1">
+                    <ul className="ml-5 pl-2 mt-1 space-y-1 border-l border-slate-700/60">
                       {item.children.map((subItem) => (
                         <li key={subItem.label}>
                           {subItem.children ? (
                             <>
-                              {/* Submenu with children */}
                               <button
-                                className="flex items-center w-full px-4 py-2 hover:bg-white hover:text-black transition-colors duration-200"
+                                className="flex items-center w-full px-3 py-2 rounded-md text-xs font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-colors duration-150"
                                 onClick={() => toggleDropdown(`${item.label}-${subItem.label}`)}
                               >
-                                <FontAwesomeIcon icon={subItem.icon} className="mr-2 text-base" />
+                                <FontAwesomeIcon icon={subItem.icon} className="mr-2 text-xs text-teal-400/80" />
                                 <span className="flex-1 text-left">{subItem.label}</span>
                                 <FontAwesomeIcon
                                   icon={openDropdown.includes(`${item.label}-${subItem.label}`) ? faChevronDown : faChevronRight}
-                                  className="text-xs"
+                                  className="text-[10px] text-slate-400"
                                 />
                               </button>
 
-                              {/* Final Nested Links */}
                               {openDropdown.includes(`${item.label}-${subItem.label}`) && (
-                                <ul className="ml-6 mt-1 space-y-1">
+                                <ul className="ml-4 pl-2 mt-1 space-y-1 border-l border-[#2E2A26]">
                                   {subItem.children?.map((child) => (
                                     <li key={child.label}>
                                       <NavLink
                                         to={child.path || '#'}
                                         className={({ isActive }) =>
-                                          `flex items-center px-4 py-1.5 transition-colors duration-200 rounded-md 
-                                          ${isActive ? 'bg-white text-black' : 'hover:bg-white hover:text-black'}`
+                                          `flex items-center px-3 py-1.5 text-xs rounded-md transition-all duration-150 ${
+                                            isActive
+                                              ? 'bg-[#C04E24]/20 text-[#E9B195] font-semibold border-l-2 border-[#C04E24] shadow-sm'
+                                              : 'text-[#A8A199] hover:text-white hover:bg-white/5'
+                                          }`
                                         }
                                       >
-                                        <FontAwesomeIcon icon={child.icon} className="mr-2" />
+                                        <FontAwesomeIcon icon={child.icon} className="mr-2 text-[10px]" />
                                         {child.label}
                                       </NavLink>
                                     </li>
@@ -296,15 +324,17 @@ const Sidebar: React.FC = () => {
                               )}
                             </>
                           ) : (
-                            // Direct Submenu Link
                             <NavLink
                               to={subItem.path || '#'}
                               className={({ isActive }) =>
-                                `flex items-center px-4 py-2 transition-colors duration-200 rounded-md 
-                                ${isActive ? 'bg-white text-black' : 'hover:bg-white hover:text-black'}`
+                                `flex items-center px-3 py-2 text-xs rounded-md font-medium transition-all duration-150 ${
+                                  isActive
+                                    ? 'bg-[#C04E24]/20 text-[#E9B195] font-semibold border-l-2 border-[#C04E24] shadow-sm'
+                                    : 'text-[#A8A199] hover:text-white hover:bg-white/5'
+                                }`
                               }
                             >
-                              <FontAwesomeIcon icon={subItem.icon} className="mr-2 text-base" />
+                              <FontAwesomeIcon icon={subItem.icon} className="mr-2 text-xs text-[#E9B195]" />
                               {subItem.label}
                             </NavLink>
                           )}
@@ -314,16 +344,19 @@ const Sidebar: React.FC = () => {
                   )}
                 </>
               ) : (
-                // Single-level menu
                 <NavLink
                   to={item.path || '#'}
                   className={({ isActive }) =>
-                    `flex items-center px-6 py-3 transition-colors duration-200 rounded-md 
-                    ${collapsed ? 'justify-center' : ''} 
-                    ${isActive ? 'bg-white text-black' : 'hover:bg-white hover:text-black'}`
+                    `flex items-center px-3.5 py-2.5 rounded-lg transition-all duration-150 text-sm font-medium ${
+                      collapsed ? 'justify-center' : ''
+                    } ${
+                      isActive
+                        ? 'bg-[#C04E24] text-white font-semibold shadow-sm'
+                        : 'text-[#A8A199] hover:bg-white/5 hover:text-white'
+                    }`
                   }
                 >
-                  <FontAwesomeIcon icon={item.icon} className={`text-lg ${collapsed ? '' : 'mr-3'}`} />
+                  <FontAwesomeIcon icon={item.icon} className={`text-base ${collapsed ? '' : 'mr-3 text-[#E9B195]'}`} />
                   {!collapsed && <span>{item.label}</span>}
                 </NavLink>
               )}
@@ -331,6 +364,22 @@ const Sidebar: React.FC = () => {
           ))}
         </ul>
       </nav>
+
+      {/* Collapse Toggle Footer */}
+      <div className="p-3 bg-[#141312] border-t border-[#2E2A26] flex items-center justify-between">
+        {!collapsed && (
+          <div className="text-[11px] text-[#7A7570] font-medium">
+            <span>Grace Cabs SaaS v2.5</span>
+          </div>
+        )}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="text-[#A8A199] hover:text-white text-xs p-1.5 rounded hover:bg-white/5 transition"
+          title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+        >
+          <FontAwesomeIcon icon={collapsed ? faChevronRight : faChevronDown} className={collapsed ? '' : '-rotate-90'} />
+        </button>
+      </div>
     </aside>
   );
 };

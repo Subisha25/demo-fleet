@@ -17,8 +17,7 @@ router.get('/getAllVehiclesForWeb',authMiddleware,getAllVehiclesForWeb);
 router.get('/getAvailableVehicle',authMiddleware,getAvailableVehicles );
 router.get('/:vehicleId/getVehicleById',authMiddleware,getVehicleById );
 
-// router.put('/:vehicleId/updateVehicle',authMiddleware,updateVehicle );
-router.put('/:vehicleId/updateVehicle', uploadVehicleImg.array("vehicleImg", 5),  updateVehicle);
+router.put('/:vehicleId/updateVehicle', authMiddleware, uploadVehicleImg.array("vehicleImg", 5), updateVehicle);
 router.put('/:vehicleId/updateVehicleStatus',authMiddleware,updateVehicleStatus );
 router.put('/:vehicleId/softDeleteVehicle', authMiddleware, softDeleteVehicle); // ✅ add this
 router.put('/:vehicleId/restoreVehicle', authMiddleware, restoreVehicle);       // ✅ add this

@@ -5,6 +5,9 @@ import { Booking } from '../models/booking';
 import { VehicleType } from '../models/vehicleType';
 import { USERS } from "../utils/costants";
 import { ORDER } from '../utils/costants';
+import { Op } from 'sequelize';
+import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
+import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 const { ROLES } = USERS;
 
 
@@ -18,11 +21,21 @@ export const getAllDrivers = async (req: any, res: Response) => {
     }
 
     const { status } = req.query;
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     let drivers;
     if (status === 'trashed') {
       // Fetch only trashed drivers
       drivers = await Drivers.unscoped().findAll({
-        where: { isDeleted: true },  include: [
+        where: { isDeleted: true, ...tenantCondition },  include: [
           {
             model: VehicleType,  required: false,
             include: [{ model: Vehicle,   required: false }]
@@ -32,7 +45,7 @@ export const getAllDrivers = async (req: any, res: Response) => {
     } else {
       // Fetch only active drivers (default)
       drivers = await Drivers.findAll({
-        where: { isDeleted: false }, include: [
+        where: { isDeleted: false, ...tenantCondition }, include: [
           {
             model: VehicleType,
               required: false, 
@@ -62,15 +75,17 @@ export const getDriverById = async (req: any, res: Response) => {
       return res.status(403).json({ message: 'Not Authorized' });
     }
 
-    const driver = await Drivers.findByPk(driverId,
-       
-    );
+    const driver = await Drivers.findByPk(driverId);
     if (!driver) {
       return res.status(404).json({ message: 'Driver not found' });
     }
+    assertTenantOwnership(driver);
 
     res.status(200).json({ message: 'Driver retrieved successfully', driver });
-  } catch (err) {
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
     res.status(500).json({ error: err });
   }
 };
@@ -89,6 +104,7 @@ export const  updateDriver = async (req: any, res: Response) => {
     if (!driver) {
       return res.status(404).json({ message: 'Driver not found' });
     }
+    assertTenantOwnership(driver);
 
     // Check if email is being updated and if it already exists
     if (updateData.driverEmail && updateData.driverEmail !== driver.driverEmail) {
@@ -115,7 +131,10 @@ await driver.update({
   trackingsource: updateData.trackingSource, // ✅ map correct DB column
 });
     res.status(200).json({ message: 'Driver updated successfully', driver });
-  } catch (err) {
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
     res.status(500).json({ error: err });
   }
 };
@@ -134,10 +153,14 @@ export const deleteDriver = async (req: any, res: Response) => {
     if (!driver) {
       return res.status(404).json({ message: 'Driver not found' });
     }
+    assertTenantOwnership(driver);
 
     await driver.update({isDeleted : 1});
     res.status(200).json({ message: 'Driver deleted successfully' });
-  } catch (err) {
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
     res.status(500).json({ error: err });
   }
 };
@@ -157,11 +180,15 @@ export const restoreDriver = async (req: any, res: Response) => {
     if (!driver) {
       return res.status(404).json({ message: 'Driver not found' });
     }
+    assertTenantOwnership(driver);
 
     await driver.update({ isDeleted: false });
 
     res.status(200).json({ message: 'Driver restored successfully', driver });
-  } catch (err) {
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
     res.status(500).json({ error: err });
   }
 };
@@ -191,12 +218,16 @@ export const getVehiclesForDriver = async (req: Request, res: Response) => {
         message: "No driver found with the given ID"
       });
     }
+    assertTenantOwnership(driver);
 
     res.status(200).json({
       message: "Vehicle details retrieved successfully",
       driver: driver.toJSON(), // clean Sequelize instance to plain JSON
     });
   } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
     res.status(500).json({
       message: "Error retrieving vehicle details",
       error: err.message
@@ -210,11 +241,21 @@ export const getBookingByVehicleAndDriver = async (req: any, res: any) => {
   console.log("hello  ",driverId);
 
   try {
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     const bookings = await Booking.findAll({
       where: {
-        //vehicleId: vehicleId,
         driverId: driverId,
-        confirmStatus: ORDER.STATUS.CONFIRMED
+        confirmStatus: ORDER.STATUS.CONFIRMED,
+        ...tenantCondition
       },
    include: [
                       { model: VehicleType ,    required: false, 

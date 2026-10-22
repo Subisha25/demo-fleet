@@ -5,6 +5,7 @@ import { VehicleType } from '../models/vehicleType';
 import { User } from '../models/user';
 import { Company } from '../models/company';
 import { USERS,ORDER } from "../utils/costants";
+import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 const { STATUS } = ORDER;
 const { ROLES } = USERS;
 
@@ -20,6 +21,9 @@ export const createBooking = async (req: any, res: Response) => {
       return res.status(403).json({ message: 'Not able to authorize' });
     }
 
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+
     const confirmStatus = STATUS.PENDING;
     const bookingStatus = STATUS.PENDING;
 
@@ -27,7 +31,8 @@ export const createBooking = async (req: any, res: Response) => {
       bookingDate, bookingTime, employeeId, pickupPoint, pickupCity, dropPoint, travellersCount,
       femaleCount, maleCount, remarks, purpose, confirmStatus, bookingStatus, vehicleId,driverId, vehicleTypeId,
       preferredType, roundTrip, pickupAirport, pickupStation, flightNo, trainNo, notes,
-      pickupLongitude, pickupLatitude, dropLatitude, dropLongitude, userId, pickupArea,predefinedArea, approximatetds2,approximatetds1
+      pickupLongitude, pickupLatitude, dropLatitude, dropLongitude, userId, pickupArea,predefinedArea, approximatetds2,approximatetds1,
+      tenantId
     });
 
     // Build include array conditionally

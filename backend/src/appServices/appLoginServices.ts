@@ -10,6 +10,7 @@ import { USERS } from "../utils/costants";
 import { Op } from 'sequelize';
 import axios from 'axios';
 import { combineTableNames } from 'sequelize/lib/utils';
+import { ROOT_TENANT_ID } from '../context/tenantContext';
  
 const { ROLES } = USERS;
  
@@ -309,7 +310,8 @@ export const verifyOTPLogin = async (req: Request, res: Response) => {
     // Generate JWT token
     const tokenPayload = {
       userId: userResult.userData.id,
-      roles: userResult.userData.role
+      roles: userResult.userData.role,
+      tenantId: userResult.user?.tenantId || ROOT_TENANT_ID
     };
  
     const accessToken = Security.generateJwtToken(

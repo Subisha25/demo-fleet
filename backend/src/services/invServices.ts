@@ -19,6 +19,8 @@ import path from "path";
 import fs from "fs";
 import { generateInvoiceHTML, mapBookingToInvoiceData } from "../appServices/appInvoiceServices";
 import puppeteer from "puppeteer";
+import { assertTenantOwnership, isTenantError } from "../utils/tenantGuard";
+import { getTenantContext, ROOT_TENANT_ID } from "../context/tenantContext";
 
 export const createInvoice = async (req: any, res: Response) => {
   try {
@@ -35,13 +37,12 @@ export const createInvoice = async (req: any, res: Response) => {
     if (!closependingId) {
       return res.status(400).json({ success: false, message: "closependingId is required" });
     }
-    const booking = await Booking.findByPk(bookingId, {
-
-    });
+    const booking = await Booking.findByPk(bookingId);
 
     if (!booking) {
       return res.status(404).json({ success: false, message: "Booking not found" });
     }
+    assertTenantOwnership(booking);
 
 
     const closePending = await ClosePending.findByPk(closependingId, { include: [PackageData] });
@@ -78,6 +79,7 @@ export const createInvoice = async (req: any, res: Response) => {
       endDate: closePending.garageCloseDateTime,
       invoiceNumber,
       invoiceAmount: totalAmount,
+      tenantId: booking.tenantId || ROOT_TENANT_ID,
     });
 
     return res.status(201).json({
@@ -98,6 +100,9 @@ export const createInvoice = async (req: any, res: Response) => {
       },
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: error.message });
+    }
     console.error("Error creating invoice:", error);
     return res.status(500).json({
       success: false,
@@ -434,8 +439,17 @@ console.log("User Email: ", recipientEmail);
 export const getPendingInvoices = async (req: Request, res: Response) => {
   try {
     const { userId, companyId } = req.query;
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
 
-    const whereClause: any = { invoiceStatus: 0 };
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
+    const whereClause: any = { invoiceStatus: 0, ...tenantCondition };
 
     if (userId) whereClause["$user.userId$"] = userId;
     if (companyId) whereClause["$user.companyId$"] = companyId;
@@ -495,8 +509,18 @@ export const getFilteredPendingInvoices = async (req: Request, res: Response) =>
   try {
     const { username, company, fromDate, toDate } = req.query;
 
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     // Filters
-    const invoiceWhere: any = { invoiceStatus: 0 };
+    const invoiceWhere: any = { invoiceStatus: 0, ...tenantCondition };
     const userWhere: any = {};
 
     // Username filter
@@ -578,9 +602,18 @@ if (fromDate && toDate) {
 export const getCompletedInvoices = async (req: Request, res: Response) => {
   try {
     const { username, company, fromDate, toDate } = req.query;
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
 
     // Filters
-    const invoiceWhere: any = { invoiceStatus: 9 }; // ✅ Completed invoices only
+    const invoiceWhere: any = { invoiceStatus: 9, ...tenantCondition }; // ✅ Completed invoices only
     const userWhere: any = {};
 
     // Username filter
@@ -667,12 +700,22 @@ if (fromDate && toDate) {
 export const getAllInvoices = async (req: Request, res: Response) => {
   try {
     const { username, company, fromDate, toDate } = req.query;
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
 
     // Filters for invoices
     const invoiceWhere: any = {
       invoiceStatus: {
         [Op.ne]: '6', // Exclude cancelled invoices
       },
+      ...tenantCondition,
     };
 
     // Filters for users
@@ -760,8 +803,18 @@ if (fromDate && toDate) {
 
 
 export const getAllCompanyInvoices = async (req: Request, res: Response) => {
-  try {
-    const companies = await Company.findAll();
+  try {
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
+    const companies = await Company.findAll({ where: tenantCondition });
 
     if (!companies || companies.length === 0) {
       return res.status(404).json({ success: false, message: "No companies found!" });
@@ -845,7 +898,24 @@ export const getcompanyOrderSummery = async (req: Request, res: Response) => {
   try {
     const { companyId, pickupPoint, fromDate, toDate, filterType } = req.query;
 
-    const whereClause: any = {};
+    if (companyId) {
+      const company = await Company.findByPk(companyId as string);
+      if (company) {
+        assertTenantOwnership(company, 'Company');
+      }
+    }
+
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
+    const whereClause: any = { ...tenantCondition };
 
     // Filter by companyId
     if (companyId) {
@@ -970,6 +1040,9 @@ export const getcompanyOrderSummery = async (req: Request, res: Response) => {
       data: finalData,
     });
   } catch (error) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: (error as Error).message });
+    }
     console.error("[GET_COMPANY_ORDER_SUMMARY_ERROR]", error);
     return res.status(500).json({
       success: false,
@@ -986,6 +1059,12 @@ export const getInvoicesByUserId = async (req: Request, res: Response) => {
     if (!userId) {
       return res.status(400).json({ message: "userId is required" });
     }
+
+    const targetUser = await User.findByPk(userId);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    assertTenantOwnership(targetUser, 'User');
 
 const invoices = await Invoice.findAll({
   where: {
@@ -1033,6 +1112,9 @@ const invoices = await Invoice.findAll({
 
     return res.json({ success: true, data: result });
   } catch (error) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: (error as Error).message });
+    }
     console.error("Error fetching invoices:", error);
     return res.status(500).json({ success: false, message: "Server error" });
   }
@@ -1044,6 +1126,12 @@ export const getUserOrderStats = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     if (!userId) return res.status(400).json({ message: "userId is required" });
+
+    const targetUser = await User.findByPk(userId);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    assertTenantOwnership(targetUser, 'User');
 
     // 1️⃣ Booking counts
     const bookingPendingCount = await Booking.count({
@@ -1093,6 +1181,9 @@ export const getUserOrderStats = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ success: false, message: (error as Error).message });
+    }
     console.error("Error fetching user order stats:", error);
     return res.status(500).json({ success: false, message: "Server error" });
   }
@@ -1100,12 +1191,22 @@ export const getUserOrderStats = async (req: Request, res: Response) => {
 
 export const getInvoiceStatusCount = async (req: Request, res: Response) => {
   try {
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     const pendingCount = await Invoice.count({
-      where: { invoiceStatus: ORDER.STATUS.PENDING }
+      where: { invoiceStatus: ORDER.STATUS.PENDING, ...tenantCondition }
     });
 
     const completedCount = await Invoice.count({
-      where: { invoiceStatus: ORDER.STATUS.PAYMENTCOMPLETED }
+      where: { invoiceStatus: ORDER.STATUS.PAYMENTCOMPLETED, ...tenantCondition }
     });
 
     const totalCount = pendingCount + completedCount;
@@ -1139,7 +1240,7 @@ export const cancelInvoice = async (req: any, res: Response) => {
     const role = req.role;
     const { bookingId, remarks } = req.body;
 
-    if (role === ROLES.USER) {
+    if (role === ROLES.USER || role === ROLES.EMPLOYEE || role === ROLES.DRIVER) {
       return res.status(403).json({ message: "Not Authorized" });
     }
 
@@ -1148,10 +1249,14 @@ export const cancelInvoice = async (req: any, res: Response) => {
       include: [{ model: User, as: "user" }],
     });
 
-     const invoice = await Invoice.findOne({ where: {bookingId : booking?.bookingId  }});
-
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
+    }
+    assertTenantOwnership(booking);
+
+    const invoice = await Invoice.findOne({ where: {bookingId : booking?.bookingId  }});
+    if (invoice) {
+      assertTenantOwnership(invoice);
     }
    // console.log("bef ",booking);
     // Update booking + related records
@@ -1311,7 +1416,10 @@ console.log("cancelll needEmail:", needEmail);
       message:
         "Invoice cancelled successfully. Email sent to user if configured.",
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ success: false, message: err.message });
+    }
     console.error("Invoice cancel Status Error:", err);
     return res.status(500).json({ error: "Internal server error" });
   }

@@ -382,7 +382,7 @@ for (let r = 1; r <= range.e.r; r++) {
       accessor: "orderNumber",
       render: (row) => (
         <button
-          className="text-blue-600 hover:underline font-bold"
+          className="text-teal-700 hover:text-teal-900 hover:underline font-bold transition text-left"
           onClick={() => navigate(`/orders/view/payment-pending-order/${row.bookingId}`)}
         >
           {row.orderNumber}

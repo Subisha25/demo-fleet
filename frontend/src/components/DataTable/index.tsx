@@ -83,13 +83,13 @@ export const DataTable = <T extends object>({
   );
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full table-auto text-sm text-left text-gray-700 overflow-hidden">
+    <div className="overflow-x-auto rounded-lg border border-slate-200/90 shadow-sm bg-white">
+      <table className="w-full table-auto text-sm text-left text-slate-700">
         {/* Table Header */}
-        <thead className="bg-gray-100 text-gray-800">
+        <thead className="bg-slate-50 text-slate-600 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
           <tr>
             {columns.map((col, i) => (
-              <th key={i} className="px-4 py-3 border">
+              <th key={i} className="px-4 py-3.5">
                 {col.header}
               </th>
             ))}
@@ -103,7 +103,7 @@ export const DataTable = <T extends object>({
               onRestore ||
               onPermanentDelete ||
               onInvoice) && (
-              <th className="px-6 py-3 text-left text-sm font-semibold border-b border-gray-200">
+              <th className="px-5 py-3.5 text-right font-semibold">
                 Actions
               </th>
             )}
@@ -111,7 +111,7 @@ export const DataTable = <T extends object>({
         </thead>
 
         {/* Table Body */}
-        <tbody>
+        <tbody className="divide-y divide-slate-100">
           {loading ? (
             <tr>
               <td
@@ -130,27 +130,27 @@ export const DataTable = <T extends object>({
                     ? 1
                     : 0)
                 }
-                className="px-4 py-3 border"
+                className="px-4 py-8 text-center text-slate-500 font-medium"
               >
-                <FontAwesomeIcon icon={faSpinner} spin className="mr-2" />
-                Loading...
+                <FontAwesomeIcon icon={faSpinner} spin className="mr-2 text-teal-600" />
+                Loading records...
               </td>
             </tr>
           ) : currentData.length > 0 ? (
             currentData.map((row, rowIndex) => (
               <tr
                 key={rowIndex}
-                className="hover:bg-gray-50 transition-colors duration-150"
+                className="hover:bg-slate-50/75 transition-colors duration-150"
               >
                 {columns.map((col, colIndex) => (
-                  <td key={colIndex} className="px-4 py-3 border">
+                  <td key={colIndex} className="px-4 py-3.5 text-slate-700 text-sm align-middle">
                     {col.render
                       ? col.render(row)
                       : row[col.accessor] !== undefined &&
                         row[col.accessor] !== null &&
                         row[col.accessor] !== ""
                       ? String(row[col.accessor])
-                      : "-"}
+                      : "—"}
                   </td>
                 ))}
 
@@ -165,99 +165,100 @@ export const DataTable = <T extends object>({
                   onRestore ||
                   onPermanentDelete ||
                   onInvoice) && (
-                  <td className="px-6 py-4 text-sm text-gray-600 border">
-                    <div className="flex gap-4">
+                  <td className="px-5 py-3.5 text-sm text-slate-600 align-middle">
+                    <div className="flex items-center justify-end gap-2.5">
                       {onView && (
                         <button
                           onClick={() => onView(row)}
-                          className="flex text-blue-600 hover:text-blue-800 font-medium"
+                          className="inline-flex items-center text-teal-600 hover:text-teal-800 font-medium p-1 rounded hover:bg-teal-50 transition"
+                          title="View"
                         >
-                          <FontAwesomeIcon icon={faEye} className="mr-1" /> View
+                          <FontAwesomeIcon icon={faEye} className="mr-1 text-xs" /> View
                         </button>
                       )}
                       {onEdit && (
                         <button
-                        type="button" 
+                          type="button" 
                           onClick={() => onEdit(row)}
-                          className="text-blue-600 hover:text-blue-800"
+                          className="text-sky-600 hover:text-sky-800 p-1 rounded hover:bg-sky-50 transition"
                           title="Edit"
                         >
-                          <FontAwesomeIcon icon={faPen} />
+                          <FontAwesomeIcon icon={faPen} className="text-xs" />
                         </button>
                       )}
                       {onDelete && (
                         <button
                           onClick={() => onDelete(row)}
-                          className="text-red-600 hover:text-red-800"
+                          className="text-rose-600 hover:text-rose-800 p-1 rounded hover:bg-rose-50 transition"
                           title="Delete"
                         >
-                          <FontAwesomeIcon icon={faTrash} />
+                          <FontAwesomeIcon icon={faTrash} className="text-xs" />
                         </button>
                       )}
                       {onCancel && (
                         <button
                           onClick={() => onCancel(row)}
-                          className="text-orange-500 hover:text-orange-700"
+                          className="text-amber-600 hover:text-amber-800 p-1 rounded hover:bg-amber-50 transition"
                           title="Cancel"
                         >
-                          <FontAwesomeIcon icon={faBan} />
+                          <FontAwesomeIcon icon={faBan} className="text-xs" />
                         </button>
                       )}
                       {onClose && (
                         <button
                           onClick={() => onClose(row)}
-                          className="text-gray-500 hover:text-gray-700"
+                          className="text-slate-500 hover:text-slate-700 p-1 rounded hover:bg-slate-100 transition"
                           title="Close"
                         >
-                          <FontAwesomeIcon icon={faTimes} />
+                          <FontAwesomeIcon icon={faTimes} className="text-xs" />
                         </button>
                       )}
                       {onCopy && (
                         <button
                           onClick={() => onCopy(row)}
-                          className="text-purple-600 hover:text-purple-800"
+                          className="text-indigo-600 hover:text-indigo-800 p-1 rounded hover:bg-indigo-50 transition"
                           title="Copy"
                         >
-                          <FontAwesomeIcon icon={faCopy} />
+                          <FontAwesomeIcon icon={faCopy} className="text-xs" />
                         </button>
                       )}
                       {onSave && (
                         <button
                           onClick={() => onSave(row, {} as Partial<T>)}
-                          className="text-indigo-600 hover:text-indigo-800"
+                          className="text-teal-600 hover:text-teal-800 p-1 rounded hover:bg-teal-50 transition"
                           title="Save"
                         >
-                          <FontAwesomeIcon icon={faSave} />
+                          <FontAwesomeIcon icon={faSave} className="text-xs" />
                         </button>
                       )}
                       {onRestore && (
                         <button
                           onClick={() => onRestore(row)}
-                          className="text-blue-500 hover:text-blue-700"
+                          className="text-emerald-600 hover:text-emerald-800 p-1 rounded hover:bg-emerald-50 transition"
                           title="Restore"
                         >
-                          <FontAwesomeIcon icon={faUndoAlt} />
+                          <FontAwesomeIcon icon={faUndoAlt} className="text-xs" />
                         </button>
                       )}
                       {onPermanentDelete && (
                         <button
                           onClick={() => onPermanentDelete(row)}
-                          className="text-red-800 hover:text-red-900"
+                          className="text-rose-700 hover:text-rose-900 p-1 rounded hover:bg-rose-50 transition"
                           title="Permanent Delete"
                         >
-                          <FontAwesomeIcon icon={faRecycle} />
+                          <FontAwesomeIcon icon={faRecycle} className="text-xs" />
                         </button>
                       )}
-                      {/* ✅ New invoice button */}
-                    {onInvoice && (invoiceVisible ? invoiceVisible(row) : true) && (
-  <button
-    onClick={() => onInvoice(row)}
-    className="flex text-green-600 hover:text-green-800 font-medium"
-  >
-    {invoiceIcon || <FontAwesomeIcon icon={faCopy} className="mr-1" />}
-    {typeof invoiceLabel === "function" ? invoiceLabel(row) : invoiceLabel}
-  </button>
-)}
+                      {/* New invoice button */}
+                      {onInvoice && (invoiceVisible ? invoiceVisible(row) : true) && (
+                        <button
+                          onClick={() => onInvoice(row)}
+                          className="inline-flex items-center text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 font-semibold px-2 py-1 rounded border border-teal-200 transition text-xs"
+                        >
+                          {invoiceIcon || <FontAwesomeIcon icon={faCopy} className="mr-1 text-xs" />}
+                          {typeof invoiceLabel === "function" ? invoiceLabel(row) : invoiceLabel}
+                        </button>
+                      )}
                     </div>
                   </td>
                 )}
@@ -281,7 +282,7 @@ export const DataTable = <T extends object>({
                     ? 1
                     : 0)
                 }
-                className="text-center py-6 text-red-500 border"
+                className="text-center py-10 text-slate-400 font-medium"
               >
                 {emptyMessage}
               </td>
@@ -290,79 +291,72 @@ export const DataTable = <T extends object>({
         </tbody>
       </table>
 
-     {/* ✅ Updated Pagination */}
-{totalPages > 1 && (
-  <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-3">
-    {/* Showing count */}
-    <p className="text-sm text-gray-600">
-      Showing {(currentPage - 1) * rowsPerPage + 1}–
-      {Math.min(currentPage * rowsPerPage, data.length)} of {data.length} entries
-    </p>
+      {/* Modernized Pagination */}
+      {totalPages > 1 && (
+        <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+          <p className="font-medium">
+            Showing <span className="text-slate-900 font-semibold">{(currentPage - 1) * rowsPerPage + 1}</span> to{' '}
+            <span className="text-slate-900 font-semibold">{Math.min(currentPage * rowsPerPage, data.length)}</span> of{' '}
+            <span className="text-slate-900 font-semibold">{data.length}</span> entries
+          </p>
 
-    {/* Pagination controls */}
-    <div className="flex items-center gap-2">
-      {/* Previous */}
-      <button
-        type="button"
-        onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-        disabled={currentPage === 1}
-        className={`px-3 py-1 border rounded ${
-          currentPage === 1
-            ? "text-gray-400 bg-gray-100 cursor-not-allowed"
-            : "text-gray-700 bg-white hover:bg-gray-50"
-        }`}
-      >
-        Previous
-      </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className={`px-2.5 py-1 rounded border text-xs font-medium transition ${
+                currentPage === 1
+                  ? "text-slate-300 bg-slate-100 border-slate-200 cursor-not-allowed"
+                  : "text-slate-700 bg-white border-slate-300 hover:bg-slate-100"
+              }`}
+            >
+              Previous
+            </button>
 
-      {/* Dynamic Page Numbers (only 3 visible) */}
-      {(() => {
-        let startPage = currentPage;
-        let endPage = Math.min(currentPage + 2, totalPages);
+            {(() => {
+              let startPage = currentPage;
+              let endPage = Math.min(currentPage + 2, totalPages);
+              if (endPage - startPage < 2) {
+                startPage = Math.max(endPage - 2, 1);
+              }
 
-        // Ensure we always show 3 pages if possible
-        if (endPage - startPage < 2) {
-          startPage = Math.max(endPage - 2, 1);
-        }
+              return Array.from(
+                { length: endPage - startPage + 1 },
+                (_, i) => startPage + i
+              ).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => setCurrentPage(page)}
+                  className={`w-7 h-7 flex items-center justify-center rounded text-xs font-semibold transition ${
+                    currentPage === page
+                      ? "text-white bg-teal-600 border border-teal-600 shadow-sm"
+                      : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
+                  }`}
+                >
+                  {page}
+                </button>
+              ));
+            })()}
 
-        return Array.from(
-          { length: endPage - startPage + 1 },
-          (_, i) => startPage + i
-        ).map((page) => (
-          <button
-            key={page}
-            type="button"
-            onClick={() => setCurrentPage(page)}
-            className={`px-3 py-1 border rounded ${
-              currentPage === page
-                ? "text-white bg-[#275981]"
-                : "bg-white text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            {page}
-          </button>
-        ));
-      })()}
-
-      {/* Next */}
-      <button
-        type="button"
-        onClick={() =>
-          setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-        }
-        disabled={currentPage === totalPages}
-        className={`px-3 py-1 border rounded ${
-          currentPage === totalPages
-            ? "text-gray-400 bg-gray-100 cursor-not-allowed"
-            : "text-gray-700 bg-white hover:bg-gray-50"
-        }`}
-      >
-        Next
-      </button>
-    </div>
-  </div>
-)}
-
+            <button
+              type="button"
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
+              disabled={currentPage === totalPages}
+              className={`px-2.5 py-1 rounded border text-xs font-medium transition ${
+                currentPage === totalPages
+                  ? "text-slate-300 bg-slate-100 border-slate-200 cursor-not-allowed"
+                  : "text-slate-700 bg-white border-slate-300 hover:bg-slate-100"
+              }`}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

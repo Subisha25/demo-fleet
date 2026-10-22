@@ -35,19 +35,19 @@ router.put("/cancelBooking", authMiddleware, cancelBooking);
 router.put("/declineBooking", authMiddleware, declineBooking);
 router.get('/status/cancelled', authMiddleware, getCancelledBooking);
 
-router.get("/details/:bookingCode", getBookingDetails);
-router.get("/getallinvoicereport", getOverallInvoiceReport);
+router.get("/details/:bookingCode", authMiddleware, getBookingDetails);
+router.get("/getallinvoicereport", authMiddleware, getOverallInvoiceReport);
 router.get("/companyBookingReport", authMiddleware, companyBookingReport);
 router.get('/getmonthlybookings', authMiddleware, getMonthlyBookings);
 
-router.get("/user/:userId/all", getAllOrdersByUser);    //my order details
-router.get("/user/:userId/pending", getPendingOrdersByUser);
-router.get("/user/:userId/pending-invoices", getPendingInvoicesByUser); //pending invoices
-router.get("/user/:userId/confirmed", getConfirmedOrdersByUser);
-router.get("/user/:userId/payment-completed", getPaymentCompletedOrdersByUser);
-router.get("/user/:userId/closed", getClosedOrdersByUser);
-router.get("/user/:userId/cancelled", getCancelledOrdersByUser);
-router.get("/user/:userId/payment-pending", getPaymentPendingOrdersByUser);
+router.get("/user/:userId/all", authMiddleware, getAllOrdersByUser);    //my order details
+router.get("/user/:userId/pending", authMiddleware, getPendingOrdersByUser);
+router.get("/user/:userId/pending-invoices", authMiddleware, getPendingInvoicesByUser); //pending invoices
+router.get("/user/:userId/confirmed", authMiddleware, getConfirmedOrdersByUser);
+router.get("/user/:userId/payment-completed", authMiddleware, getPaymentCompletedOrdersByUser);
+router.get("/user/:userId/closed", authMiddleware, getClosedOrdersByUser);
+router.get("/user/:userId/cancelled", authMiddleware, getCancelledOrdersByUser);
+router.get("/user/:userId/payment-pending", authMiddleware, getPaymentPendingOrdersByUser);
 router.get("/user/invoices/:bookingId/:invoiceId/pdf",  authMiddleware, downloadUserInvoicePdf);
 
 export default router;

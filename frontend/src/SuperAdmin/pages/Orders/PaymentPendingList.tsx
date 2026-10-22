@@ -582,8 +582,8 @@ const renderOnCallTable = () => {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-[#275981] border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-500">Loading On Call Invoices...</p>
+          <div className="w-8 h-8 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-slate-500 font-medium">Loading On Call Invoices...</p>
         </div>
       </div>
     );
@@ -763,10 +763,10 @@ const renderOnCallTable = () => {
       <button
         key={i + 1}
         onClick={() => setCurrentPage(i + 1)}
-        className={`px-3 py-1 border rounded ${
+        className={`w-7 h-7 flex items-center justify-center rounded text-xs font-semibold transition ${
           currentPage === i + 1
-            ? "bg-[#275981] text-white"
-            : "bg-white text-gray-700"
+            ? "bg-teal-600 text-white border border-teal-600 shadow-sm"
+            : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
         }`}
       >
         {i + 1}
@@ -823,7 +823,7 @@ const renderOnCallTable = () => {
                 type="date"
                 value={editCreatedAt}
                 onChange={(e) => setEditCreatedAt(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#275981] focus:border-transparent transition"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition"
               />
             </div>
 
@@ -835,8 +835,8 @@ const renderOnCallTable = () => {
                 disabled={editLoading || !editCreatedAt}
                 className={`flex-1 py-2 rounded-lg text-sm font-semibold text-white transition-all ${
                   editLoading || !editCreatedAt
-                    ? "bg-[#275981]/50 cursor-not-allowed"
-                    : "bg-[#275981] hover:bg-[#1e4a6e]"
+                    ? "bg-teal-600/50 cursor-not-allowed"
+                    : "bg-teal-600 hover:bg-teal-700 shadow-sm"
                 }`}
               >
                 {editLoading ? (
@@ -886,33 +886,33 @@ const renderOnCallTable = () => {
           <div className="flex gap-2 whitespace-nowrap">
             <button
               onClick={() => setViewType("regular")}
-              className={`px-4 py-2 rounded font-semibold ${
+              className={`px-4 py-2 rounded-lg font-bold text-xs transition ${
                 viewType === "regular"
-                  ? "bg-[#275981] text-white"
-                  : "bg-gray-200 text-gray-700"
+                  ? "bg-[#0f1c3f] text-white shadow-sm border border-[#0f1c3f]"
+                  : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-300"
               }`}
             >
-              Regular
+              Single-Trip / Regular
             </button>
             <button
               onClick={() => setViewType("monthly")}
-              className={`px-4 py-2 rounded font-semibold ${
+              className={`px-4 py-2 rounded-lg font-bold text-xs transition ${
                 viewType === "monthly"
-                  ? "bg-[#275981] text-white"
-                  : "bg-gray-200 text-gray-700"
+                  ? "bg-[#0f1c3f] text-white shadow-sm border border-[#0f1c3f]"
+                  : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-300"
               }`}
             >
-              Monthly
+              Monthly Consolidated
             </button>
             <button
               onClick={() => setViewType("oncall")}
-              className={`px-4 py-2 rounded font-semibold ${
+              className={`px-4 py-2 rounded-lg font-bold text-xs transition ${
                 viewType === "oncall"
-                  ? "bg-[#275981] text-white"
-                  : "bg-gray-200 text-gray-700"
+                  ? "bg-[#0f1c3f] text-white shadow-sm border border-[#0f1c3f]"
+                  : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-300"
               }`}
             >
-              On Call
+              On-Call Duties
             </button>
           </div>
         </div>

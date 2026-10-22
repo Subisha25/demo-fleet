@@ -20,13 +20,13 @@ router.post(
 router.get("/getFilteredPendingInvoices", authMiddleware, getFilteredPendingInvoices);
 router.get("/getCompletedInvoices", authMiddleware, getCompletedInvoices);
 router.get("/getAllInvoices", authMiddleware, getAllInvoices);
-router.get("/summary", getAllCompanyInvoices);
-router.get("/invoices/:userId", getInvoicesByUserId);
-router.get("/getcompanyOrderSummery", getcompanyOrderSummery);
-router.get("/user-order-stats/:userId", getUserOrderStats);
-router.get("/invoice/status-count", getInvoiceStatusCount);
+router.get("/summary", authMiddleware, getAllCompanyInvoices);
+router.get("/invoices/:userId", authMiddleware, getInvoicesByUserId);
+router.get("/getcompanyOrderSummery", authMiddleware, getcompanyOrderSummery);
+router.get("/user-order-stats/:userId", authMiddleware, getUserOrderStats);
+router.get("/invoice/status-count", authMiddleware, getInvoiceStatusCount);
 
-router.put("/invoice/cancelInvoice", cancelInvoice)
+router.put("/invoice/cancelInvoice", authMiddleware, cancelInvoice);
 export default router;
  
 

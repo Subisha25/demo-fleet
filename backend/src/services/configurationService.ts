@@ -45,6 +45,12 @@ export const createConfiguration = async (req: Request, res: Response): Promise<
 
         const existingConfig = await Configuration.findOne();
 
+        // If updating and password is placeholder/masked or blank, retain existing password
+        let finalPassword = smtpEmailPassword;
+        if (existingConfig && (!smtpEmailPassword || smtpEmailPassword === '••••••••')) {
+            finalPassword = existingConfig.smtpEmailPassword;
+        }
+
         if (existingConfig) {
             await existingConfig.update({
                 serviceTaxPercentage,
@@ -54,15 +60,20 @@ export const createConfiguration = async (req: Request, res: Response): Promise<
                 invoiceNoPrefix,
                 smtpServer,
                 smtpEmailAddress,
-                smtpEmailPassword,
+                smtpEmailPassword: finalPassword,
                 smtpEmailPort,
                 outstationHasTax
             });
 
+            const updatedConfig = existingConfig.toJSON() as any;
+            if (updatedConfig.smtpEmailPassword) {
+                updatedConfig.smtpEmailPassword = '••••••••';
+            }
+
             res.status(200).json({
                 success: true,
                 message: 'Configuration updated successfully',
-                data: existingConfig
+                data: updatedConfig
             });
         } else {
             const newConfig = await Configuration.create({
@@ -73,15 +84,20 @@ export const createConfiguration = async (req: Request, res: Response): Promise<
                 invoiceNoPrefix,
                 smtpServer,
                 smtpEmailAddress,
-                smtpEmailPassword,
+                smtpEmailPassword: finalPassword,
                 smtpEmailPort,
                 outstationHasTax
             });
 
+            const createdConfig = newConfig.toJSON() as any;
+            if (createdConfig.smtpEmailPassword) {
+                createdConfig.smtpEmailPassword = '••••••••';
+            }
+
             res.status(201).json({
                 success: true,
                 message: 'Configuration created successfully',
-                data: newConfig
+                data: createdConfig
             });
         }
 
@@ -107,10 +123,16 @@ export const getConfiguration = async (req: Request, res: Response): Promise<voi
             return;
         }
 
+        const safeConfig = configuration.toJSON() as any;
+        // Redact plain text SMTP password
+        if (safeConfig.smtpEmailPassword) {
+            safeConfig.smtpEmailPassword = '••••••••';
+        }
+
         res.status(200).json({
             success: true,
             message: 'Configuration retrieved successfully',
-            data: configuration
+            data: safeConfig
         });
 
     } catch (error) {

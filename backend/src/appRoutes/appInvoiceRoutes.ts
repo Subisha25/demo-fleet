@@ -22,6 +22,11 @@ router.get("/download/invoice/:fileName", async (req: Request, res: Response) =>
     const { fileName } = req.params;
     const { token } = req.query;
 
+    const safeFileName = path.basename(fileName);
+    if (!safeFileName || safeFileName !== fileName || fileName.includes('..')) {
+      return res.status(400).json({ message: "Invalid file name" });
+    }
+
     if (!token || typeof token !== "string") {
       return res.status(401).json({ message: "Missing or invalid token" });
     }
@@ -70,7 +75,13 @@ router.get("/download/month-invoice/:fileName", async (req: Request, res: Respon
   try {
     const { fileName } = req.params;
     const { token } = req.query;
-   const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
+
+    const safeFileName = path.basename(fileName);
+    if (!safeFileName || safeFileName !== fileName || fileName.includes('..')) {
+      return res.status(400).json({ message: "Invalid file name" });
+    }
+
+    const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 
     if (!token || typeof token !== "string") {
       console.error("Missing or invalid token");
@@ -141,6 +152,11 @@ router.get("/download/oncall-invoice/:fileName", async (req: Request, res: Respo
   try {
     const { fileName } = req.params;
     const { token } = req.query;
+
+    const safeFileName = path.basename(fileName);
+    if (!safeFileName || safeFileName !== fileName || fileName.includes('..')) {
+      return res.status(400).json({ message: "Invalid file name" });
+    }
 
     if (!token || typeof token !== "string") {
       return res.status(401).json({ message: "Missing or invalid token" });

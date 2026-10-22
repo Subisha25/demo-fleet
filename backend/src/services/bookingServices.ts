@@ -28,6 +28,8 @@ import customParseFormat from "dayjs/plugin/customParseFormat";
 import { Partner } from '../models/Partner';
 import { UniqueConstraintError } from "sequelize";
 import fs from 'fs';
+import { assertTenantOwnership, withTenant, isTenantError } from '../utils/tenantGuard';
+import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 
 const logoPath = path.join(__dirname, "..", "images", "logo.png");
 const logoBase64 = fs.readFileSync(logoPath, "base64");
@@ -319,6 +321,10 @@ export const getAllOrders = async (req:any, res: Response) => {
     //   });
     // }
     console.log("userrrrrrrrr",User.findOne(userid));
+    const ctx = getTenantContext();
+    const currentTenantId = ctx?.tenantId || ROOT_TENANT_ID;
+    const isSuperAdmin = ctx?.isPlatformSuperAdmin;
+
     if(role === ROLES.USER) {
       const orders = await Booking.findAll({
              include: [
@@ -341,55 +347,48 @@ export const getAllOrders = async (req:any, res: Response) => {
                               }
                             ]},
                  ],    
-                   where: { userId: userid },
+                   where: isSuperAdmin ? { userId: userid } : { userId: userid, tenantId: currentTenantId },
                   order: [['createdAt', 'DESC']]
     });
-  //    console.log(orders);
-//     console.log(
-//   'Booking associations:',
-//   Object.keys(Booking.associations)
-// );
     return res.status(200).json({
       success: true,
       message: 'Orders retrieved successfully.',
       data: orders,
     });
     } 
-   // if(role === ROLES.USER) {
     else {
-           const orders = await Booking.findAll({
-             include: [
-                     { model: VehicleType,    required: false,
-                          include: [
-                      {
-                        model: Vehicle,
-                        as: "vehicle",
-                        required: false,
-                      },]
-                      },
-                     { model:  Vehicle,    required: false},
-                         { model:  User,   as: 'user', required: false,
-                       attributes: ['userId', 'username', 'email', 'mobile'],
-                                              include: [
-                              {
-                                model: Company,
-                          //      as: 'company',     // must match User → Company alias
-                                required: false,
-                                attributes: ['companyId', 'companyName']
-                              }
-                            ]
-                     },
-                     
-                 ],    
-                //   where: { userId: userid },
-                  order: [['createdAt', 'DESC']]
-    });
-    //  console.log(orders);
-    return res.status(200).json({
-      success: true,
-      message: 'Orders retrieved successfully.',
-      data: orders,
-    });
+      const whereCondition: any = isSuperAdmin ? {} : { tenantId: currentTenantId };
+      const orders = await Booking.findAll({
+        include: [
+          { model: VehicleType, required: false,
+            include: [
+              {
+                model: Vehicle,
+                as: "vehicle",
+                required: false,
+              },
+            ]
+          },
+          { model: Vehicle, required: false },
+          { model: User, as: 'user', required: false,
+            attributes: ['userId', 'username', 'email', 'mobile'],
+            include: [
+              {
+                model: Company,
+                required: false,
+                attributes: ['companyId', 'companyName']
+              }
+            ]
+          },
+        ],
+        where: whereCondition,
+        order: [['createdAt', 'DESC']]
+      });
+      return res.status(200).json({
+        success: true,
+        message: 'Orders retrieved successfully.',
+        data: orders,
+      });
     }
    
   } catch (error) {
@@ -404,12 +403,24 @@ export const getAllOrders = async (req:any, res: Response) => {
 };
 
 
-export const getOrdersByStatus = async (confirmStatus: number) => {
+export const getOrdersByStatus = async (confirmStatus: number, req?: any) => {
+  const ctx = getTenantContext();
+  const tenantId = ctx?.tenantId || req?.tenantId || ROOT_TENANT_ID;
+  const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+  const tenantCondition = isPlatformAdmin && !req?.headers?.['x-tenant-id']
+    ? {}
+    : tenantId === ROOT_TENANT_ID
+      ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+      : { tenantId };
+
   return await Booking.findAll({
-    where: { confirmStatus },include: [
-                    { model: VehicleType ,    required: false},
-                    { model: Vehicle,    required: false },
-                ], order: [["createdAt", "DESC"]],
+    where: { confirmStatus, ...tenantCondition },
+    include: [
+      { model: VehicleType, required: false },
+      { model: Vehicle, required: false },
+    ],
+    order: [["createdAt", "DESC"]],
   });
 };
 
@@ -436,6 +447,8 @@ export const editBooking = async (req: any, res: Response) => {
         message: 'Booking not found.',
       });
     }
+
+    assertTenantOwnership(booking, 'Booking');
 
     // Update the booking fields
     await booking.update(updateFields);
@@ -479,6 +492,13 @@ export const editBooking = async (req: any, res: Response) => {
   } catch (error) {
     console.error('[EDIT_BOOKING_ERROR]', error);
 
+    if (isTenantError(error)) {
+      return res.status(403).json({
+        success: false,
+        message: (error as Error).message,
+      });
+    }
+
     return res.status(500).json({
       success: false,
       message: 'An error occurred while updating the booking.',
@@ -510,6 +530,8 @@ export const editCloseBooking = async (req: any, res: Response) => {
         message: 'Booking not found.',
       });
     }
+
+    assertTenantOwnership(booking, 'Booking');
 
     // Update the booking fields
     await booking.update(updateFields);
@@ -548,7 +570,14 @@ export const editCloseBooking = async (req: any, res: Response) => {
       data: booking,
     });
   } catch (error) {
-    console.error('[EDIT_BOOKING_ERROR]', error);
+    console.error('[EDIT_CLOSE_BOOKING_ERROR]', error);
+
+    if (isTenantError(error)) {
+      return res.status(403).json({
+        success: false,
+        message: (error as Error).message,
+      });
+    }
 
     return res.status(500).json({
       success: false,
@@ -607,6 +636,8 @@ export const cancelBooking = async (req: any, res: Response) => {
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
+
+    assertTenantOwnership(booking, "Booking");
 
     // Update booking + related records
     const [affected] = await Booking.update(
@@ -715,14 +746,27 @@ console.log("cancel needEmail:", needEmail);
     });
   } catch (err) {
     console.error("Trip cancel Status Error:", err);
+    if (isTenantError(err)) {
+      return res.status(403).json({ error: (err as Error).message });
+    }
     return res.status(500).json({ error: "Internal server error" });
   }
 };
 
 export const getCancelledBooking = async (req: Request, res: Response) => {
   try {
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     const bookings = await Booking.findAll({
-      where: { confirmStatus: ORDER.STATUS.CANCELLED },
+      where: { confirmStatus: ORDER.STATUS.CANCELLED, ...tenantCondition },
     });
 
     res.status(200).json({
@@ -745,6 +789,12 @@ export const declineBooking = async (req: any, res: Response) => {
       return res.status(403).json({ message: 'Not Authorized' });
     }
 
+    const booking = await Booking.findByPk(bookingId);
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+    assertTenantOwnership(booking, 'Booking');
+
     const updateConfirm = await Booking.update({ bookingStatus: ORDER.STATUS.DECLINED, remarks: remarks },
       {
         where: {
@@ -763,6 +813,9 @@ export const declineBooking = async (req: any, res: Response) => {
     });
   } catch (err) {
     console.error('Trip decline Status Error:', err);
+    if (isTenantError(err)) {
+      return res.status(403).json({ error: (err as Error).message });
+    }
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -1160,6 +1213,12 @@ export const getOrderById = async (req: Request, res: Response) => {
       });
     }
 
+    try {
+      assertTenantOwnership(order, 'Booking');
+    } catch (err: any) {
+      return res.status(403).json({ success: false, message: err.message || 'Forbidden' });
+    }
+
     return res.status(200).json({
       success: true,
       message: "Booking details retrieved successfully.",
@@ -1358,6 +1417,12 @@ export const getBookingDetails = async (req: Request, res: Response) => {
     });
 
     if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+    try {
+      assertTenantOwnership(booking, 'Booking');
+    } catch (err: any) {
+      return res.status(403).json({ success: false, message: err.message || 'Forbidden' });
+    }
 
     const userCompanyId = booking.companyId || booking.user?.companyId;
     const allowTax = booking.user?.company?.allowTax || "";
@@ -2064,6 +2129,13 @@ export const getOrderPaymentListById = async (req: any, res: Response) => {
       return res.status(404).json({ message: "Payment not found" });
     }
 
+    if (payment.invoices && payment.invoices.length > 0) {
+      assertTenantOwnership(payment.invoices[0], 'Invoice');
+      if (payment.invoices[0].booking) {
+        assertTenantOwnership(payment.invoices[0].booking, 'Booking');
+      }
+    }
+
     const paymentObj: any = payment.toJSON ? payment.toJSON() : payment;
 
     // BANK REF (RRN) — check multiple likely paths (including lastStatusCheck)
@@ -2100,6 +2172,12 @@ export const getOrderPaymentListById = async (req: any, res: Response) => {
     });
   } catch (error) {
     console.error("Error fetching payment details:", error);
+    if (isTenantError(error)) {
+      return res.status(403).json({
+        success: false,
+        message: (error as Error).message,
+      });
+    }
     return res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -2981,12 +3059,23 @@ export const getOverallInvoiceReport = async (req: Request, res: Response) => {
       vehicleTypeMap.set(vt.vehicleTypeId, vt.vehicleType);
     });
     
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     /* =========================================================
        ONCALL ROWS BUILDER
     ========================================================= */
 const buildOncallRows = async () => {
   const oncallWhere: any = {
     CreatedAt: { [Op.between]: [start, end] },
+    ...tenantCondition,
   };
   if (companyId !== "ALL") {
     oncallWhere.companyId = companyId;
@@ -3118,6 +3207,7 @@ carType: vehicleTypeMap.get(item.vehicleTypeId) || item.vehicleTypeId,
 const buildMonthlyRows = async () => {
   const monthlyWhere: any = {
     invoiceDate: { [Op.between]: [start, end] },
+    ...tenantCondition,
   };
   if (companyId !== "ALL") {
     monthlyWhere.companyId = companyId;
@@ -3274,6 +3364,7 @@ const buildMonthlyRows = async () => {
     const buildNormalRows = async () => {
       const bookingWhere: any = {
         createdAt: { [Op.between]: [start, end] },
+        ...tenantCondition,
       };
 
       const bookings = await Booking.findAll({
@@ -3459,8 +3550,26 @@ export const companyBookingReport = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "companyId is required" });
     }
 
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
+    if (companyId !== "ALL") {
+      const company = await Company.findByPk(companyId);
+      if (!company) {
+        return res.status(404).json({ success: false, message: "Company not found" });
+      }
+      assertTenantOwnership(company, "Company");
+    }
+
     // Booking filter
-    const bookingWhere: any = {};
+    const bookingWhere: any = { ...tenantCondition };
     if (from && to) bookingWhere.createdAt = { [Op.between]: [new Date(from), new Date(to)] };
     else if (from) bookingWhere.createdAt = { [Op.gte]: new Date(from) };
     else if (to) bookingWhere.createdAt = { [Op.lte]: new Date(to) };
@@ -3490,6 +3599,7 @@ if (pickupPoint && pickupPoint !== "All") {
     }
 
     const rows = await Invoice.findAll({
+      where: { ...tenantCondition },
       attributes: [
         [periodAttr, "period_label"],
         [col("booking.pickupPoint"), "pickupPoint"],
@@ -3534,6 +3644,9 @@ if (pickupPoint && pickupPoint !== "All") {
     return res.json({ success: true, data: normalized });
   } catch (err: any) {
     console.error("companyBookingReport error:", err);
+    if (isTenantError(err)) {
+      return res.status(403).json({ success: false, message: err.message });
+    }
     return res.status(500).json({ success: false, message: "Internal server error", error: err.message });
   }
 };
@@ -3545,6 +3658,16 @@ interface MonthlyBookingResult {
 }
 export const getMonthlyBookings = async (req: Request, res: Response) => {
   try {
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     // End date = today
     const endDate = new Date();
 
@@ -3563,6 +3686,7 @@ export const getMonthlyBookings = async (req: Request, res: Response) => {
         bookingDate: {
           [Op.between]: [startDate, endDate],
         },
+        ...tenantCondition,
       },
       group: [fn("YEAR", col("bookingDate")), fn("MONTH", col("bookingDate"))],
       order: [
@@ -3604,13 +3728,45 @@ export const getMonthlyBookings = async (req: Request, res: Response) => {
   }
 };
 
+const assertUserTenant = async (userId: string) => {
+  const user = await User.findByPk(userId);
+  if (!user) {
+    const err: any = new Error("User not found");
+    err.statusCode = 404;
+    throw err;
+  }
+  assertTenantOwnership(user, "User");
+  return user;
+};
+
+const handleUserOrderError = (error: any, res: Response, msg: string) => {
+  console.error(msg, error);
+  if (error?.statusCode === 404 || error?.message === "User not found") {
+    return res.status(404).json({ success: false, message: "User not found" });
+  }
+  if (isTenantError(error)) {
+    return res.status(403).json({ success: false, message: error.message });
+  }
+  return res.status(500).json({ success: false, message: "Server Error" });
+};
+
 // 🟡 Get ALL Orders for a specific user
 export const getAllOrdersByUser = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    await assertUserTenant(userId);
+
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
 
     const orders = await Booking.findAll({
-      where: { userId },
+      where: { userId, ...tenantCondition },
       include: [
         { model: Invoice, include: [{ model: Payment }, { model: ClosePending }] }
       ],
@@ -3619,8 +3775,7 @@ export const getAllOrdersByUser = async (req: Request, res: Response) => {
 
     res.status(200).json({ success: true, data: orders });
   } catch (error) {
-    console.error("Error fetching all orders:", error);
-    res.status(500).json({ success: false, message: "Server Error" });
+    handleUserOrderError(error, res, "Error fetching all orders:");
   }
 };
 
@@ -3628,11 +3783,22 @@ export const getAllOrdersByUser = async (req: Request, res: Response) => {
 export const getPendingOrdersByUser = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    await assertUserTenant(userId);
+
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
 
     const orders = await Booking.findAll({
       where: {
         userId,
         confirmStatus: ORDER.STATUS.PENDING,
+        ...tenantCondition,
       },
       include: [
         { model: Invoice, include: [{ model: Payment }, { model: ClosePending }] }
@@ -3642,24 +3808,32 @@ export const getPendingOrdersByUser = async (req: Request, res: Response) => {
 
     res.status(200).json({ success: true, data: orders });
   } catch (error) {
-    console.error("Error fetching pending orders:", error);
-    res.status(500).json({ success: false, message: "Server Error" });
+    handleUserOrderError(error, res, "Error fetching pending orders:");
   }
 };
-
-
 
 // 🟡 Get Pending invoices based on user
 export const getPendingInvoicesByUser = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    await assertUserTenant(userId);
+
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
 
     const bookings = await Booking.findAll({
-      where: { userId },
+      where: { userId, ...tenantCondition },
       include: [
         {
           model: Invoice,
           required: true, // must have an invoice to be a "pending invoice"
+          where: { ...tenantCondition },
           include: [
             { model: ClosePending, required: false },
             { model: Payment, required: false }, // allow no payment row yet
@@ -3682,22 +3856,30 @@ export const getPendingInvoicesByUser = async (req: Request, res: Response) => {
 
     return res.status(200).json({ success: true, data });
   } catch (e) {
-    console.error("Error fetching pending invoices:", e);
-    return res.status(500).json({ success: false, message: "Server Error" });
+    handleUserOrderError(e, res, "Error fetching pending invoices:");
   }
 };
-
-
 
 // 🟢 Get Confirmed Orders
 export const getConfirmedOrdersByUser = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    await assertUserTenant(userId);
+
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
 
     const orders = await Booking.findAll({
       where: {
         userId,
         confirmStatus: ORDER.STATUS.CONFIRMED,
+        ...tenantCondition,
       },
       include: [
         { model: Invoice, include: [{ model: Payment }, { model: ClosePending }] }
@@ -3707,21 +3889,30 @@ export const getConfirmedOrdersByUser = async (req: Request, res: Response) => {
 
     res.status(200).json({ success: true, data: orders });
   } catch (error) {
-    console.error("Error fetching confirmed orders:", error);
-    res.status(500).json({ success: false, message: "Server Error" });
+    handleUserOrderError(error, res, "Error fetching confirmed orders:");
   }
 };
-
 
 // 💳 Get Payment Completed Orders
 export const getPaymentCompletedOrdersByUser = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    await assertUserTenant(userId);
+
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
 
     const orders = await Booking.findAll({
       where: {
         userId,
         confirmStatus: ORDER.STATUS.PAYMENTCOMPLETED,
+        ...tenantCondition,
       },
       include: [
         { model: Invoice, include: [{ model: Payment }, { model: ClosePending }] }
@@ -3731,21 +3922,30 @@ export const getPaymentCompletedOrdersByUser = async (req: Request, res: Respons
 
     res.status(200).json({ success: true, data: orders });
   } catch (error) {
-    console.error("Error fetching payment completed orders:", error);
-    res.status(500).json({ success: false, message: "Server Error" });
+    handleUserOrderError(error, res, "Error fetching payment completed orders:");
   }
 };
-
 
 // 🔒 Get Closed Orders
 export const getClosedOrdersByUser = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    await assertUserTenant(userId);
+
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
 
     const orders = await Booking.findAll({
       where: {
         userId,
         confirmStatus: ORDER.STATUS.CONFIRMED,
+        ...tenantCondition,
       },
       include: [
         { model: Invoice, include: [{ model: Payment }, { model: ClosePending }] }
@@ -3755,21 +3955,30 @@ export const getClosedOrdersByUser = async (req: Request, res: Response) => {
 
     res.status(200).json({ success: true, data: orders });
   } catch (error) {
-    console.error("Error fetching closed orders:", error);
-    res.status(500).json({ success: false, message: "Server Error" });
+    handleUserOrderError(error, res, "Error fetching closed orders:");
   }
 };
-
 
 // ❌ Get Cancelled Orders
 export const getCancelledOrdersByUser = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    await assertUserTenant(userId);
+
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
 
     const orders = await Booking.findAll({
       where: {
         userId,
         confirmStatus: ORDER.STATUS.CANCELLED,
+        ...tenantCondition,
       },
       include: [
         { model: Invoice, include: [{ model: Payment }, { model: ClosePending }] }
@@ -3779,20 +3988,30 @@ export const getCancelledOrdersByUser = async (req: Request, res: Response) => {
 
     res.status(200).json({ success: true, data: orders });
   } catch (error) {
-    console.error("Error fetching cancelled orders:", error);
-    res.status(500).json({ success: false, message: "Server Error" });
+    handleUserOrderError(error, res, "Error fetching cancelled orders:");
   }
 };
 
 export const getPaymentPendingOrdersByUser = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    await assertUserTenant(userId);
+
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
 
     // Fetch invoices with invoiceStatus = 0 (pending)
     const invoices = await Invoice.findAll({
       where: {
         userId,
         invoiceStatus: ORDER.STATUS.PENDING, // 0
+        ...tenantCondition,
       },
       include: [
         {
@@ -3833,8 +4052,7 @@ export const getPaymentPendingOrdersByUser = async (req: Request, res: Response)
 
     res.status(200).json({ success: true, data: response });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: "Server Error" });
+    handleUserOrderError(error, res, "Error fetching payment pending orders:");
   }
 };
 

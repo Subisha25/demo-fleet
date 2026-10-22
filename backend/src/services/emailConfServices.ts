@@ -211,7 +211,6 @@ export const sendEmailFromTemplate = async (
   const smtpHost = (conf?.smtpServer || "").trim();
   const smtpUser = (conf?.smtpEmailAddress || "").trim();
   const smtpPass = (conf?.smtpEmailPassword || "").trim();
-  console.log("SMTP CONFIG:", { smtpHost, smtpUser, portNum, smtpPass });
   if (!smtpHost || !smtpUser || !smtpPass) {
     throw new Error("SMTP configuration incomplete");
   }

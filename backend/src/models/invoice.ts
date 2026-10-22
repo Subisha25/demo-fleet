@@ -50,12 +50,18 @@ export class Invoice extends Model {
 })
   invoiceId!: string;
 
-  
-    @Column({
-      type: DataType.STRING,
-      unique: true,
-    })
-    invoiceNumber!: string;
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+    defaultValue: 'e7b8a1c0-0000-0000-0000-000000000001',
+  })
+  tenantId!: string;
+
+  @Column({
+    type: DataType.STRING,
+    unique: true,
+  })
+  invoiceNumber!: string;
   
 
   static async generateNextInvoiceNumber(
