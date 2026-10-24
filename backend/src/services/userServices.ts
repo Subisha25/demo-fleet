@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import { User } from '../models/user';
 import { Company } from '../models/company';
+import { Booking } from '../models/booking';
 import { Op } from 'sequelize';                    
 import { sendEmailFromTemplate } from "../services/emailConfServices"; 
+import { validateRegistrationAgainstPolicy } from '../services/policyService';
 import { MapCount } from '../models/mapCount';
 import XLSX from "xlsx";
 import fs from "fs";
@@ -464,15 +466,21 @@ let companyName = "";
         companyName = existingCompany.companyName;
 
     }
-// 🔴 Danfoss email validation
-if (companyName.toLowerCase().includes("danfoss")) {
-  if (email && !email.toLowerCase().endsWith("@danfoss.com")) {
-    return res.status(400).json({
-      success: false,
-      message: "Danfoss users must use @danfoss.com email only",
-    });
-  }
-}
+
+    // Dynamic policy check for authorized email domains and custom employee formats
+    if (companyId && email) {
+      const policyValidation = await validateRegistrationAgainstPolicy(
+        companyId,
+        String(email).trim().toLowerCase(),
+        danfossuserId
+      );
+      if (!policyValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: policyValidation.message || "Email or Employee ID violates company policy",
+        });
+      }
+    }
     // Check for duplicate email (excluding current user)
     if (email) {
       const existingUserByEmail = await User.findOne({
@@ -1104,6 +1112,14 @@ export const permanentDeleteUser = async (req: Request, res: Response) => {
       });
     }
     assertTenantOwnership(user);
+
+    const bookingCount = await Booking.count({ where: { userId: id } });
+    if (bookingCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot permanently delete user with ${bookingCount} associated booking(s). Keep user soft-deleted to preserve audit history.`
+      });
+    }
 
     await user.destroy(); // HARD DELETE
 

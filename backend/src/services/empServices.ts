@@ -21,13 +21,14 @@ import { sendNotification } from "../utils/sendNotification";
 import { sendEmailFromTemplate } from "../services/emailConfServices";
 import { fetchAllEmailConfs } from "../services/emailConfServices";
 import config from '../config/config';
-import { sendTransactionalSms } from './smsServices';
+import { sendTransactionalSms, dispatchAuditedSms } from './smsServices';
 import {normalizeManagerEmails } from '../utils/email';
 import { sendSmsNotifications } from '../utils/smsNotifications';
 
 import crypto from "crypto";
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
+import { generateUniqueCompanySlug } from '../utils/slugUtils';
 
 
 
@@ -1275,7 +1276,6 @@ export const createCompany = async (req: any, res: Response) => {
   } = req.body;
 
   const companyLogo = req.file?.filename;
-  //let managerApproval = 0;
 
   try {
     const role = req.role;
@@ -1301,22 +1301,38 @@ export const createCompany = async (req: any, res: Response) => {
         .status(400)
         .json({ message: "Please provide at least one manager email." });
     }
-//const needEmailBoolean = needEmail === "true" || needEmail === true;
 
+    const finalSeoUrl = await generateUniqueCompanySlug(seoUrl || companyName || "company");
 
+    // Foreign key safety: verify employeeId exists in employee table, and userId in user table
+    let resolvedEmployeeId = null;
+    if (employeeId) {
+      const empExists = await Employee.findByPk(employeeId);
+      if (empExists) {
+        resolvedEmployeeId = employeeId;
+      }
+    }
+
+    let resolvedUserId = userId || null;
+    if (!resolvedUserId && req.userId) {
+      const userExists = await User.findByPk(req.userId);
+      if (userExists) {
+        resolvedUserId = req.userId;
+      }
+    }
 
     const company = await Company.create({
       companyName,
       companyPhno,
-      employeeId,
+      employeeId: resolvedEmployeeId,
       companyLogo,
       domainName,
-     managerEmail: managerEmails.join(', '), // stored as array/JSON column
-      seoUrl,
+      managerEmail: managerEmails.join(', '), // stored as array/JSON column
+      seoUrl: finalSeoUrl,
       gstNo,
       allowTax,
       needEmail,
-      userId,
+      userId: resolvedUserId,
       startTime,
       closeTime,
       companyCode,
@@ -2744,35 +2760,20 @@ async function sendBookingEmailToUserAuto(booking: any, userId: string) {
 async function sendBookingSMSToUser(user: any) {
   try {
     if (!user?.mobile) {
-      console.log("User mobile number not found");
+      console.log("User mobile number not found for booking SMS");
       return;
     }
 
-    const apiKey = process.env.TWO_FACTOR_API_KEY;
-    const senderId = process.env.TWO_FACTOR_SENDER_ID;
-    const templateName = "Booking Creation";
-
-    if (!apiKey || !senderId) {
-      throw new Error("SMS API configuration missing");
-    }
-
-    const smsUrl =
-      `https://2factor.in/API/R1/?module=TRANS_SMS&apikey=${apiKey}` +
-      `&to=${user.mobile}` +
-      `&from=${senderId}` +
-      `&templatename=${encodeURIComponent(templateName)}` +
-      `&var1=${encodeURIComponent(user.username)}`;
-
-    const smsResponse = await fetch(smsUrl);
-
-    if (!smsResponse.ok) {
-      throw new Error(`SMS API request failed: ${smsResponse.status}`);
-    }
-
-    const result = await smsResponse.json();
-    console.log("SMS sent successfully:", result);
-
+    await dispatchAuditedSms({
+      recipient: user.mobile,
+      templateCode: 'BOOKING_CREATED',
+      templateName: 'Booking Creation',
+      vars: [user.username || 'Valued Customer'],
+      message: `Grace Cabs: Hello ${user.username || 'Customer'}, your booking has been created successfully.`,
+      referenceEntity: 'USER',
+      referenceId: String(user.userId || ''),
+    });
   } catch (err: any) {
-    console.error("SMS send error:", err.message);
+    console.error("SMS send error in sendBookingSMSToUser:", err?.message);
   }
 }

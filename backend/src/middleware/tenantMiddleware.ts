@@ -16,7 +16,8 @@ import jwt from 'jsonwebtoken';
  * - Legacy Grace Cabs users without tenantId in token are mapped to ROOT_TENANT_ID.
  */
 export const tenantMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  const headerTenantId = (req.headers['x-tenant-id'] || req.headers['X-Tenant-ID']) as string | undefined;
+  const rawHeaderTenantId = (req.headers['x-tenant-id'] || req.headers['X-Tenant-ID'] || req.headers['x-selected-tenant-id'] || req.headers['X-Selected-Tenant-ID']) as string | undefined;
+  const headerTenantId = rawHeaderTenantId?.trim();
 
   let tokenTenantId: string | undefined;
   let tokenRole: string | undefined;
@@ -42,7 +43,6 @@ export const tenantMiddleware = (req: Request, res: Response, next: NextFunction
       tokenUserId = decoded.userId ? String(decoded.userId) : undefined;
       tokenCompanyId = decoded.companyId;
       tokenEmail = decoded.email;
-      isPlatformSuperAdmin = tokenRole === 'superadmin' || tokenRole === 'SUPERADMIN';
 
       if (decoded.tenantId) {
         tokenTenantId = String(decoded.tenantId);
@@ -50,20 +50,39 @@ export const tenantMiddleware = (req: Request, res: Response, next: NextFunction
         // Authenticated legacy Grace Cabs user without explicit tenantId claim
         tokenTenantId = ROOT_TENANT_ID;
       }
+
+      // Strict Platform SuperAdmin validation:
+      // Must have role superadmin AND belong to root tenant / root admin identity
+      isPlatformSuperAdmin = (tokenRole === 'superadmin' || tokenRole === 'SUPERADMIN') &&
+        (tokenTenantId === ROOT_TENANT_ID || !decoded.tenantId || tokenEmail === 'subisha2002.m@gmail.com');
     } catch {
       // Invalid/expired token - authMiddleware will formally reject where required
     }
   }
 
   let resolvedTenantId: string | undefined;
+  let selectedTenantId: string | undefined;
 
   if (isAuthenticated && tokenTenantId) {
     if (isPlatformSuperAdmin) {
-      // Platform SuperAdmin can target any tenant via header, or defaults to tokenTenantId
-      resolvedTenantId = headerTenantId || tokenTenantId;
+      if (!headerTenantId || headerTenantId === 'all' || headerTenantId === 'ALL') {
+        // SuperAdmin viewing All Fleets (platform aggregate)
+        resolvedTenantId = ROOT_TENANT_ID;
+        selectedTenantId = 'all';
+        // Cleanse headers so downstream services checking !req.headers['x-tenant-id'] treat it as All Fleets
+        delete req.headers['x-tenant-id'];
+        delete req.headers['X-Tenant-ID'];
+        delete req.headers['x-selected-tenant-id'];
+        delete req.headers['X-Selected-Tenant-ID'];
+      } else {
+        // SuperAdmin viewing a specific selected fleet
+        resolvedTenantId = headerTenantId;
+        selectedTenantId = headerTenantId;
+        req.headers['x-tenant-id'] = headerTenantId;
+      }
     } else {
-      // Standard authenticated tenant user or legacy user
-      // Security Check: CANNOT supply an arbitrary X-Tenant-ID to switch tenants!
+      // Standard authenticated tenant user (Fleet Admin, Company Manager, User)
+      // Security Check: CANNOT supply 'all' or an arbitrary X-Tenant-ID to switch tenants!
       if (headerTenantId && headerTenantId !== tokenTenantId) {
         return res.status(403).json({
           success: false,
@@ -71,17 +90,19 @@ export const tenantMiddleware = (req: Request, res: Response, next: NextFunction
         });
       }
       resolvedTenantId = tokenTenantId;
+      selectedTenantId = tokenTenantId;
     }
   } else {
     // Unauthenticated request
     // Security: Do NOT trust arbitrary X-Tenant-ID header from anonymous callers!
-    // Never silently default anonymous requests to root tenant for protected data.
     resolvedTenantId = undefined;
+    selectedTenantId = undefined;
   }
 
   const context: TenantContextData = {
     tenantId: resolvedTenantId || '',
     tenantCode: resolvedTenantId === ROOT_TENANT_ID ? ROOT_TENANT_CODE : (resolvedTenantId ? 'TENANT' : ''),
+    selectedTenantId,
     userId: tokenUserId,
     role: tokenRole,
     companyId: tokenCompanyId,
@@ -93,6 +114,7 @@ export const tenantMiddleware = (req: Request, res: Response, next: NextFunction
     (req as any).tenantId = resolvedTenantId;
     res.setHeader('X-Tenant-ID', resolvedTenantId);
   }
+  (req as any).tenantContext = context;
 
   // Propagate through AsyncLocalStorage
   tenantStorage.run(context, () => {

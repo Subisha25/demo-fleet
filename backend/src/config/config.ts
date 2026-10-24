@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 // Loading env to process
 dotenv.config();
 
-const WEB_BASE_URL = process.env.WEB_BASE_URL || "http://localhost:3001";
+const WEB_BASE_URL = process.env.WEB_BASE_URL || "http://localhost:3000";
 const BASE_URL = process.env.API_BASE_URL || "http://localhost:5001";
 
 const config = {
@@ -14,7 +14,7 @@ const config = {
   },
   baseurl:
   {
-    webbaseurl: WEB_BASE_URL || "http://localhost:3001",
+    webbaseurl: WEB_BASE_URL || "http://localhost:3000",
     apibaseurl: process.env.API_BASE_URL || "http://localhost:5000",
   },
   database: {
@@ -34,12 +34,9 @@ const config = {
     phoneNumber: process.env.TWILIO_PHONE_NUMBER || '', // Your Twilio phone number
   },
 
- twofactor: {
-    // apiKey: process.env.TWOFACTOR_API_KEY,
-    // baseUrl: process.env.TWOFACTOR_BASE_URL || 'https://2factor.in/API/V1',
-    // otpTtlSeconds: 300, // 5 minutes
-    // templatename: process.env.TEMPLATENAME || 'LOGIN_OTP'
-     apiKey: process.env.TWOFACTOR_API_KEY || '',
+  twofactor: {
+    apiKey: process.env.TWO_FACTOR_API_KEY || process.env.TWOFACTOR_API_KEY || '',
+    senderId: process.env.TWO_FACTOR_SENDER_ID || process.env.TWOFACTOR_SENDER_ID || 'GRCCAB',
     templateName: process.env.TWOFACTOR_TEMPLATE_NAME || 'OTP1',
   },
  
@@ -56,7 +53,7 @@ const config = {
     smtp_password: process.env.SMTP_EMAIL_PASSWORD || process.env.SMTP_PASS || "",
     smtp_port: parseInt(process.env.SMTP_EMAIL_PORT || process.env.SMTP_PORT || "587"),
     smtp_secure: process.env.SMTP_SECURE === "true" || process.env.SMTP_SECURE === "1",
-    superadmin_email: process.env.SUPERADMIN_EMAIL || "subisha2002@gmail.com",
+    superadmin_email: process.env.SUPERADMIN_EMAIL || "subisha2002.m@gmail.com",
   },
   companyurl: {
     seo_base: process.env.SEO_BASE_URL || "http://gracecabs.com/Company/"

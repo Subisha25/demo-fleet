@@ -23,6 +23,7 @@ export default function ActivateAccount() {
   const [tenantInfo, setTenantInfo] = useState<TokenVerificationData | null>(null);
   const [verificationError, setVerificationError] = useState<string | null>(null);
 
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -41,6 +42,9 @@ export default function ActivateAccount() {
         const res = await axiosInstance.get(`/public/verify-activation-token?token=${encodeURIComponent(token)}`);
         if (res.data && res.data.success) {
           setTenantInfo(res.data.data);
+          if (res.data.data?.email) {
+            setEmail(res.data.data.email);
+          }
         } else {
           setVerificationError(
             res.data?.message || "This activation link is invalid, expired, or has already been redeemed."
@@ -60,6 +64,11 @@ export default function ActivateAccount() {
     e.preventDefault();
     setSubmitError(null);
 
+    if (!email || !email.includes("@")) {
+      setSubmitError("A valid registered administrator email is required.");
+      return;
+    }
+
     if (password.length < 8) {
       setSubmitError("Password must be at least 8 characters long.");
       return;
@@ -74,6 +83,7 @@ export default function ActivateAccount() {
     try {
       const res = await axiosInstance.post("/public/activate-account", {
         token,
+        email,
         password,
         confirmPassword,
       });
@@ -209,6 +219,20 @@ export default function ActivateAccount() {
                     {submitError}
                   </div>
                 )}
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-1.5">
+                    Registered Administrator Email *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter registered applicant email"
+                    className="w-full px-4 py-3 rounded-xl border border-[#E0DAD1] focus:outline-none focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] text-sm bg-white"
+                  />
+                </div>
 
                 <div>
                   <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-1.5">

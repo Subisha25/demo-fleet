@@ -19,8 +19,8 @@ router.get('/:vendorId',authMiddleware, getVendorById);
 router.put('/:vendorId/update',authMiddleware,updateVendor);
 router.delete('/:vendorId/delete',authMiddleware,deleteVendor)
 
-router.post('/createVehicleType',uploadVehicleImg.array("vehicleImg", 5),authMiddleware, createVehicleType);
-router.post('/createVehicle', uploadVehicleImg.array("vehicleImg", 5), authMiddleware, requireVehicleQuota, createVehicle);
+router.post('/createVehicleType', authMiddleware, uploadVehicleImg.array("vehicleImg", 5), createVehicleType);
+router.post('/createVehicle', authMiddleware, requireVehicleQuota, uploadVehicleImg.array("vehicleImg", 5), createVehicle);
 router.post('/createVehicleMaster', authMiddleware, requireVehicleQuota, createVehicleMaster);
 router.post('/createDriver', authMiddleware, requireDriverQuota, createDriver);
 

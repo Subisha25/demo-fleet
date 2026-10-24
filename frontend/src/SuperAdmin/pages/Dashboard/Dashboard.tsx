@@ -32,6 +32,7 @@ import {
 import { CircularProgressbarWithChildren, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
 import axiosInstance from '../../../utils/axiosInstance';
+import { useTenant } from '../../../context/TenantContext';
 
 interface MonthlyBooking {
   year: number;
@@ -88,23 +89,27 @@ const StatCard: React.FC<StatCardProps> = ({
 
 interface FleetOverviewData {
   tenant?: {
-    id: string;
-    companyName: string;
-    contactPerson: string;
-    contactEmail: string;
-    contactPhone: string;
-    status: string;
+    tenantId?: string;
+    id?: string;
+    name?: string;
+    companyName?: string;
+    code?: string;
+    contactPerson?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    status?: string;
   };
   subscription?: {
-    plan: string;
-    billingCycle: string;
-    status: string;
-    startDate: string;
-    endDate: string;
-    daysRemaining: number;
-    isExpiringSoon: boolean;
-    inGracePeriod: boolean;
-    isSuspended: boolean;
+    planTier?: string;
+    plan?: string;
+    billingCycle?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+    daysRemaining?: number;
+    isExpiringSoon?: boolean;
+    inGracePeriod?: boolean;
+    isSuspended?: boolean;
   };
   quotas?: {
     vehicles: { current: number; limit: number };
@@ -124,6 +129,11 @@ const Dashboard: React.FC = () => {
   const [pendingPercentage, setPendingPercentage] = useState<number>(0);
   const [completedPercentage, setCompletedPercentage] = useState<number>(0);
   const [fleetOverview, setFleetOverview] = useState<FleetOverviewData | null>(null);
+
+  const { selectedFleet, fleetChangeVersion, currentTenant } = useTenant();
+  const role = localStorage.getItem('role') || 'User';
+  const isSuperAdmin = role === 'superadmin';
+  const isAllFleets = isSuperAdmin && selectedFleet === 'all';
 
   const cardData: StatCardProps[] = [
     {
@@ -184,7 +194,7 @@ const Dashboard: React.FC = () => {
     };
 
     fetchCounts();
-  }, []);
+  }, [selectedFleet, fleetChangeVersion]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -227,14 +237,63 @@ const Dashboard: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedFleet, fleetChangeVersion]);
 
   const sub = fleetOverview?.subscription;
   const quotas = fleetOverview?.quotas;
 
+  const activeTenantName = fleetOverview?.tenant?.name || currentTenant?.name || 'Active Fleet';
+  const effectivePlan = fleetOverview?.subscription?.planTier || sub?.planTier || currentTenant?.planTier || 'PRO';
+
+  const dashboardTitle = isSuperAdmin
+    ? (isAllFleets
+        ? "Platform-Wide Operations (All Fleets)"
+        : `${activeTenantName} Operations Dashboard`)
+    : `${activeTenantName} Operations Dashboard`;
+
+  const dashboardSubtitle = isSuperAdmin
+    ? (isAllFleets
+        ? "Real-time aggregated counts, telemetry, and bookings across all platform fleets."
+        : `Operational telemetry, fleet capacity quotas, and active dispatch pipeline for ${activeTenantName}.`)
+    : `Operational telemetry, fleet capacity quotas, and active dispatch pipeline for ${activeTenantName}.`;
+
   return (
-    <PageLayout breadcrumbName="Operations Dashboard">
+    <PageLayout
+      breadcrumbName="Operations Dashboard"
+      title={dashboardTitle}
+      subtitle={dashboardSubtitle}
+    >
       <div className="space-y-6">
+
+        {/* Platform-Wide Aggregated Mode Badge for SuperAdmin */}
+        {isAllFleets && (
+          <div className="bg-[#FAF0E6] border border-[#E8D0C0] p-4 rounded-xl flex items-center justify-between text-xs text-[#843217] shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <Sparkles size={18} className="text-[#C04E24]" />
+              <span>
+                <strong>Platform-Wide Aggregated View:</strong> Displaying cumulative totals across all authorized fleets. Use the <strong>Fleet Scope</strong> selector in the header to focus on an individual fleet.
+              </span>
+            </div>
+            <span className="font-bold uppercase tracking-wider text-[10px] bg-[#C04E24] text-white px-2.5 py-1 rounded-full">
+              All Fleets
+            </span>
+          </div>
+        )}
+
+        {/* Filtered Fleet Mode Badge for SuperAdmin */}
+        {isSuperAdmin && !isAllFleets && (
+          <div className="bg-[#F0FDF4] border border-[#BBF7D0] p-3.5 rounded-xl flex items-center justify-between text-xs text-[#166534] shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle size={18} className="text-[#16A34A]" />
+              <span>
+                <strong>Filtered Fleet View:</strong> Scoped strictly to <strong>{currentTenant?.name}</strong>. All cards, counts, and reports reflect only this fleet.
+              </span>
+            </div>
+            <span className="font-bold uppercase tracking-wider text-[10px] bg-[#16A34A] text-white px-2.5 py-1 rounded-full">
+              Filtered Scope
+            </span>
+          </div>
+        )}
 
         {/* 1. Subscription Renewal Alert Banner (Days <= 2) */}
         {sub?.isExpiringSoon && !sub?.inGracePeriod && !sub?.isSuspended && (
@@ -315,7 +374,7 @@ const Dashboard: React.FC = () => {
               <span className="text-[#EDE9E3] text-xs">Isolated Tenant Telemetry</span>
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight">
-              {fleetOverview?.tenant?.companyName ? `${fleetOverview.tenant.companyName} Operations` : 'Fleet Operations Dashboard'}
+              {isAllFleets ? "Platform-Wide Fleet Operations" : `${activeTenantName} Operations`}
             </h1>
             <p className="text-xs text-[#EDE9E3] mt-1">Real-time trip progression, quota telemetry, and consolidated invoice metrics.</p>
           </div>
@@ -349,7 +408,7 @@ const Dashboard: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Sparkles size={16} className="text-[#C04E24]" />
                 <h3 className="text-xs font-bold text-[#1C1A18] uppercase tracking-wider">
-                  Plan Quota Utilization ({sub?.plan?.toUpperCase() || 'PRO'} Plan)
+                  Plan Quota Utilization ({effectivePlan.toUpperCase()} Plan)
                 </h3>
               </div>
               <span className="text-xs text-[#7A7570]">

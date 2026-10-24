@@ -5,7 +5,7 @@ import { Tenant } from '../models/tenant';
 import { TenantSubscription } from '../models/tenantSubscription';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 import { PLAN_CATALOG, PLAN_LIMITS, getOrCreateSubscription } from './quotaService';
-import { sendNotification } from './notificationService';
+import { sendNotification, getSuperAdminEmail } from './notificationService';
 import config from '../config/config';
 
 /**
@@ -227,7 +227,7 @@ export const verifySubscriptionPayment = async (req: Request, res: Response) => 
     }
 
     // Send payment confirmation notification
-    const recipientEmail = tenant?.contactEmail || 'admin@gracecabs.com';
+    const recipientEmail = tenant?.contactEmail || (await getSuperAdminEmail());
     await sendNotification({
       channel: 'EMAIL',
       recipient: recipientEmail,

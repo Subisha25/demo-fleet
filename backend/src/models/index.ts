@@ -66,7 +66,7 @@ const connectDB = async () => {
           subdomain: 'gracecabs',
           status: 'ACTIVE',
           planTier: 'ENTERPRISE',
-          contactEmail: 'admin@gracecabs.com',
+          contactEmail: 'subisha2002.m@gmail.com',
           brandingTokens: {
             primaryColor: '#275981',
             secondaryColor: '#1d4260',

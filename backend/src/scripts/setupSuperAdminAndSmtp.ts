@@ -50,7 +50,7 @@ async function main() {
     updateOrAddKey('SMTP_EMAIL_PORT', '587');
     updateOrAddKey('SMTP_PORT', '587');
     updateOrAddKey('SMTP_SECURE', 'false');
-    updateOrAddKey('SUPERADMIN_EMAIL', 'subisha2002@gmail.com');
+    updateOrAddKey('SUPERADMIN_EMAIL', 'subisha2002.m@gmail.com');
 
     if (activeSmtpPass) {
       updateOrAddKey('SMTP_EMAIL_PASSWORD', activeSmtpPass);
@@ -83,7 +83,7 @@ async function main() {
     }
 
     // 4. Update / verify SuperAdmin account in Employee table
-    const targetEmail = 'subisha2002@gmail.com';
+    const targetEmail = 'subisha2002.m@gmail.com';
     const rawPass = 'superadmin@123';
     const hashedPassword = await bcrypt.hash(rawPass, 10);
 

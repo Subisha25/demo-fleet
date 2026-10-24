@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Configuration, EmailConfiguration } from '../models';
+import { Configuration, EmailConfiguration, NotificationLog } from '../models';
 import { USERS } from "../utils/costants";
 import nodemailer from "nodemailer";
 import config from "../config/config";  
@@ -205,12 +205,12 @@ export const sendEmailFromTemplate = async (
   const finalMessage = replacePlaceholders(emailConf.message, data);
   const finalSubject = replacePlaceholders(emailConf.subject, data);
 
-  // Load SMTP configuration
+  // Load SMTP configuration from environment with DB Configuration fallback
   const conf = await Configuration.findOne();
-  const portNum = Number(conf?.smtpEmailPort) || 587;
-  const smtpHost = (conf?.smtpServer || "").trim();
-  const smtpUser = (conf?.smtpEmailAddress || "").trim();
-  const smtpPass = (conf?.smtpEmailPassword || "").trim();
+  const smtpHost = (process.env.SMTP_SERVER || process.env.SMTP_HOST || conf?.smtpServer || "").trim();
+  const portNum = Number(process.env.SMTP_EMAIL_PORT || process.env.SMTP_PORT || conf?.smtpEmailPort) || 587;
+  const smtpUser = (process.env.SMTP_EMAIL_ADDRESS || process.env.SMTP_USER || conf?.smtpEmailAddress || "").trim();
+  const smtpPass = (process.env.SMTP_EMAIL_PASSWORD || process.env.SMTP_PASS || conf?.smtpEmailPassword || "").trim();
   if (!smtpHost || !smtpUser || !smtpPass) {
     throw new Error("SMTP configuration incomplete");
   }
@@ -260,30 +260,46 @@ export const sendEmailFromTemplate = async (
   };
 
   // Create transporter
- const transporter = nodemailer.createTransport({
-  host: smtpHost,
-//    host: "smtpout.secureserver.net",
-  port: 587,
-  secure: false,
-  auth: {
-    user: smtpUser,       // traveldesk@gracecabs.com
-    pass: smtpPass
-  },
-  tls: {
-    rejectUnauthorized: false
-//    rejectUnauthorized: true   
-  }
-});
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: portNum,
+    secure: portNum === 465,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+  });
 
   // ✅ SEND MAIL (ONLY ONCE)
   try {
    // const info = await transporter.sendMail(mailOptions);
-const info: SentMessageInfo = await transporter.sendMail(mailOptions);
+    const info: SentMessageInfo = await transporter.sendMail(mailOptions);
 
     console.log("EMAIL SENT SUCCESSFULLY:", {
       accepted: info.accepted,
       messageId: info.messageId
     });
+
+    try {
+      await NotificationLog.create({
+        channel: 'EMAIL',
+        recipient: allRecipients.join(', '),
+        templateCode: String(emailConf.emailCode || idOrCode),
+        referenceEntity: 'EMAIL_CONF',
+        referenceId: String(emailConf.id || ''),
+        providerStatus: 'SENT',
+        providerMessageId: info.messageId || null,
+        errorDetails: null,
+        retryCount: 0,
+        maxRetries: 3,
+        metadata: { subject: finalSubject, accepted: info.accepted },
+      });
+    } catch (logErr) {
+      console.warn("Could not write NotificationLog for emailConf:", logErr);
+    }
 
     // cleanup attachments
     if (attachments.length > 0) {
@@ -294,8 +310,23 @@ const info: SentMessageInfo = await transporter.sendMail(mailOptions);
 
     return { sent: true };
 
-  } catch (err) {
+  } catch (err: any) {
     console.error("EMAIL SEND FAILED:", err);
+    try {
+      await NotificationLog.create({
+        channel: 'EMAIL',
+        recipient: allRecipients.join(', '),
+        templateCode: String(emailConf?.emailCode || idOrCode),
+        referenceEntity: 'EMAIL_CONF',
+        referenceId: String(emailConf?.id || ''),
+        providerStatus: 'FAILED',
+        providerMessageId: null,
+        errorDetails: err?.message || 'Email send failed',
+        retryCount: 0,
+        maxRetries: 3,
+        metadata: { subject: finalSubject },
+      });
+    } catch {}
     throw err;
   }
 };

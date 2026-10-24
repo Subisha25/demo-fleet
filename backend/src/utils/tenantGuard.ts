@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import { getTenantContext, ROOT_TENANT_ID, TenantContextMissingError } from '../context/tenantContext';
 
 export class CrossTenantAccessError extends Error {
@@ -29,7 +30,7 @@ export const assertTenantOwnership = (
   // If no entity found, caller will handle 404
   if (!entity) return;
 
-  // Platform SuperAdmin has audited administrative access
+  // Platform SuperAdmin has audited administrative access across all tenants
   if (ctx?.isPlatformSuperAdmin) return;
 
   const currentTenantId = ctx?.tenantId;
@@ -54,7 +55,15 @@ export const withTenant = (whereClause: Record<string, any> = {}): Record<string
   const ctx = getTenantContext();
 
   if (ctx?.isPlatformSuperAdmin) {
-    return { ...whereClause };
+    if (!ctx.selectedTenantId || ctx.selectedTenantId === 'all') {
+      return { ...whereClause };
+    }
+    return {
+      ...whereClause,
+      ...(ctx.selectedTenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId: ctx.selectedTenantId }),
+    };
   }
 
   const tenantId = ctx?.tenantId;
@@ -64,6 +73,9 @@ export const withTenant = (whereClause: Record<string, any> = {}): Record<string
 
   return {
     ...whereClause,
-    tenantId,
+    ...(tenantId === ROOT_TENANT_ID
+      ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+      : { tenantId }),
   };
 };
+

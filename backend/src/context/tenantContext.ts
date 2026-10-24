@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'async_hooks';
 export interface TenantContextData {
   tenantId: string;
   tenantCode: string;
+  selectedTenantId?: string; // Explicitly set when SuperAdmin selects a specific fleet, or 'all'/undefined when All Fleets
   userId?: string;
   role?: string;
   companyId?: string;

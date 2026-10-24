@@ -360,7 +360,11 @@ const selectedManager = managers.find((m) => m.userId === managerUserId);
     }
   };
 useEffect(() => {
-  if (!companyId) return;
+  if (!companyId) {
+    setShowDanfossFields(false);
+    setRequireManagerApproval(false);
+    return;
+  }
 
   const checkCompany = async () => {
     try {
@@ -377,9 +381,12 @@ useEffect(() => {
         seoUrl.includes("danfoss") ||
         code === "dan";
 
-      setShowDanfossFields(isDanfoss);
+      const managerApproval =
+        company?.managerApproval === true || company?.managerApproval === 1;
 
-      // ✅ ADD THIS BLOCK 👇
+      setShowDanfossFields(isDanfoss || Boolean(managerApproval));
+      setRequireManagerApproval(Boolean(managerApproval));
+
       if (isDanfoss) {
         setFormData((prev) => ({
           ...prev,
@@ -387,52 +394,7 @@ useEffect(() => {
         }));
       }
 
-    } catch (e) {
-      setShowDanfossFields(false);
-    }
-  };
-
-  checkCompany();
-}, [companyId]);
-  useEffect(() => {
-    fetchVehicleSchedule();
-  }, []);
-useEffect(() => {
-  if (userId) {
-    fetchManagerByUserId(userId);
-  }
-}, [userId]);
-useEffect(() => {
-  if (!companyId) return;
-
-  const checkCompany = async () => {
-    try {
-      const res = await axiosInstance.get(`/company/getCompanyById/${companyId}`);
-      const company = res?.data?.data || res?.data?.company || res?.data;
-
-      const name = String(company?.companyName || "").toLowerCase();
-      const code = String(company?.companyCode || "").toLowerCase();
-      const seoUrl = String(company?.seoUrl || "").toLowerCase();
-
-      // ✅ Danfoss only
-      const isDanfoss =
-        name.includes("danfoss") ||
-        code.includes("danfoss") ||
-        seoUrl.includes("danfoss") ||
-        code === "dan"; // if you use short code
-
-      setShowDanfossFields(isDanfoss);
-
-      // ✅ managerApproval flag (true/1)
-      const managerApproval =
-        company?.managerApproval === true || company?.managerApproval === 1;
-
-      // ✅ FINAL CONDITION: Danfoss + managerApproval
-      const shouldShow = isDanfoss && managerApproval;
-      setRequireManagerApproval(shouldShow);
-
-      // reset when not required
-      if (!shouldShow) {
+      if (!managerApproval) {
         setCostCenter("");
         setManagerUserId("");
         setManagers([]);
@@ -833,9 +795,7 @@ const validBehalfPhone =
 //   return email.toLowerCase().endsWith("@danfoss.com");
 // };
 const isValidManagerEmail = (email: string) => {
-  //const regex = /^[a-zA-Z0-9._%+-]+@danfoss\.com$/i;
-//    const regex = /^[a-zA-Z0-9._%+-]+@(gmail\.com|gracecabs\.com|danfoss\.com)$/i;
-  const regex = /^[a-zA-Z0-9._%+-]+@(danfoss\.com)$/i;
+  const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/i;
   return regex.test(email.trim());
 };
   const handleBooking = async () => {
@@ -893,7 +853,7 @@ if (requireManagerApproval) {
 //   return;
 // }
 if (!isValidManagerEmail(managerEmail)) {
-  showToast("Enter valid mail (eg: name@danfoss.com)", "error");
+  showToast("Please enter a valid manager email address", "error");
   setIsBooking(false);
   return;
 }

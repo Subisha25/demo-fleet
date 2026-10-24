@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { TenantProvider } from './context/TenantContext';
-import PrivateRoute from './routes/PrivateRoutes';
+import PrivateRoute, { SuperAdminRoute } from './routes/PrivateRoutes';
 import Login from './SuperAdmin/pages/Login/Login';
 import Sidebar from './components/Sidebar';
 import { AlertContainer } from './components/AlertBox';
@@ -179,14 +179,14 @@ const Layout = () => {
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/" element={<Dashboard />} />
-          {/* SaaS Multi-Tenant Routes */}
-          <Route path="/tenants/list" element={<TenantList />} />
-          <Route path="/tenants/add" element={<AddTenant />} />
-          <Route path="/tenants/policies" element={<CompanyPolicies />} />
-          <Route path="/tenants/registrations" element={<RegistrationsQueue />} />
-          <Route path="/admin/registrations" element={<RegistrationsQueue />} />
-          <Route path="/admin/billing" element={<SubscriptionCheckout />} />
-          <Route path="/billing" element={<SubscriptionCheckout />} />
+          {/* SaaS Multi-Tenant Routes (SuperAdmin Only) */}
+          <Route path="/tenants/list" element={<SuperAdminRoute><TenantList /></SuperAdminRoute>} />
+          <Route path="/tenants/add" element={<SuperAdminRoute><AddTenant /></SuperAdminRoute>} />
+          <Route path="/tenants/policies" element={<SuperAdminRoute><CompanyPolicies /></SuperAdminRoute>} />
+          <Route path="/tenants/registrations" element={<SuperAdminRoute><RegistrationsQueue /></SuperAdminRoute>} />
+          <Route path="/admin/registrations" element={<SuperAdminRoute><RegistrationsQueue /></SuperAdminRoute>} />
+          <Route path="/admin/billing" element={<SuperAdminRoute><SubscriptionCheckout /></SuperAdminRoute>} />
+          <Route path="/billing" element={<SuperAdminRoute><SubscriptionCheckout /></SuperAdminRoute>} />
           {/* Master Routes */}
           <Route path="/master/tax/add" element={<AddTax />} />
           <Route path="/master/tax/list" element={<ListTax />} />
@@ -199,11 +199,11 @@ const Layout = () => {
           <Route path="/company/edit/:companyId" element={<EditCompany />} />
           <Route path="/master/package/add" element={<AddPackage />} />
           <Route path="/master/package/list" element={<ListPackage />} />
-          {/* Configuration Routes */}
-          <Route path="/configuration/master" element={<Configuration />} />
-          <Route path="/configuration/email" element={<EmailConfiguration />} />
-          <Route path="/email/configurations/edit/:id" element={<EditEmail />} />
-          <Route path="/email/configurations/edit-main-template" element={<EditMainTemplate />} />
+          {/* Configuration Routes (SuperAdmin Only) */}
+          <Route path="/configuration/master" element={<SuperAdminRoute><Configuration /></SuperAdminRoute>} />
+          <Route path="/configuration/email" element={<SuperAdminRoute><EmailConfiguration /></SuperAdminRoute>} />
+          <Route path="/email/configurations/edit/:id" element={<SuperAdminRoute><EditEmail /></SuperAdminRoute>} />
+          <Route path="/email/configurations/edit-main-template" element={<SuperAdminRoute><EditMainTemplate /></SuperAdminRoute>} />
           {/* Payment Mode Routes */}
           <Route path="/paymentmode/add" element={<AddPaymentMode />} />
           <Route path="/paymentmode/list" element={<ListPaymentMode />} />

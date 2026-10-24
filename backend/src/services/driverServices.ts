@@ -155,7 +155,19 @@ export const deleteDriver = async (req: any, res: Response) => {
     }
     assertTenantOwnership(driver);
 
-    await driver.update({isDeleted : 1});
+    const activeBooking = await Booking.findOne({
+      where: {
+        driverId,
+        confirmStatus: { [Op.in]: [ORDER.STATUS.PENDING, ORDER.STATUS.CONFIRMED, ORDER.STATUS.ACCEPTED] }
+      }
+    });
+    if (activeBooking) {
+      return res.status(400).json({
+        message: 'Cannot delete driver with active or assigned bookings. Please reassign bookings first.'
+      });
+    }
+
+    await driver.update({ isDeleted: true });
     res.status(200).json({ message: 'Driver deleted successfully' });
   } catch (err: any) {
     if (isTenantError(err)) {

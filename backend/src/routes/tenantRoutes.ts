@@ -9,7 +9,12 @@ import {
   getSubscriptionPlans,
   renewTenantSubscription,
   getFleetDashboardOverview,
+  uploadCurrentTenantLogo,
+  getRegistrationNotifications,
+  markRegistrationNotificationRead,
+  markAllRegistrationNotificationsRead,
 } from '../services/tenantService';
+import { uploadFleetLogo } from '../middleware/uploadConfig';
 import { getCompanyPolicy, upsertCompanyPolicy } from '../services/policyService';
 import {
   submitFleetRegistration,
@@ -32,7 +37,7 @@ import {
   runLifecycleEvaluation,
   getLifecycleStatus,
 } from '../services/subscriptionLifecycleService';
-import { authMiddleware } from '../middleware/authMiddleware';
+import { authMiddleware, requireSuperAdmin } from '../middleware/authMiddleware';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 
 const router = Router();
@@ -53,20 +58,20 @@ router.post('/activate-account', completeAccountActivation);
 // =============================================================================
 // SUPERADMIN REGISTRATION REVIEW & ONBOARDING QUEUE
 // =============================================================================
-router.get('/admin/registrations', authMiddleware, getRegistrationRequests);
-router.get('/admin/registrations/:requestId', authMiddleware, getRegistrationRequestById);
-router.post('/admin/registrations/:requestId/approve', authMiddleware, approveRegistrationRequest);
-router.post('/admin/registrations/:requestId/reject', authMiddleware, rejectRegistrationRequest);
-router.post('/admin/registrations/:requestId/resend-activation', authMiddleware, resendActivationLink);
-router.post('/admin/registrations/:requestId/resend-token', authMiddleware, resendActivationLink);
+router.get('/admin/registrations', authMiddleware, requireSuperAdmin, getRegistrationRequests);
+router.get('/admin/registrations/:requestId', authMiddleware, requireSuperAdmin, getRegistrationRequestById);
+router.post('/admin/registrations/:requestId/approve', authMiddleware, requireSuperAdmin, approveRegistrationRequest);
+router.post('/admin/registrations/:requestId/reject', authMiddleware, requireSuperAdmin, rejectRegistrationRequest);
+router.post('/admin/registrations/:requestId/resend-activation', authMiddleware, requireSuperAdmin, resendActivationLink);
+router.post('/admin/registrations/:requestId/resend-token', authMiddleware, requireSuperAdmin, resendActivationLink);
 
 // Direct aliases for /api/admin mounts
-router.get('/registrations', authMiddleware, getRegistrationRequests);
-router.get('/registrations/:requestId', authMiddleware, getRegistrationRequestById);
-router.post('/registrations/:requestId/approve', authMiddleware, approveRegistrationRequest);
-router.post('/registrations/:requestId/reject', authMiddleware, rejectRegistrationRequest);
-router.post('/registrations/:requestId/resend-activation', authMiddleware, resendActivationLink);
-router.post('/registrations/:requestId/resend-token', authMiddleware, resendActivationLink);
+router.get('/registrations', authMiddleware, requireSuperAdmin, getRegistrationRequests);
+router.get('/registrations/:requestId', authMiddleware, requireSuperAdmin, getRegistrationRequestById);
+router.post('/registrations/:requestId/approve', authMiddleware, requireSuperAdmin, approveRegistrationRequest);
+router.post('/registrations/:requestId/reject', authMiddleware, requireSuperAdmin, rejectRegistrationRequest);
+router.post('/registrations/:requestId/resend-activation', authMiddleware, requireSuperAdmin, resendActivationLink);
+router.post('/registrations/:requestId/resend-token', authMiddleware, requireSuperAdmin, resendActivationLink);
 
 // =============================================================================
 // SUBSCRIPTION CHECKOUT & INVOICING (Authenticated Tenant Operator)
@@ -84,20 +89,30 @@ router.post('/billing/run-lifecycle-check', authMiddleware, runLifecycleEvaluati
 // =============================================================================
 // SUBSCRIPTION LIFECYCLE SCHEDULER & HEALTH STATUS
 // =============================================================================
-router.post('/admin/subscription-lifecycle/run', authMiddleware, runLifecycleEvaluation);
-router.get('/admin/subscription-lifecycle/status', authMiddleware, getLifecycleStatus);
+router.post('/admin/subscription-lifecycle/run', authMiddleware, requireSuperAdmin, runLifecycleEvaluation);
+router.get('/admin/subscription-lifecycle/status', authMiddleware, requireSuperAdmin, getLifecycleStatus);
 
 // =============================================================================
 // TENANT PROFILE, DASHBOARD STATS & BRANDING (Authenticated Staff)
 // =============================================================================
 router.get('/current/profile', authMiddleware, getCurrentTenantProfile);
 router.put('/current/branding', authMiddleware, updateCurrentTenantBranding);
+router.post('/current/logo', authMiddleware, uploadFleetLogo.single('logo'), uploadCurrentTenantLogo);
+router.put('/current/logo', authMiddleware, uploadFleetLogo.single('logo'), uploadCurrentTenantLogo);
 router.get('/dashboard/stats', authMiddleware, getFleetDashboardOverview);
 router.get('/dashboard/overview', authMiddleware, getFleetDashboardOverview);
 
+// In-App Registration Notifications (SuperAdmin)
+router.get('/admin/notifications', authMiddleware, requireSuperAdmin, getRegistrationNotifications);
+router.post('/admin/notifications/mark-read/:requestId', authMiddleware, requireSuperAdmin, markRegistrationNotificationRead);
+router.post('/admin/notifications/mark-all-read', authMiddleware, requireSuperAdmin, markAllRegistrationNotificationsRead);
+router.get('/notifications', authMiddleware, requireSuperAdmin, getRegistrationNotifications);
+router.post('/notifications/mark-read/:requestId', authMiddleware, requireSuperAdmin, markRegistrationNotificationRead);
+router.post('/notifications/mark-all-read', authMiddleware, requireSuperAdmin, markAllRegistrationNotificationsRead);
+
 // Notification Diagnostics (SuperAdmin / Dev)
-router.get('/admin/notifications/diagnose-smtp', authMiddleware, diagnoseEmailEndpoint);
-router.post('/admin/notifications/test-email', authMiddleware, sendTestEmailEndpoint);
+router.get('/admin/notifications/diagnose-smtp', authMiddleware, requireSuperAdmin, diagnoseEmailEndpoint);
+router.post('/admin/notifications/test-email', authMiddleware, requireSuperAdmin, sendTestEmailEndpoint);
 
 
 // =============================================================================
@@ -140,10 +155,10 @@ router.post('/policies/:companyId', authMiddleware, handleUpsertPolicy);
 // =============================================================================
 // PLATFORM TENANT MANAGEMENT (SuperAdmin)
 // =============================================================================
-router.get('/', authMiddleware, getAllTenants);
-router.post('/', authMiddleware, createTenant);
+router.get('/', authMiddleware, requireSuperAdmin, getAllTenants);
+router.post('/', authMiddleware, requireSuperAdmin, createTenant);
 router.get('/:tenantId', authMiddleware, getTenantById);
-router.put('/:tenantId/subscription', authMiddleware, updateTenantSubscription);
-router.post('/:tenantId/subscription/renew', authMiddleware, renewTenantSubscription);
+router.put('/:tenantId/subscription', authMiddleware, requireSuperAdmin, updateTenantSubscription);
+router.post('/:tenantId/subscription/renew', authMiddleware, requireSuperAdmin, renewTenantSubscription);
 
 export default router;

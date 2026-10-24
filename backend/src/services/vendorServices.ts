@@ -17,8 +17,10 @@ import { sendNotification } from "../utils/sendNotification";
 import { sendEmailFromTemplate, fetchAllEmailConfs } from "../services/emailConfServices";
 import { User } from "../models/user";
 import { formatDateTime,formatToIST } from '../utils/formatDateTime';
-import { sendSmsNotifications } from '../utils/smsNotifications';
 import moment from "moment-timezone";
+import bcrypt from 'bcrypt';
+import { dispatchAuditedSms } from './smsServices';
+import { sendSmsNotifications } from '../utils/smsNotifications';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 
 export const confirmBooking = async (req: any, res: Response) => {
@@ -560,7 +562,7 @@ export const deleteVendor = async (req: any, res: Response) => {
 
 export const createDriver = async (req: any, res: Response) => {
   const { driverName, driverEmail, phno, password, city, state, country, address,
-    licenseNo,licExpDate, pincode,  vehicleTypeId, trackingSource  } = req.body;
+    licenseNo, licExpDate, pincode, vehicleTypeId, trackingSource } = req.body;
   try {
     const drole = req.role;
     if (drole === ROLES.USER) {
@@ -570,14 +572,46 @@ export const createDriver = async (req: any, res: Response) => {
     const ctx = getTenantContext();
     const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
 
-    const existing = await Drivers.findOne({ where: { phno, tenantId } });
+    if (!driverName || !String(driverName).trim()) {
+      return res.status(400).json({ message: 'Driver name is required' });
+    }
+
+    if (!phno || !String(phno).trim()) {
+      return res.status(400).json({ message: 'Phone number is required' });
+    }
+
+    const cleanPhone = String(phno).trim();
+    const existing = await Drivers.findOne({ where: { phno: cleanPhone, tenantId } });
     if (existing) {
       return res.status(400).json({ message: 'Phone number already exists in this fleet' });
     }
 
+    if (driverEmail && String(driverEmail).trim() !== '') {
+      const cleanEmail = String(driverEmail).trim();
+      const existingEmail = await Drivers.findOne({ where: { driverEmail: cleanEmail, tenantId } });
+      if (existingEmail) {
+        return res.status(400).json({ message: 'Email already exists for another driver in this fleet' });
+      }
+    }
+
+    const rawPassword = (password && String(password).trim() !== '') ? String(password).trim() : 'Driver@123';
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
     const driver = await Drivers.create({
-      driverName, driverEmail, phno, password, city, state, country, address,role: role,
-      pincode, licenseNo, licExpDate, vehicleTypeId, trackingsource:trackingSource,
+      driverName: String(driverName).trim(),
+      driverEmail: driverEmail ? String(driverEmail).trim() : null,
+      phno: cleanPhone,
+      password: hashedPassword,
+      city,
+      state,
+      country,
+      address,
+      role: role,
+      pincode,
+      licenseNo,
+      licExpDate,
+      vehicleTypeId: vehicleTypeId || null,
+      trackingsource: trackingSource,
       tenantId
     });
 
@@ -585,17 +619,51 @@ export const createDriver = async (req: any, res: Response) => {
       where: { driverId: driver.driverId },
       include: [{
         model: Vehicle, required: false,
-        include: [{ model: VehicleType, required: false, }]
+        include: [{ model: VehicleType, required: false }]
       }]
     });
 
-    res.status(201).json({
-      message: "Registered successfully",
+    // Send email notification if email provided
+    let emailSent = false;
+    if (driverEmail && String(driverEmail).trim() !== '') {
+      try {
+        await sendEmailFromTemplate('DRIVER_REGISTRATION_EMAIL_TO_DRIVER', {
+          DriverName: driver.driverName,
+          DriverEmail: driver.driverEmail,
+          DriverPhone: driver.phno,
+          Password: rawPassword,
+          to: driver.driverEmail
+        });
+        emailSent = true;
+      } catch (emailErr: any) {
+        console.error('Driver creation email notification failed:', emailErr?.message || emailErr);
+      }
+    }
+
+    // Send SMS notification to driver's registered phone
+    let smsSent = false;
+    try {
+      const smsRes = await dispatchAuditedSms({
+        recipient: cleanPhone,
+        templateCode: 'DRIVER_WELCOME_SMS',
+        message: `Welcome to Grace Cabs, ${driver.driverName}! Your driver account is active. Mobile: ${cleanPhone}.`,
+        referenceEntity: 'DRIVER',
+        referenceId: driver.driverId,
+        metadata: { driverId: driver.driverId, driverName: driver.driverName }
+      });
+      smsSent = smsRes.success;
+    } catch (smsErr: any) {
+      console.error('Driver creation SMS notification failed:', smsErr?.message || smsErr);
+    }
+
+    return res.status(201).json({
+      message: 'Driver registered successfully',
+      notifications: { emailSent, smsSent },
       driver: driverWithVehicle
     });
 
   } catch (err: any) {
-    console.error('Validation Error Details:', err.errors || err);
+    console.error('Driver creation error:', err.errors || err);
     return res.status(400).json({ message: err.message, errors: err.errors });
   }
 };

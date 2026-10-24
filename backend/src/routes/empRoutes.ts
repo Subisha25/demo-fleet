@@ -17,7 +17,7 @@ router.post('/createVendor',authMiddleware, createVendor);
 router.post('/createBooking',authMiddleware, createBooking);
 router.post('/createBookingForWeb',authMiddleware,createBookingForWeb);
 router.post('/createBookingForWebOnCall',authMiddleware, createBookingForWebOnCall);
-router.post('/createCompany', uploadCompanyLogo.single("companyLogo"), authMiddleware, requireCompanyQuota, createCompany);
+router.post('/createCompany', authMiddleware, requireCompanyQuota, uploadCompanyLogo.single("companyLogo"), createCompany);
 
 // router.get('/getAllCompany',authMiddleware, getAllCompany);
 

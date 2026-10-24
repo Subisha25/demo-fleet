@@ -43,4 +43,19 @@ const PrivateRoute = ({ children }: { children: JSX.Element }) => {
   );
 };
 
+export const SuperAdminRoute = ({ children }: { children: JSX.Element }) => {
+  const { isAuthenticated } = useAuth();
+  const role = localStorage.getItem('role');
+
+  if (!isAuthenticated) {
+    return <Navigate to="/adminlogin" replace />;
+  }
+
+  if (role !== 'superadmin') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+};
+
 export default PrivateRoute;

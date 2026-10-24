@@ -10,7 +10,7 @@ import { TenantSubscription } from '../models/tenantSubscription';
 import { User } from '../models/user';
 import { Employee } from '../models/employee';
 import { PLAN_LIMITS } from './quotaService';
-import { sendNotification, getSuperAdminEmail, diagnoseSmtpConfig } from './notificationService';
+import { sendNotification, getSuperAdminEmail, getSuperAdminPhone, diagnoseSmtpConfig } from './notificationService';
 import config from '../config/config';
 
 const WEB_BASE_URL = config.baseurl?.webbaseurl || 'http://localhost:3000';
@@ -103,29 +103,64 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
       termsConsent: Boolean(termsConsent),
     });
 
-    // Send acknowledgment email to applicant
-    await sendNotification({
-      channel: 'EMAIL',
-      recipient: registration.contactEmail,
-      templateCode: 'REGISTRATION_RECEIVED',
-      subject: `Grace Cabs Fleet Application Received: ${registration.fleetName} (${registration.businessCode})`,
-      body: `Hello ${registration.ownerName},\n\nThank you for applying to join Grace Cabs Mobility Platform. Your application for ${registration.fleetName} (Code: ${registration.businessCode}) has been received and is currently under review by our operations team.\n\nApplication Reference: ${requestId}\nPlan: ${normalizedTier} (${normalizedCycle} billing)\n\nYou will receive a secure activation link once your fleet application is approved.`,
-      referenceEntity: 'REGISTRATION_REQUEST',
-      referenceId: requestId,
-    });
-
-    // Alert SuperAdmin
+    // Dispatch notifications concurrently and safely via Promise.allSettled
     const superAdminEmail = await getSuperAdminEmail();
-    await sendNotification({
-      channel: 'EMAIL',
-      recipient: superAdminEmail,
-      templateCode: 'SUPERADMIN_NEW_APPLICATION_ALERT',
-      subject: `[ALERT] New Fleet Application: ${registration.fleetName} (${registration.businessCode})`,
-      body: `A new fleet application has been submitted by ${registration.ownerName} (${registration.contactEmail}, ${registration.contactPhone}) for ${registration.fleetName}.\n\nPlan Tier: ${normalizedTier}\nCity: ${registration.city}, ${registration.state}\n\nPlease review the application at: ${WEB_BASE_URL}/admin/registrations`,
-      referenceEntity: 'REGISTRATION_REQUEST',
-      referenceId: requestId,
-      metadata: { reviewUrl: `${WEB_BASE_URL}/admin/registrations`, actionText: 'Review Inbound Applications' },
-    });
+    const superAdminPhone = await getSuperAdminPhone();
+
+    const notificationTasks: Promise<any>[] = [
+      // 1. Acknowledgment email to applicant
+      sendNotification({
+        channel: 'EMAIL',
+        recipient: registration.contactEmail,
+        templateCode: 'REGISTRATION_RECEIVED',
+        subject: `Grace Cabs Fleet Application Received: ${registration.fleetName} (${registration.businessCode})`,
+        body: `Hello ${registration.ownerName},\n\nThank you for applying to join Grace Cabs Mobility Platform. Your application for ${registration.fleetName} (Code: ${registration.businessCode}) has been received and is currently under review by our operations team.\n\nApplication Reference: ${requestId}\nPlan: ${normalizedTier} (${normalizedCycle} billing)\n\nYou will receive a secure activation link once your fleet application is approved.`,
+        referenceEntity: 'REGISTRATION_REQUEST',
+        referenceId: requestId,
+      }),
+
+      // 2. Alert SuperAdmin via Email (subisha2002.m@gmail.com)
+      sendNotification({
+        channel: 'EMAIL',
+        recipient: superAdminEmail,
+        templateCode: 'SUPERADMIN_NEW_APPLICATION_ALERT',
+        subject: `[ALERT] New Fleet Application: ${registration.fleetName} (${registration.businessCode})`,
+        body: `A new fleet application has been submitted by ${registration.ownerName} (${registration.contactEmail}, ${registration.contactPhone}) for ${registration.fleetName}.\n\nPlan Tier: ${normalizedTier}\nCity: ${registration.city}, ${registration.state}\n\nPlease review the application at: ${WEB_BASE_URL}/admin/registrations`,
+        referenceEntity: 'REGISTRATION_REQUEST',
+        referenceId: requestId,
+        metadata: { reviewUrl: `${WEB_BASE_URL}/admin/registrations`, actionText: 'Review Inbound Applications' },
+      }),
+
+      // 3. Alert SuperAdmin via SMS (authorized phone e.g. 9003241571)
+      sendNotification({
+        channel: 'SMS',
+        recipient: superAdminPhone,
+        templateCode: 'SUPERADMIN_NEW_APPLICATION_SMS',
+        smsTemplateName: 'Booking Creation',
+        smsVars: [`Fleet: ${registration.fleetName}`],
+        body: `Grace Cabs Alert: New fleet registration application submitted for ${registration.fleetName} (${registration.businessCode}) by ${registration.ownerName}.`,
+        referenceEntity: 'REGISTRATION_REQUEST',
+        referenceId: requestId,
+      }),
+    ];
+
+    // 4. Acknowledgment SMS to applicant if phone provided
+    if (registration.contactPhone) {
+      notificationTasks.push(
+        sendNotification({
+          channel: 'SMS',
+          recipient: registration.contactPhone,
+          templateCode: 'REGISTRATION_RECEIVED_SMS',
+          smsTemplateName: 'Booking Creation',
+          smsVars: [registration.ownerName || 'Applicant'],
+          body: `Grace Cabs: Application for ${registration.fleetName} (${registration.businessCode}) received. Ref: ${requestId.substring(0, 8)}. Review in progress.`,
+          referenceEntity: 'REGISTRATION_REQUEST',
+          referenceId: requestId,
+        })
+      );
+    }
+
+    await Promise.allSettled(notificationTasks);
 
     return res.status(201).json({
       success: true,
@@ -523,7 +558,7 @@ export const verifyActivationToken = async (req: Request, res: Response) => {
  */
 export const completeAccountActivation = async (req: Request, res: Response) => {
   try {
-    const { token, password, confirmPassword } = req.body;
+    const { token, password, confirmPassword, email } = req.body;
 
     if (!token || !password) {
       return res.status(400).json({
@@ -563,6 +598,14 @@ export const completeAccountActivation = async (req: Request, res: Response) => 
       });
     }
 
+    // Strict validation: Verify email is registered for an approved fleet
+    if (email && String(email).toLowerCase().trim() !== record.adminEmail.toLowerCase().trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is not registered for an approved fleet.',
+      });
+    }
+
     // Hash password with bcrypt
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -575,7 +618,7 @@ export const completeAccountActivation = async (req: Request, res: Response) => 
       await emp.update({
         password: hashedPassword,
         tenantId: record.tenantId,
-        role: 'superadmin',
+        role: 'fleet_admin',
       });
     } else {
       let finalPhone = cleanPhone;
@@ -590,7 +633,7 @@ export const completeAccountActivation = async (req: Request, res: Response) => 
         username: record.adminName || record.adminEmail.split('@')[0],
         phno: finalPhone,
         password: hashedPassword,
-        role: 'superadmin',
+        role: 'fleet_admin',
         tenantId: record.tenantId,
       });
     }
@@ -601,7 +644,7 @@ export const completeAccountActivation = async (req: Request, res: Response) => 
       await user.update({
         password: hashedPassword,
         tenantId: record.tenantId,
-        role: 'superadmin',
+        role: 'fleet_admin',
       });
     } else {
       await User.create({
@@ -610,7 +653,7 @@ export const completeAccountActivation = async (req: Request, res: Response) => 
         username: record.adminEmail.split('@')[0],
         mobile: cleanPhone,
         password: hashedPassword,
-        role: 'superadmin',
+        role: 'fleet_admin',
         tenantId: record.tenantId,
         status: 'active',
       });

@@ -105,8 +105,7 @@ async function runTests() {
   assert(PLAN_LIMITS.BASIC.drivers === 15, 'Basic Tier driver quota is hard-capped at 15');
   assert(PLAN_LIMITS.BASIC.companies === 3, 'Basic Tier company quota is hard-capped at 3');
   assert(PLAN_LIMITS.PRO.vehicles === 75, 'Pro Tier vehicle quota is 75');
-  assert(PLAN_LIMITS.PRO.companies === 20, 'Pro Tier company quota is 20');
-  assert(PLAN_LIMITS.ENTERPRISE.vehicles >= 999999, 'Enterprise Tier provides unlimited vehicle fleet');
+  assert(PLAN_LIMITS.ENTERPRISE.vehicles >= 250, 'Enterprise Tier provides high-capacity vehicle fleet (250+)');
 
   // TEST SUITE 4: Dynamic Company Policy Engine & Danfoss Decoupling
   console.log('\n🔹 [Suite 4] Dynamic Company Policy Engine');

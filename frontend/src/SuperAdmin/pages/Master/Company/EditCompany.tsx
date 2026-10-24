@@ -71,11 +71,8 @@ export default function EditCompany() {
     priorMinutes: defaultPrior,
     companyCode: "", 
   });
-const showManagerApproval =
-  companyForm.companyName
-    ?.toLowerCase()
-    .includes("danfoss");
-  // Add inside EditCompany component
+
+  // Handle logo change
 const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0] || null;
   if (file && file.size > 1 * 1024 * 1024) {
@@ -180,13 +177,11 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   "needEmail",
   companyForm.needEmail ? "true" : "false"   // ✅ IMPORTANT
 );
-formData.append(
-  "managerApproval",
-  showManagerApproval && companyForm.managerApproval
-    ? "true"
-    : "false"
-);
-      formData.append("gstNo", companyForm.gstNo);   // ✅ added here
+      formData.append(
+        "managerApproval",
+        companyForm.managerApproval ? "true" : "false"
+      );
+      formData.append("gstNo", companyForm.gstNo);
       formData.append("startTime", companyForm.startTime);
       formData.append("closeTime", companyForm.endTime);
       formData.append("priorMinutes", companyForm.priorMinutes);
@@ -195,12 +190,12 @@ formData.append(
       if (companyLogo) {
         formData.append("companyLogo", companyLogo);
       }
-if (!companyForm.companyCode || !companyForm.companyCode.trim()) {
-  showToast("Company Code is required", "warn");
-  return;
-}
+      if (!companyForm.companyCode || !companyForm.companyCode.trim()) {
+        showToast("Company Code is required", "warn");
+        return;
+      }
 
-formData.append("companyCode", companyForm.companyCode.trim());
+      formData.append("companyCode", companyForm.companyCode.trim());
 
       await axiosInstance.put(`company/companyUpdate/${companyId}`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -209,7 +204,7 @@ formData.append("companyCode", companyForm.companyCode.trim());
       showToast("Company updated successfully!", "success");
       navigate("/master/company/list");
     } catch (error: any) {
-      showToast("Update failed. Please try again.", "warn");
+      showToast(error.response?.data?.message || "Update failed. Please try again.", "error");
     }
   };
 
@@ -371,17 +366,15 @@ formData.append("companyCode", companyForm.companyCode.trim());
   />
   <label>Need Email</label>
 </div>
-{showManagerApproval && (
-  <div className="w-full flex items-center gap-2 mt-6">
-    <input
-      type="checkbox"
-      name="managerApproval"
-      checked={companyForm.managerApproval}
-      onChange={handleInputChange}
-    />
-    <label>Manager Approval Required</label>
-  </div>
-)}
+              <div className="w-full flex items-center gap-2 mt-6">
+                <input
+                  type="checkbox"
+                  name="managerApproval"
+                  checked={companyForm.managerApproval}
+                  onChange={handleInputChange}
+                />
+                <label>Manager Approval Required</label>
+              </div>
 
             </div>
           </div>

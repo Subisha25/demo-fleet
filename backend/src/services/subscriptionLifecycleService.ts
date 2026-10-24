@@ -4,7 +4,7 @@ import { TenantSubscription } from '../models/tenantSubscription';
 import { Tenant } from '../models/tenant';
 import { NotificationLog } from '../models/notificationLog';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
-import { sendNotification } from './notificationService';
+import { sendNotification, getSuperAdminEmail } from './notificationService';
 
 let lastLifecycleRunRecord: {
   timestamp: string;
@@ -42,7 +42,7 @@ export async function runSubscriptionLifecycleEvaluation() {
     const end = new Date(sub.currentPeriodEnd);
     const diffMs = end.getTime() - now.getTime();
     const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-    const recipientEmail = sub.tenant?.contactEmail || 'admin@gracecabs.com';
+    const recipientEmail = sub.tenant?.contactEmail || (await getSuperAdminEmail());
 
     // 1. Two-day renewal reminder (diffDays <= 2 and diffDays >= 0)
     if (diffDays <= 2 && diffDays >= 0 && sub.status === 'ACTIVE') {

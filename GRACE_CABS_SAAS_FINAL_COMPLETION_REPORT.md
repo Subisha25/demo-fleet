@@ -1,238 +1,219 @@
-# GRACE CABS — FULL SAAS COMPLETION & VERIFICATION REPORT
-**Date & Time:** October 22, 2026 | Local Time: 14:30 IST  
-**Environment:** Local Development (Windows 64-bit, Node.js v25.9.0 / v20.19.2)  
-**Database:** Local MySQL 8.4.7 (`wampmysqld64` on `127.0.0.1:3306`), Active Database: `demodb`  
-**Verified Cold Backup:** `D:\demobooking\db_backups\demodb_backup_20261022_103230` (45 table files, 18.67 MB, verified intact)  
-**Overall Completion Status:** **COMPLETE MULTI-TENANT SAAS PLATFORM (174/174 Automated Tests Passed, 100%)**  
-**Visual Identity:** **Warm Cream (`#FAF8F5`), Terracotta / Burnt Orange (`#C04E24`), Dark Charcoal (`#1C1A18`) — ZERO NAVY BLUE**
+# MASTER COMPLETION REPORT: FLEET/COMPANY MULTI-TENANT ARCHITECTURE, SUPERADMIN DASHBOARD, BRANDING, ACTIVATION & AUTHENTICATION
+
+**Active Workspace**: `D:\demobooking\demo-bookings`  
+**Reference Project**: `D:\New Pcs\vehicle` (STRICTLY READ-ONLY — Untouched)  
+**Verification Date**: October 23, 2026  
+**Test Suite Status**: 
+- `backend/src/tests/testMasterMultiTenantFix.ts`: **49/49 Passed (100%)**
+- `backend/src/tests/testRoleBasedSaaS.ts`: **43/43 Passed (100%)**
+- Backend TypeScript (`tsc --noEmit`): **Clean (0 errors)**
+- Frontend TypeScript (`tsc --noEmit`): **Clean (0 errors)**
+- Frontend Production Bundle (`npm run build`): **Build Succeeded**
 
 ---
 
-## 1. EXECUTIVE SUMMARY & POST-AUDIT OVERVIEW
+## 1. Executive Summary & Root Cause Analysis
 
-Following the comprehensive audit and full implementation across backend services, database schema, notification pipelines, subscription lifecycle engines, and frontend design tokens:
+### Issue 1: SuperAdmin Header Incorrectly Displaying "vijay" and "BASIC"
+* **Root Cause**: In [Header.tsx](file:///d:/demobooking/demo-bookings/frontend/src/components/Header.tsx), the user identity badge inspected `currentTenant?.name` and `currentTenant?.planTier` indiscriminately for all logged-in roles. When a SuperAdmin was viewing or default-scoped to an existing tenant (such as `vijay` on the `BASIC` plan), the SuperAdmin’s header was rendered with the tenant’s branding instead of platform identity.
+* **Fix**: Updated [Header.tsx](file:///d:/demobooking/demo-bookings/frontend/src/components/Header.tsx) and [Sidebar.tsx](file:///d:/demobooking/demo-bookings/frontend/src/components/Sidebar.tsx). When `user?.role === 'superadmin'`, the header renders the immutable platform identity: **"Grace Cabs SaaS"** with badge **"SuperAdmin"**, and the sidebar displays **"Grace Cabs SaaS Platform"** with **"Platform Admin"**. The selected tenant is only displayed in the fleet selector filter, never overriding platform identity.
 
-1. **Safety & Zero Data Loss Invariants Upheld:**
-   - Cold backup directory `D:\demobooking\db_backups\demodb_backup_20261022_103230` remains 100% intact.
-   - MySQL service `wampmysqld64` runs on `127.0.0.1:3306` with active database `demodb`.
-   - All 4 SaaS tables (`tenant_registration_requests`, `tenant_activation_tokens`, `subscription_invoices`, `notification_logs`) are verified in the live schema.
-   - Zero destructive synchronizations occurred. All legacy business tables (`booking`, `vehicle`, `drivers`, `employee`, `company`, `invoice`, `monthly_invoice`, `onCallInvoice`) are preserved with 100% data integrity.
+### Issue 2: SuperAdmin Fleet Selector Missing Available Fleets
+* **Root Cause**: In [TenantContext.tsx](file:///d:/demobooking/demo-bookings/frontend/src/context/TenantContext.tsx) and [tenantService.ts](file:///d:/demobooking/demo-bookings/backend/src/services/tenantService.ts), directory loading had inconsistent exclusions and lacked an automated refresh hook on component mount. Furthermore, `loadAllTenants()` was not invoked when opening the dropdown.
+* **Fix**: Refactored `loadAllTenants()` in [TenantContext.tsx](file:///d:/demobooking/demo-bookings/frontend/src/context/TenantContext.tsx) and [Header.tsx](file:///d:/demobooking/demo-bookings/frontend/src/components/Header.tsx). It cleanly excludes `ROOT_TENANT_ID` (`e7b8a1c0-0000-0000-0000-000000000001`) and test fixtures prefixed with `TST`, while listing all legitimate active fleets (e.g., `Alpha Fleet Ltd`, `Beta Transport Corp`, `vijay`, `ganthi`, `suryafleet`, `Swift Logistics`). Added automatic refetch on mount and focus.
 
-2. **SuperAdmin Account & Authentication Configured:**
-   - SuperAdmin Email: `subisha2002@gmail.com`
-   - SuperAdmin Login Password: `superadmin@123` (bcrypt salted and hashed with 10 rounds, never stored plaintext)
-   - SuperAdmin Role: `superadmin` on root tenant `00000000-0000-0000-0000-000000000000`.
-   - Login endpoint `POST /api/auth/emplogin` successfully tested and verified: returns HTTP 200, JWT token, and verified role `superadmin`.
-   - SuperAdmin tenant management endpoint `GET /api/tenants` successfully tested with JWT: returns all 13 tenant records.
+### Issue 3: Fleet Admin Dashboard Showing "Grace Cabs Fleet Operations" and "ENTERPRISE"
+* **Root Cause**: 
+  1. In [TenantContext.tsx](file:///d:/demobooking/demo-bookings/frontend/src/context/TenantContext.tsx), `currentTenant` defaulted to `DEFAULT_ROOT_TENANT` ("Grace Cabs Fleet Operations" on "ENTERPRISE") during initial render and did not immediately fetch `/api/tenants/current/profile` for non-superadmins.
+  2. In [Dashboard.tsx](file:///d:/demobooking/demo-bookings/frontend/src/SuperAdmin/pages/Dashboard/Dashboard.tsx), the fleet overview fallback read `fleetOverview?.tenant?.companyName` (a non-existent field; the model property is `name`) and `sub?.plan` (the property is `planTier`), causing the UI to drop back to hardcoded defaults.
+* **Fix**: Corrected field accesses to `fleetOverview?.tenant?.name` and `sub?.planTier` in [Dashboard.tsx](file:///d:/demobooking/demo-bookings/frontend/src/SuperAdmin/pages/Dashboard/Dashboard.tsx). Updated [TenantContext.tsx](file:///d:/demobooking/demo-bookings/frontend/src/context/TenantContext.tsx) so non-superadmins immediately load `/api/tenants/current/profile` on initialization.
 
-3. **SMTP Alignment & Live Email Delivery Verified:**
-   - Provider: GoDaddy / Microsoft Workspace SMTP (`smtpout.secureserver.net`, Port `587`, STARTTLS).
-   - Sender: `traveldesk@gracecabs.com`.
-   - Transporter verification: Confirmed via `backend/src/scripts/runSmtpDiagnostic.ts` (`transporterVerified: true`).
-   - SuperAdmin Recipient: Dynamically resolved from the authorized SuperAdmin account (`subisha2002@gmail.com`), eliminating previous hardcoded addresses.
-   - Live Delivery Test: Real test email dispatched to `subisha2002@gmail.com` via `POST /api/tenants/admin/notifications/test-email`.
-   - Provider accepted message: Message ID `<801a9a09-a641-077c-f38e-59ddac81ca19@gracecabs.com>`. Recorded in `notification_logs` table with exact recipient `subisha2002@gmail.com` and status `SENT`.
-   - Secure logging: Plaintext password printing removed from code and logs.
-
-4. **Canonical Subscription Pricing Enforced:**
-   - **Monthly Rates (excl. GST):**
-     - BASIC (Starter Mobility): **₹299/month**
-     - PRO (Growth Fleet Pro): **₹349/month**
-     - ENTERPRISE (Enterprise Mobility Suite): **₹549/month**
-   - **Annual Rates (with 15% discount, excl. GST):**
-     - BASIC: **₹3,050/year**
-     - PRO: **₹3,560/year**
-     - ENTERPRISE: **₹5,600/year**
-   - Codified as `priceAnnualINR` on the backend `PlanDefinition` in `backend/src/services/quotaService.ts` and `subscriptionBillingService.ts`.
-   - Synchronized across frontend pricing components (`Pricing.tsx`, `FleetRegistration.tsx`, `SubscriptionCheckout.tsx`, `HomePage.tsx`).
-   - Server-side calculation strictly prevents client price spoofing.
-
-5. **Root Cause Analysis & Fix of Old Home/Public Page Design:**
-   - **Root Cause:** In `frontend/src/App.tsx`, routes `/`, `/about`, `/services`, `/portfolio`, and `/contact` were all mounted to the legacy `HomePage` component (`homepage.tsx`). This component loaded the old 813-line `Header.tsx` containing yellow Figma SVG overlays (`bgyellow.png`, `mobileyellow.png`), blue fonts (`#221C84`, `#2F1C84`), and old blue `logo.png`. In contrast, `/pricing` was mounting a newly redesigned component. When clicking "Home" from `/pricing`, users navigated to `/`, rendering the legacy layout.
-   - **Resolution:**
-     - Created a single unified `PublicLayout.tsx` shell embedding `PublicHeader.tsx` and `PublicFooter.tsx`.
-     - Built dedicated modern pages: `HomePage.tsx`, `AboutPage.tsx`, `ServicesPage.tsx`, `PortfolioPage.tsx`, and `ContactPage.tsx`.
-     - Unified `App.tsx` routes to mount their respective dedicated pages inside `PublicLayout`.
-     - Overhauled legacy components `simpleheader.tsx`, `Footer.tsx`, `TermsAndConditions.tsx`, `PrivacyPolicy.tsx`, and `CancelReservation.tsx` to inherit the warm-cream/terracotta theme.
-     - Strictly enforced Warm Cream (`#FAF8F5`, `#FDFBF7`), Terracotta (`#C04E24`), Dark Charcoal (`#1C1A18`), Warm Grey (`#E0DAD1`), and **ZERO NAVY BLUE**.
+### Issue 4: Company Creation Foreign Key Constraint Failure
+* **Root Cause**: In [empServices.ts](file:///d:/demobooking/demo-bookings/backend/src/services/empServices.ts), `createCompany` blindly assigned `employeeId: req.userId`. Because SaaS Fleet Admins and SuperAdmins are authenticated accounts in the `users` table rather than legacy `employee` table rows, MySQL rejected the query with `company_ibfk_200 FOREIGN KEY (employeeId) REFERENCES employee (employeeId)`.
+* **Fix**: Implemented safe verification in [empServices.ts](file:///d:/demobooking/demo-bookings/backend/src/services/empServices.ts): verifies whether `employeeId` exists in the `employee` table, and resolves `userId` against the `users` table before persisting in `Company.create()`.
 
 ---
 
-## 2. VERIFIED AUTOMATED TEST RESULTS (174/174 PASSED)
+## 2. Schema Changes & Database Migration
 
-Executed against live local MySQL database `demodb`. Every test assertion passed with exit code 0:
-
-| Test Suite File | Domain / Focus | Assertions Passed | Failures | Status | Exit Code |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| `src/tests/testPhase1Schema.ts` | Schema columns, foreign keys, non-destructive legacy table invariant checks | **54** | **0** | **PASS** | 0 |
-| `src/tests/testRegistrationAndActivation.ts` | Public registration, duplicate defense, SuperAdmin approval, SHA-256 tokens, login, billing | **32** | **0** | **PASS** | 0 |
-| `src/tests/testIsolation.ts` | Cross-tenant headers, spoofing prevention, path traversal defense, SuperAdmin scope | **11** | **0** | **PASS** | 0 |
-| `src/tests/testComprehensiveRegression.ts` | Corporate company, vehicle, driver, passenger isolation, quota enforcement, bookings | **39** | **0** | **PASS** | 0 |
-| `src/tests/testPhase5E2EWorkflows.ts` | Real booking creation, dispatch, trip closing, operational invoices, monthly invoicing | **38** | **0** | **PASS** | 0 |
-| **TOTAL** | **Comprehensive Full-Spectrum SaaS Validation** | **174** | **0** | **100% PASS** | **0** |
-
-### Compilation & Build Verification Evidence:
-- **Backend TypeScript Check:** `npx tsc --noEmit` in `d:\demobooking\demo-bookings\backend` exited with **Code 0** (0 errors).
-- **Frontend TypeScript Check:** `npx tsc --noEmit` in `d:\demobooking\demo-bookings\frontend` exited with **Code 0** (0 errors).
-- **Frontend Production Build:** `npm run build` in `d:\demobooking\demo-bookings\frontend` exited with **Code 0** (`build/` production bundle generated successfully).
+### Notification Read Tracking Column
+* **Migration Target**: `tenant_registration_requests`
+* **Column Added**: `isNotificationRead TINYINT(1) DEFAULT 0`
+* **Model Synchronization**: Updated [tenantRegistrationRequest.ts](file:///d:/demobooking/demo-bookings/backend/src/models/tenantRegistrationRequest.ts) with `isNotificationRead: boolean` and default value `false`.
 
 ---
 
-## 3. ACCEPTANCE CRITERIA COMPLIANCE MATRIX
+## 3. Implementation Details by Phase
 
-| # | Acceptance Criterion | Verified Implementation & Evidence | Status |
-| :-: | :--- | :--- | :---: |
-| **1** | SuperAdmin account configured securely with `subisha2002@gmail.com` | Account exists with role `superadmin` and bcrypt-hashed password `superadmin@123`. Authenticates via `POST /api/auth/emplogin` (HTTP 200). Protected endpoints verified. | **PASS** |
-| **2** | SMTP configured with GoDaddy settings and real delivery verified | `smtpout.secureserver.net:587`, `traveldesk@gracecabs.com`. Handshake verified (`transporterVerified: true`). Real test email delivered with Message ID `<801a9a09-a641-077c-f38e-59ddac81ca19@gracecabs.com>`. Logged as `SENT` in `notification_logs`. | **PASS** |
-| **3** | Canonical pricing updated everywhere (₹299, ₹349, ₹549 / Annual ₹3050, ₹3560, ₹5600) | Codified in `quotaService.ts`, `subscriptionBillingService.ts`, frontend `Pricing.tsx`, `FleetRegistration.tsx`, `SubscriptionCheckout.tsx`, and verified by tests. | **PASS** |
-| **4** | Root cause of old Home design diagnosed and fixed | Removed legacy `homepage.tsx` route collision in `App.tsx`. Mounted dedicated `HomePage.tsx` under `PublicLayout`. All navigation links point to modern routes. | **PASS** |
-| **5** | Redesign applied across all public pages (Home, About, Services, Portfolio, Pricing, Contact, Register, Login) | Unified warm cream (`#FAF8F5`), terracotta (`#C04E24`), dark charcoal (`#1C1A18`), warm grey (`#E0DAD1`). Verified via browser subagent screenshots. | **PASS** |
-| **6** | Shared header and footer created and verified | `PublicHeader.tsx` and `PublicFooter.tsx` provide unified navigation, responsive mobile drawer, active states, verified contact details, dynamic year `{new Date().getFullYear()}`. | **PASS** |
-| **7** | Registration creates a PENDING application without operational access | Stored in `tenant_registration_requests` with status `PENDING` and `#REG-` reference. No operational data created. Verified by `testRegistrationAndActivation.ts`. | **PASS** |
-| **8** | Approval sends the activation email; rejection sends the correct notification | `approveRegistrationRequest` creates 24h single-use SHA-256 token and dispatches activation email. `rejectRegistrationRequest` logs review notes and rejection notification. | **PASS** |
-| **9** | Activation link expires, works once, and cannot be reused | Single-use cryptographic SHA-256 token in `tenant_activation_tokens`. Token marked `isRevoked: true` and `usedAt: new Date()` upon first use. Replay attempts return HTTP 400. | **PASS** |
-| **10** | Password is hashed with bcrypt and never emailed or stored as plaintext | Passwords hashed using bcrypt (10 rounds). Plaintext passwords never stored in database or included in email templates. Verified by tests. | **PASS** |
-| **11** | Real gateway verification required before production activation | `subscriptionBillingService.ts` strictly blocks simulated verification when `NODE_ENV === 'production'`. Cryptographic signature verification is enforced. | **PASS** |
-| **12** | Vehicle/driver/user quotas enforced on the backend | `entitlementMiddleware.ts` enforces limits at DB level (HTTP 403 when quota exceeded). Verified by `testComprehensiveRegression.ts`. | **PASS** |
-| **13** | Cross-tenant access denied for every relevant operational resource | Cross-tenant requests for companies, vehicles, drivers, passengers, bookings, and invoices return HTTP 403. Verified by `testIsolation.ts`. | **PASS** |
-| **14** | Renewal alert appears at 2 days remaining; grace and Day 4 blocking are correct | 2-Day alert banner, 3-Day grace banner, Day 4+ suspension banner rendered on Fleet Dashboard. `requireActiveSubscription` blocks new bookings on Day 4+ unpaid. | **PASS** |
-| **15** | Legacy bookings, dispatch, trip closure, invoices, PDFs, and reports remain functional | All legacy features verified against live database: booking creation, dispatch, odometer trip closure, and PDF invoice generation intact. Verified by `testPhase5E2EWorkflows.ts`. | **PASS** |
+### Phase 1: Tenant Hierarchy & Data Isolation
+* Enforced the 4-tier hierarchy: Platform SuperAdmin $\to$ Multiple Fleets $\to$ Multiple Companies $\to$ Multiple Users.
+* SuperAdmin remains platform owner bound to `ROOT_TENANT_ID`.
+* Fleet Admins own and manage exclusively their own `tenantId`.
+* Any cross-tenant spoofing attempt using `X-Tenant-ID` header injection is blocked server-side with `HTTP 403 Forbidden`.
+
+### Phase 2: SuperAdmin Identity & Fleet Selector
+* SuperAdmin header: Platform Identity ("Grace Cabs SaaS" / "SuperAdmin").
+* Fleet selector: "All Fleets" (platform aggregate) is the default view.
+* Selecting a specific fleet scopes all dashboard KPIs, counts, vehicles, drivers, bookings, invoices, and reports to that tenant without changing the SuperAdmin's identity.
+* Persistent across browser refresh and navigation via `localStorage` and `TenantContext`.
+
+### Phase 3: SuperAdmin In-App Registration Notifications
+* Added live notification bell with unread badge count in [Header.tsx](file:///d:/demobooking/demo-bookings/frontend/src/components/Header.tsx).
+* Implemented backend endpoints:
+  - `GET /api/tenants/admin/notifications`: fetches pending registrations with unread status.
+  - `POST /api/tenants/admin/notifications/mark-read/:requestId`: marks specific notification read.
+  - `POST /api/tenants/admin/notifications/mark-all-read`: bulk marks all notifications read.
+* Displays applicant name, fleet name, selected subscription plan, phone number, and direct link to review queue.
+
+### Phase 4: Fleet Registration & Secure Activation
+* Registration preserves selected subscription plan (`BASIC`, `PRO`, `ENTERPRISE`).
+* SuperAdmin approval generates a cryptographically secure, 24-hour expiring activation token.
+* In [registrationService.ts](file:///d:/demobooking/demo-bookings/backend/src/services/registrationService.ts), account activation strictly verifies the submitted email against `record.adminEmail`. If mismatched, it returns `400 Bad Request` with message: `"Email is not registered for an approved fleet."`.
+* Tokens are invalidated upon first use (`usedAt: new Date()`), preventing token replay.
+* In [ActivateAccount.tsx](file:///d:/demobooking/demo-bookings/frontend/src/components/Homepage/ActivateAccount.tsx), applicant email confirmation field displays meaningful toast on validation failure.
+
+### Phase 5 & 6: Fleet Document Branding & Logo Upload
+* Created [fleetBrandingService.ts](file:///d:/demobooking/demo-bookings/backend/src/services/fleetBrandingService.ts) (`getFleetDocumentBranding`), authoritatively resolving fleet name, base64 logo URI, custom `headerColor`, GSTIN, registered address, and phone number by `tenantId`.
+* Added logo upload endpoint `POST /api/tenants/current/logo` with disk storage in [uploadConfig.ts](file:///d:/demobooking/demo-bookings/backend/src/middleware/uploadConfig.ts) and neutral fallback handling.
+* In [appInvoiceServices.ts](file:///d:/demobooking/demo-bookings/backend/src/appServices/appInvoiceServices.ts), [bookingServices.ts](file:///d:/demobooking/demo-bookings/backend/src/services/bookingServices.ts), and [smsServices.ts](file:///d:/demobooking/demo-bookings/backend/src/services/smsServices.ts), dynamic fleet branding replaces hardcoded "Grace Cabs" text and logos.
+
+### Phase 7 & 8: Company Management, SEO URLs & Company Login
+* Unique SEO slug generation in [slugUtils.ts](file:///d:/demobooking/demo-bookings/backend/src/utils/slugUtils.ts) and public resolution at `GET /api/company/:seoUrl`.
+* In [authServices.ts](file:///d:/demobooking/demo-bookings/backend/src/services/authServices.ts):
+  - `registerUser`: Fleet Admin can only create users under companies belonging to their authorized fleet.
+  - `CompanyLogin`: strictly verifies `user.companyId === company.companyId`. Cross-company logins rejected.
+  - `forgetPasswordSendOtp`: verifies user belongs to the company specified by `seoUrl`; returns generic 200 to prevent user enumeration.
+
+### Phase 9: Role-Based Menus & Data Isolation
+* Platform SuperAdmin: access to platform aggregate metrics, All Fleets selector, registrations review, tenant management, and platform configuration.
+* Fleet Admin: scoped strictly to own fleet operations, vehicle/driver management, company management, and reports. SaaS Tenant management menu hidden.
+* Cross-tenant access rejected server-side with `403 Forbidden`.
 
 ---
 
-## 4. SMTP DELIVERY DIAGNOSIS & EVIDENCE
+## 4. Test Suite Execution & Evidence
 
-### Real GoDaddy SMTP Handshake Diagnostic
-Script: `backend/src/scripts/runSmtpDiagnostic.ts`
-```json
-{
-  "configured": true,
-  "server": "smtpout.secureserver.net",
-  "port": 587,
-  "sender": "traveldesk@gracecabs.com",
-  "hasPassword": true,
-  "transporterVerified": true,
-  "superAdminEmail": "subisha2002@gmail.com"
-}
+### Master Verification Suite (`testMasterMultiTenantFix.ts`)
+Run command: `npx ts-node src/tests/testMasterMultiTenantFix.ts`
+```
+================================================================
+🚀 RUNNING MASTER MULTI-TENANT ARCHITECTURE & BRANDING VERIFICATION
+================================================================
+Database connected and SaaS tables verified.
+
+--- Scenario 1 & 2: SuperAdmin Identity & Fleets Directory ---
+  ✅ [PASS] SuperAdmin can fetch all tenants directory (HTTP 200)
+  ✅ [PASS] Tenants returned as array
+  ✅ [PASS] Alpha Fleet Ltd exists in authoritative tenant directory
+  ✅ [PASS] Beta Transport Corp exists in authoritative tenant directory
+  ✅ [PASS] vijay fleet exists in authoritative tenant directory
+  ✅ [PASS] vijay fleet correctly has planTier BASIC
+
+--- Scenario 3 & 4: SuperAdmin Fleet Scoping ---
+  ✅ [PASS] Dashboard overview for all fleets returns HTTP 200
+  ✅ [PASS] Overview correctly identifies isAllFleets=true
+  ✅ [PASS] Tenant identity in aggregated mode is all
+  ✅ [PASS] Dashboard overview scoped to Alpha Fleet returns HTTP 200
+  ✅ [PASS] Overview returns Alpha Fleet ID
+  ✅ [PASS] Overview returns Alpha Fleet name
+  ✅ [PASS] Dashboard overview scoped to vijay returns HTTP 200
+  ✅ [PASS] Overview returns vijay fleet name
+  ✅ [PASS] Overview returns vijay planTier BASIC
+
+--- Scenario 5: Fleet Admin Profile & Isolation ---
+  ✅ [PASS] Alpha Fleet Admin can fetch current profile (HTTP 200)
+  ✅ [PASS] Alpha Fleet Admin profile name matches Alpha Fleet Ltd
+  ✅ [PASS] Alpha Fleet Admin profile matches alpha ID
+  ✅ [PASS] Fleet Admin calling /api/tenants directory is rejected with HTTP 403 Forbidden
+  ✅ [PASS] Fleet Admin trying to spoof another tenant via X-Tenant-ID is rejected with HTTP 403
+
+--- Scenario 8: SuperAdmin In-App Notifications ---
+  ✅ [PASS] Public fleet registration submitted successfully (HTTP 201)
+  ✅ [PASS] Received requestId for new fleet application
+  ✅ [PASS] SuperAdmin can fetch registration notifications (HTTP 200)
+  ✅ [PASS] unreadCount is returned as number
+  ✅ [PASS] Unread count reflects pending registration (1)
+  ✅ [PASS] Submitted registration appears in SuperAdmin notifications list
+  ✅ [PASS] Notification contains correct fleet name
+  ✅ [PASS] Notification initially has isRead=false
+  ✅ [PASS] Notification marked as read returns HTTP 200
+
+--- Scenario 9 & 10: Approval & Activation Validation ---
+  ✅ [PASS] SuperAdmin approval of registration succeeds (HTTP 200)
+  ✅ [PASS] Approval returns secure activation token
+  ✅ [PASS] Public verify activation token returns HTTP 200
+  ✅ [PASS] Activation token is confirmed valid
+  ✅ [PASS] Activation with mismatched email is rejected with HTTP 400
+  ✅ [PASS] Meaningful error toast returned: "Email is not registered for an approved fleet."
+  ✅ [PASS] Activation with registered email succeeds (HTTP 200)
+  ✅ [PASS] Replay of used activation token is blocked (HTTP 400)
+
+--- Scenario 11 & 12: Company SEO URL & Authentication ---
+  ✅ [PASS] Company created with unique SEO URL (HTTP 200/201)
+  ✅ [PASS] Company resolves by SEO URL (HTTP 200)
+  ✅ [PASS] Resolved company SEO URL matches requested slug
+  ✅ [PASS] Forgot password returns generic 200 to prevent user enumeration
+
+--- Scenario 14: Dynamic Fleet Document Branding ---
+  ✅ [PASS] Fleet Admin can update branding tokens (HTTP 200)
+  ✅ [PASS] Branding resolver returns Alpha Fleet Ltd
+  ✅ [PASS] Branding resolver returns custom header color #1A365D
+  ✅ [PASS] Branding resolver returns correct GST number
+  ✅ [PASS] Branding resolver returns correct registered address
+  ✅ [PASS] Branding resolver provides valid logo source (embedded data URI or URL)
+  ✅ [PASS] Beta Fleet has its own distinct fleet name
+  ✅ [PASS] Beta Fleet header color is distinct from Alpha Fleet
+
+================================================================
+🏁 MASTER MULTI-TENANT VERIFICATION COMPLETE:
+   Passed: 49
+   Failed: 0
+================================================================
+Exit Code: 0
 ```
 
-### Live Test Email Delivery Evidence:
-- **API Call:** `POST /api/tenants/admin/notifications/test-email`
-- **Recipient:** `subisha2002@gmail.com`
-- **Result:** `{"success": true, "message": "Test notification email dispatched successfully.", "messageId": "<801a9a09-a641-077c-f38e-59ddac81ca19@gracecabs.com>"}`
-- **Database Record in `notification_logs`:**
-  - `recipient`: `subisha2002@gmail.com`
-  - `templateCode`: `SUPERADMIN_NEW_APPLICATION_ALERT`
-  - `providerStatus`: `SENT`
-  - `providerMessageId`: `<801a9a09-a641-077c-f38e-59ddac81ca19@gracecabs.com>`
-
----
-
-## 5. CANONICAL PLAN CATALOG & ENTITLEMENTS
-
-The single source of truth is codified in `backend/src/services/quotaService.ts`:
-
-| Plan Feature / Limit | Starter Mobility (BASIC) | Growth Fleet Pro (PRO) | Enterprise Mobility Suite (ENTERPRISE) |
-| :--- | :---: | :---: | :---: |
-| **Monthly Price** | **₹299 / mo** | **₹349 / mo** | **₹549 / mo** |
-| **Annual Price (Save 15%)** | **₹3,050 / yr** | **₹3,560 / yr** | **₹5,600 / yr** |
-| **Vehicle Limit** | **15** | **75** | **250** (Strict, NOT unlimited) |
-| **Driver Limit** | **15** | **75** | **250** (Strict, NOT unlimited) |
-| **Corporate Client Limit** | **3** | **20** | **100** |
-| **Staff / Employee Limit** | **5** | **25** | **100** |
-| **Monthly Trip Limit** | **500** | **5,000** | **50,000** |
-| **Overage Cap** | ₹5,000 | ₹25,000 | ₹100,000 |
-| **Dispatch & Trip Closing** | Included | Included | Included |
-| **Single Trip Invoicing** | Included | Included | Included |
-| **Monthly Consolidated Route Cards**| Excluded | Included | Included |
-| **On-Call Duty Invoicing** | Included | Included | Included |
-| **Corporate Client Portals** | Excluded | Included | Included |
-| **Dynamic Company Policies** | Excluded | Included | Included |
-| **Automated PDF Invoice Generation**| Included | Included | Included |
-| **Analytics & Export Suite** | Standard | Advanced | Custom Enterprise |
-| **Support SLA** | Standard Email (24h) | Priority (4h) | Dedicated 24/7 Account Mgr |
-
----
-
-## 6. VISUAL REDESIGN VERIFICATION & SCREENSHOT EVIDENCE
-
-### Visual Tokens:
-- **Canvas / Background:** Warm Cream (`#FAF8F5`, `#FDFBF7`)
-- **Primary Accent / Actions:** Terracotta / Burnt Orange (`#C04E24`), Dark Terracotta Hover (`#A83F1A`)
-- **Typography / Content:** Dark Charcoal (`#1C1A18`), Secondary Charcoal (`#2B2927`), Muted Graphite (`#5A554E`)
-- **Borders & Dividers:** Muted Warm Grey (`#E0DAD1`)
-- **Status Accents:** Emerald Green (`#2E7D32`), Amber Warning (`#B45309`), Crimson Error (`#B91C1C`)
-- **Official Brand Logo:** Vector SVG `GraceCabsLogo.tsx` applied consistently.
-- **Strict Color Policy:** **0 occurrences of navy blue (`#122163`) or old blue fonts (`#221C84`) across the public site.**
-
-### Browser Verification Screenshots:
-1. **Home Page (`http://localhost:3000/`):**
-   - File: `home_page_warm_redesign_1792659434243.png`
-   - Verified: Warm cream background, terracotta CTA buttons, charcoal headers, Grace Cabs SVG logo, live fleet vehicle cards, live pricing preview (₹299/mo).
-2. **Pricing Page (`http://localhost:3000/pricing`):**
-   - Files: `pricing_page_redesign_1792659452730.png` (Annual) & `pricing_monthly_view_1792659469929.png` (Monthly)
-   - Verified: Basic ₹299/mo (₹3,050/yr), Pro ₹349/mo (₹3,560/yr), Enterprise ₹549/mo (₹5,600/yr). Clicking "Home" navigates cleanly back to `/` with the new design.
-3. **About Page (`http://localhost:3000/about`):**
-   - File: `about_page_redesign_1792659503691.png`
-   - Verified: Unified layout, company overview, fleet operational philosophy.
-4. **Services Page (`http://localhost:3000/services`):**
-   - File: `services_page_redesign_1792659519421.png`
-   - Verified: Dedicated service cards for Employee Transport, Executive Spot Rental, Airport Transfers, Monthly Route Cards.
-5. **Portfolio Page (`http://localhost:3000/portfolio`):**
-   - File: `portfolio_page_redesign_1792659532016.png`
-   - Verified: Interactive vehicle showcase with real assets (`img1.png` - `img6.png`).
-6. **Contact Page (`http://localhost:3000/contact`):**
-   - File: `contact_page_redesign_1792659544816.png`
-   - Verified: Verified business contact details (`traveldesk@gracecabs.com`, `+91 98417 22675`, Chennai office address), interactive contact form.
-7. **Register Fleet Page (`http://localhost:3000/register-fleet`):**
-   - File: `register_fleet_page_redesign_1792659577186.png`
-   - Verified: Canonical tiers (₹299, ₹349, ₹549), form validation, and clear feedback.
-8. **Operator / SuperAdmin Login Page (`http://localhost:3000/login`):**
-   - File: `login_page_redesign_1792659588352.png`
-   - Verified: Clean terracotta-and-charcoal login card, password toggle, no credentials exposed.
-
----
-
-## 7. DATABASE TABLE ROW COUNTS (DATA PRESERVATION VERIFIED)
-
+### Full Role-Based SaaS Access Control Suite (`testRoleBasedSaaS.ts`)
+Run command: `npx ts-node src/tests/testRoleBasedSaaS.ts`
 ```
-┌────────────────────────────────┬───────────────────┐
-│ Database Table Name            │ Live Row Count    │
-├────────────────────────────────┼───────────────────┤
-│ booking                        │ 27 records intact │
-│ vehicle                        │ 36 records intact │
-│ drivers                        │ 33 records intact │
-│ employee                       │ 2 records intact  │
-│ company                        │ 39 records intact │
-│ invoice                        │ 29 records intact │
-│ monthly_invoice                │ 14 records intact │
-│ onCallInvoice                  │ 1 record intact   │
-│ tenants                        │ 13 records        │
-│ tenant_subscriptions           │ 13 records        │
-│ tenant_registration_requests   │ 1 record          │
-│ tenant_activation_tokens       │ 0 records         │
-│ subscription_invoices          │ 0 records         │
-│ notification_logs              │ 13 audit records  │
-└────────────────────────────────┴───────────────────┘
+========================================================================
+🛡️  COMPLETE MULTI-TENANT SAAS ROLE-BASED ACCESS CONTROL AUDIT & TEST SUITE
+========================================================================
+[Test 1 - 15]
+...
+========================================================================
+🎉 ALL 15 REQUIRED SAAS TESTS PASSED: 43 VERIFIED ASSERTIONS, 0 FAILURES
+========================================================================
+Exit Code: 0
 ```
 
 ---
 
-## 8. DEMO & VERIFICATION INSTRUCTIONS
+## 5. Files Modified
 
-### Running Local Services:
-- Backend: `http://localhost:5000`
-- Frontend: `http://localhost:3000`
-- MySQL: Local MySQL on port 3306 (`demodb`)
-
-### Test Credentials:
-- **SuperAdmin Account:**
-  - Email: `subisha2002@gmail.com`
-  - Password: `superadmin@123`
-  - Scope: Global SuperAdmin across all tenants
-- **Verified SMTP Sender:**
-  - Sender: `traveldesk@gracecabs.com`
-  - Host: `smtpout.secureserver.net:587` (GoDaddy)
+| File | Subsystem | Description of Changes |
+| :--- | :--- | :--- |
+| `frontend/src/components/Header.tsx` | UI / Navigation | SuperAdmin platform identity display ("Grace Cabs SaaS" / "SuperAdmin"), notification bell with unread badge count, dropdown, and fleet selector auto-refresh. |
+| `frontend/src/components/Sidebar.tsx` | UI / Navigation | SuperAdmin platform sidebar branding ("Grace Cabs SaaS Platform" / "Platform Admin") vs. Fleet Admin dynamic tenant branding. |
+| `frontend/src/context/TenantContext.tsx` | State Management | Real customer fleet filtering (excluding root and test fixtures), fleet selector persistence, and immediate profile loading for non-superadmins. |
+| `frontend/src/SuperAdmin/pages/Dashboard/Dashboard.tsx` | Dashboard | Corrected field accesses to `fleetOverview?.tenant?.name` and `sub?.planTier`. |
+| `frontend/src/components/Homepage/ActivateAccount.tsx` | Authentication | Added email confirmation input and meaningful validation error toast handling. |
+| `backend/src/models/tenantRegistrationRequest.ts` | Database Model | Added `isNotificationRead` boolean column definition. |
+| `backend/src/middleware/uploadConfig.ts` | Storage Middleware | Configured multer storage and validation for fleet logo uploads (`uploadFleetLogo`). |
+| `backend/src/services/tenantService.ts` | Backend Service | Implemented in-app notification query/update methods and fleet logo upload handler. |
+| `backend/src/routes/tenantRoutes.ts` | API Routes | Exposed notification management and logo upload endpoints. |
+| `backend/src/services/registrationService.ts` | Business Logic | Strict applicant email validation on activation and single-use token invalidation. |
+| `backend/src/services/fleetBrandingService.ts` | Branding (New) | Authoritative branding resolver (`getFleetDocumentBranding`) for invoices, emails, and PDFs. |
+| `backend/src/services/empServices.ts` | Multi-Tenant Data | Fixed `createCompany` foreign key check by safely verifying `employeeId` and `userId`. |
+| `backend/src/appServices/appInvoiceServices.ts` | Invoicing | Injected dynamic fleet branding into invoice generation. |
+| `backend/src/services/bookingServices.ts` | Dispatch & Bookings | Injected dynamic fleet branding into booking confirmation emails. |
+| `backend/src/services/smsServices.ts` | SMS Notifications | Injected dynamic fleet branding into SMS notifications. |
+| `backend/src/services/authServices.ts` | Authentication | Enforced fleet boundary checks on user creation, company-level logins, and forgot password. |
+| `backend/src/tests/testMasterMultiTenantFix.ts` | Testing (New) | 49 comprehensive assertions covering all 10 phases. |
 
 ---
-*Report fully verified against live local MySQL database, active frontend/backend instances, and browser automation on October 22, 2026.*
+
+## 6. Verification of Safety & Operational Integrity
+- **Database Safety**: Zero tables dropped, zero tables truncated, zero operational records deleted.
+- **Credential Protection**: Existing GoDaddy SMTP and SMS gateway configurations preserved and active.
+- **Reference Project**: `D:\New Pcs\vehicle` remained untouched throughout the entire implementation.
+- **Production Readiness**: Production build created successfully (`npm run build`).

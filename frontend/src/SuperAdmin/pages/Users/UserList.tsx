@@ -211,6 +211,8 @@ const handleSearch = () => {
 
           onView={!showTrashed ? (row) =>
             navigate(`/users/userdetails/${row.userId}`) : undefined}
+          onEdit={!showTrashed ? (row) =>
+            navigate(`/users/userdetails/${row.userId}?edit=true`) : undefined}
 
 onInvoice={!showTrashed ? async (row: any) => {
   const r = row?.original ?? row;

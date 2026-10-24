@@ -61,19 +61,26 @@ const [loading, setLoading] = useState(false);
 
  
 
+  const [deleting, setDeleting] = useState(false);
+
   const confirmDelete = async () => {
-  if (!selectedCompany) return;
-  try {
-    await axiosInstance.delete(`/company/companyDelete/${selectedCompany.companyId}`);
-    showToast("Company moved to trash successfully!", "success");
-    setDeletePopupOpen(false);
-    
-    // Fetch the correct list based on current toggle
-    fetchCompanies();
-  } catch (error) {
-    console.error("Error deleting company:", error);
-  }
-};
+    if (!selectedCompany || deleting) return;
+    try {
+      setDeleting(true);
+      await axiosInstance.delete(`/company/companyDelete/${selectedCompany.companyId}`);
+      showToast("Company moved to trash successfully!", "success");
+      setDeletePopupOpen(false);
+      setSelectedCompany(null);
+      // Fetch the correct list based on current toggle
+      fetchCompanies();
+    } catch (error: any) {
+      console.error("Error deleting company:", error);
+      const msg = error?.response?.data?.message || "Error deleting company";
+      showToast(msg, "error");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   /** Restore */
   const handleActivate = async (company: Company) => {
@@ -83,8 +90,10 @@ const [loading, setLoading] = useState(false);
       );
       showToast("Company restored successfully!", "success");
       fetchCompanies();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error restoring company:", error);
+      const msg = error?.response?.data?.message || "Error restoring company";
+      showToast(msg, "error");
     }
   };
 
@@ -103,47 +112,54 @@ const [loading, setLoading] = useState(false);
       );
       // API returns array directly
       setCompanies(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error searching companies:", error);
+      showToast("Error searching companies", "error");
     }
   };
 
   /** Columns for DataTable */
-/** Columns for DataTable */
-const columns: Column<Company>[] = [
-  { header: "Company Name", accessor: "companyName" },
-{
-  header: "SEO URL",
-  accessor: "seoUrl",
-  render: (row: Company) => {
-    const fullSeoUrl = `${process.env.REACT_APP_SEO_BASE_URL}${row.seoUrl}`;
+  const columns: Column<Company>[] = [
+    { header: "Company Name", accessor: "companyName" },
+    {
+      header: "SEO URL",
+      accessor: "seoUrl",
+      render: (row: Company) => {
+        const origin = typeof window !== "undefined" && window.location?.origin
+          ? window.location.origin
+          : (process.env.REACT_APP_WEB_URL || "http://localhost:3000");
 
-    const handleSeoClick = () => {
-      localStorage.setItem("companyId", row.companyId);
-      localStorage.setItem("companyName", row.companyName);
+        if (!row.seoUrl) {
+          return <span className="text-gray-400 italic">Not generated</span>;
+        }
 
-      // ✅ IMPORTANT
-      if (row.companyLogo) {
-        localStorage.setItem("companyLogo", row.companyLogo);
-      }
-    };
+        const fullSeoUrl = `${origin}/Company/${encodeURIComponent(row.seoUrl)}`;
 
-    return (
-      <a
-        href={fullSeoUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={handleSeoClick}
-        className="text-blue-600 hover:underline"
-      >
-        {fullSeoUrl}
-      </a>
-    );
-  },
-},
+        const handleSeoClick = () => {
+          localStorage.setItem("companyId", row.companyId);
+          localStorage.setItem("companyName", row.companyName);
 
-  { header: "Allow Tax", accessor: "allowTax" },
-];
+          // ✅ IMPORTANT
+          if (row.companyLogo) {
+            localStorage.setItem("companyLogo", row.companyLogo);
+          }
+        };
+
+        return (
+          <a
+            href={fullSeoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleSeoClick}
+            className="text-blue-600 hover:underline"
+          >
+            {fullSeoUrl}
+          </a>
+        );
+      },
+    },
+    { header: "Allow Tax", accessor: "allowTax" },
+  ];
 
   return (
     <PageLayout>

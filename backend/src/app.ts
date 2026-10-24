@@ -83,10 +83,11 @@ app.use(cors({
 // Multi-tenant context resolution
 app.use(tenantMiddleware);
 
-app.use('/uploads/vehicleImg', express.static(path.join(__dirname, '..', '..', 'uploads', 'vehicleImg')));
+app.use('/uploads/vehicleImg', express.static(path.join(process.cwd(), 'uploads', 'vehicleImg')));
 // Protected: Signatures require authentication (Bearer token or ?token=)
-app.use('/uploads/signature', authMiddleware, express.static(path.join(__dirname,  '..', '..', 'uploads', 'signature')));
-app.use('/uploads/companyLogo', express.static(path.join(__dirname,   '..', '..','uploads', 'companyLogo'))); 
+app.use('/uploads/signature', authMiddleware, express.static(path.join(process.cwd(), 'uploads', 'signature')));
+app.use('/uploads/companyLogo', express.static(path.join(process.cwd(), 'uploads', 'companyLogo'))); 
+app.use('/uploads/fleetLogo', express.static(path.join(process.cwd(), 'uploads', 'fleetLogo'))); 
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tenants', tenantRoutes);

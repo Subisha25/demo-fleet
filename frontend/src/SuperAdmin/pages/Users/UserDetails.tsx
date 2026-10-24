@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { showToast } from '../../../components/AlertBox';
 import {
   Pencil,
@@ -85,6 +85,7 @@ type StatsApiResponse = {
 export default function UserDetails() {
   const { userId } = useParams<{ userId: string }>();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
 
   const [user, setUser] = useState<UserDetailsType | null>(null);
   const [companyData, setCompanyData] = useState<CompanyType | null>(null);
@@ -97,15 +98,19 @@ export default function UserDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('edit') === 'true') {
+      setShowModal(true);
+    }
+  }, [searchParams]);
   const [showSuccess, setShowSuccess] = useState(false); // New state for success message
   const [showCompanyModal, setShowCompanyModal] = useState(false);
 
   const [stats, setStats] = useState<UserOrderStats | null>(null);
 const [statsLoading, setStatsLoading] = useState<boolean>(false);
 const [statsErr, setStatsErr] = useState<string | null>(null);
-const danfossCompanyId = companyList.find(
-  c => c.companyName.toLowerCase().includes('danfoss')
-)?.companyId;
+
 
   const [formData, setFormData] = useState({
     username: '',
@@ -753,8 +758,8 @@ const handleUpdateUser = async (e: React.FormEvent) => {
   </select>
 </div>
 
-{/* ✅ Is Manager – ONLY for Danfoss */}
-{formData.companyId === danfossCompanyId && (
+{/* Corporate / Manager Fields */}
+{formData.companyId && (
   <div className="flex items-center gap-2 mt-2">
     <input
       type="checkbox"
@@ -770,7 +775,7 @@ const handleUpdateUser = async (e: React.FormEvent) => {
     <label className="text-sm text-gray-700">Is Manager</label>
   </div>
 )}
-{formData.companyId === danfossCompanyId && (
+{formData.companyId && (
   <>
     <div>
       <label className="block text-sm font-medium text-gray-700">

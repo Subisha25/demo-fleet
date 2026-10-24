@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Op } from 'sequelize';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { Tenant } from '../models/tenant';
@@ -14,6 +15,7 @@ import { Invoice } from '../models/invoice';
 import { MonthlyInvoice } from '../models/monthlyInvoice';
 import { OnCallInvoice } from '../models/onCallInvoice';
 import { SubscriptionInvoice } from '../models/subscriptionInvoice';
+import { TenantRegistrationRequest } from '../models/tenantRegistrationRequest';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 import { PLAN_LIMITS, PLAN_CATALOG, getOrCreateSubscription } from './quotaService';
 import { sendNotification } from './notificationService';
@@ -181,6 +183,12 @@ export const createTenant = async (req: Request, res: Response) => {
 export const getTenantById = async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.params;
+    const ctx = getTenantContext();
+
+    if (!ctx?.isPlatformSuperAdmin && ctx?.tenantId !== tenantId) {
+      return res.status(403).json({ success: false, message: 'Forbidden: Access denied to tenant profile.' });
+    }
+
     const tenant = await Tenant.findByPk(tenantId, {
       include: [{ model: TenantSubscription }],
     });
@@ -385,12 +393,24 @@ export const getCurrentTenantProfile = async (req: Request, res: Response) => {
 export const updateCurrentTenantBranding = async (req: Request, res: Response) => {
   try {
     const ctx = getTenantContext();
-    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = !!ctx?.isPlatformSuperAdmin;
+    const targetTenantId = (isPlatformAdmin && req.body.tenantId)
+      ? req.body.tenantId
+      : (ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID);
+
     const { brandingTokens, contactEmail, contactPhone } = req.body;
 
-    const tenant = await Tenant.findByPk(tenantId);
+    const tenant = await Tenant.findByPk(targetTenantId);
     if (!tenant) {
       return res.status(404).json({ success: false, message: 'Tenant not found.' });
+    }
+
+    // Validate header color format if provided
+    if (brandingTokens?.headerColor && !/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(brandingTokens.headerColor)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid headerColor format. Expected hex color like #C04E24.',
+      });
     }
 
     await tenant.update({
@@ -414,6 +434,123 @@ export const updateCurrentTenantBranding = async (req: Request, res: Response) =
 };
 
 /**
+ * Upload fleet logo for current tenant (or target fleet if SuperAdmin).
+ */
+export const uploadCurrentTenantLogo = async (req: Request, res: Response) => {
+  try {
+    const userRole = (req as any).role;
+    if (userRole && ['user', 'driver'].includes(String(userRole).toLowerCase())) {
+      return res.status(403).json({ success: false, message: 'Not Authorized: Staff permissions required to upload fleet logo.' });
+    }
+
+    const ctx = getTenantContext();
+    const isPlatformAdmin = !!ctx?.isPlatformSuperAdmin;
+    const targetTenantId = (isPlatformAdmin && req.body.tenantId)
+      ? req.body.tenantId
+      : (ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID);
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No logo file uploaded.' });
+    }
+
+    const tenant = await Tenant.findByPk(targetTenantId);
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: 'Tenant not found.' });
+    }
+
+    const logoUrl = `/uploads/fleetLogo/${req.file.filename}`;
+    const brandingTokens = {
+      ...(tenant.brandingTokens || {}),
+      logoUrl,
+    };
+
+    await tenant.update({ brandingTokens });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Fleet logo uploaded and saved successfully.',
+      logoUrl,
+      tenant,
+    });
+  } catch (error: any) {
+    console.error('Error uploading fleet logo:', error);
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+/**
+ * SuperAdmin In-App Notifications for inbound fleet registrations.
+ */
+export const getRegistrationNotifications = async (req: Request, res: Response) => {
+  try {
+    const unreadCount = await TenantRegistrationRequest.count({
+      where: { status: 'PENDING', isNotificationRead: false },
+    });
+
+    const recentRequests = await TenantRegistrationRequest.findAll({
+      order: [['createdAt', 'DESC']],
+      limit: 15,
+    });
+
+    const notifications = recentRequests.map((r: any) => ({
+      requestId: r.requestId,
+      fleetName: r.fleetName,
+      businessCode: r.businessCode,
+      ownerName: r.ownerName,
+      contactEmail: r.contactEmail,
+      contactPhone: r.contactPhone,
+      requestedPlanTier: r.requestedPlanTier,
+      billingCycle: r.billingCycle,
+      city: r.city,
+      state: r.state,
+      status: r.status,
+      createdAt: r.createdAt,
+      isRead: Boolean(r.isNotificationRead),
+    }));
+
+    return res.status(200).json({
+      success: true,
+      unreadCount,
+      notifications,
+    });
+  } catch (err: any) {
+    console.error('Error fetching registration notifications:', err);
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+/**
+ * Mark a single registration notification as read.
+ */
+export const markRegistrationNotificationRead = async (req: Request, res: Response) => {
+  try {
+    const { requestId } = req.params;
+    const record = await TenantRegistrationRequest.findByPk(requestId);
+    if (record) {
+      await record.update({ isNotificationRead: true });
+    }
+    return res.status(200).json({ success: true, message: 'Notification marked as read.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+/**
+ * Mark all pending registration notifications as read.
+ */
+export const markAllRegistrationNotificationsRead = async (req: Request, res: Response) => {
+  try {
+    await TenantRegistrationRequest.update(
+      { isNotificationRead: true },
+      { where: { isNotificationRead: false } }
+    );
+    return res.status(200).json({ success: true, message: 'All notifications marked as read.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+/**
  * Tenant-Specific Fleet Admin Dashboard Overview.
  * Applies authenticated tenant scoping on the server.
  * Returns profile, vehicle/driver/company quotas, booking pipelines, and subscription status.
@@ -421,10 +558,22 @@ export const updateCurrentTenantBranding = async (req: Request, res: Response) =
 export const getFleetDashboardOverview = async (req: Request, res: Response) => {
   try {
     const ctx = getTenantContext();
-    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformSuperAdmin = !!ctx?.isPlatformSuperAdmin;
+    const isAllFleets = isPlatformSuperAdmin && (!ctx?.selectedTenantId || ctx?.selectedTenantId === 'all');
+
+    // Determine target tenant ID for individual fleet view
+    const targetTenantId = isAllFleets
+      ? ROOT_TENANT_ID
+      : (isPlatformSuperAdmin ? (ctx?.selectedTenantId || ROOT_TENANT_ID) : (ctx?.tenantId || ROOT_TENANT_ID));
+
+    const whereTenant: Record<string, any> = isAllFleets
+      ? {}
+      : (targetTenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId: targetTenantId });
 
     // 1. Tenant & Subscription Profile
-    let tenant = await Tenant.findByPk(tenantId, {
+    let tenant = await Tenant.findByPk(targetTenantId, {
       include: [{ model: TenantSubscription }],
     });
 
@@ -434,7 +583,7 @@ export const getFleetDashboardOverview = async (req: Request, res: Response) => 
       });
     }
 
-    const sub = tenant?.subscription || (await getOrCreateSubscription(tenantId));
+    const sub = tenant?.subscription || (await getOrCreateSubscription(targetTenantId));
     const limits = PLAN_LIMITS[sub.planTier || 'PRO'];
 
     // Subscription Days & Alerts Calculation
@@ -447,30 +596,31 @@ export const getFleetDashboardOverview = async (req: Request, res: Response) => 
     const isGracePeriod = daysRemaining < 0 && daysRemaining >= -3;
     const isSuspended = sub.status === 'SUSPENDED' || daysRemaining < -3;
 
-    // 2. Strict Tenant-Scoped Resource Counts
-    const [vehicleCount, driverCount, companyCount, employeeCount] = await Promise.all([
-      Vehicle.count({ where: { tenantId } }),
-      Drivers.count({ where: { tenantId } }),
-      Company.count({ where: { tenantId } }),
-      Employee.count({ where: { tenantId } }),
+    // 2. Resource Counts (platform aggregated if isAllFleets, else scoped to target tenant)
+    const [vehicleCount, driverCount, companyCount, employeeCount, activeFleetsCount] = await Promise.all([
+      Vehicle.count({ where: whereTenant }),
+      Drivers.count({ where: whereTenant }),
+      Company.count({ where: whereTenant }),
+      Employee.count({ where: whereTenant }),
+      Tenant.count({ where: { status: 'ACTIVE' } }),
     ]);
 
-    // 3. Strict Tenant-Scoped Booking Pipeline
+    // 3. Booking Pipeline
     const [confirmPending, closePending, paymentPending, completed, totalBookings] = await Promise.all([
-      Booking.count({ where: { tenantId, status: 'ConfirmPending' } }),
-      Booking.count({ where: { tenantId, status: 'ClosePending' } }),
-      Booking.count({ where: { tenantId, status: 'PaymentPending' } }),
-      Booking.count({ where: { tenantId, status: 'Completed' } }),
-      Booking.count({ where: { tenantId } }),
+      Booking.count({ where: { ...whereTenant, confirmStatus: '0' } }),
+      Booking.count({ where: { ...whereTenant, confirmStatus: '1' } }),
+      Booking.count({ where: { ...whereTenant, confirmStatus: '2' } }),
+      Booking.count({ where: { ...whereTenant, confirmStatus: '3' } }),
+      Booking.count({ where: whereTenant }),
     ]);
 
-    // 4. Strict Tenant-Scoped Invoices Breakdown
+    // 4. Invoices Breakdown
     const [singleTripInvoices, monthlyInvoices, onCallInvoices, subscriptionInvoices] = await Promise.all([
-      Invoice.count({ where: { tenantId } }),
-      MonthlyInvoice.count({ where: { tenantId } }),
-      OnCallInvoice.count({ where: { tenantId } }),
+      Invoice.count({ where: whereTenant }),
+      MonthlyInvoice.count({ where: whereTenant }),
+      OnCallInvoice.count({ where: whereTenant }),
       SubscriptionInvoice.findAll({
-        where: { tenantId },
+        where: isAllFleets ? {} : { tenantId: targetTenantId },
         order: [['createdAt', 'DESC']],
         limit: 5,
       }),
@@ -479,45 +629,61 @@ export const getFleetDashboardOverview = async (req: Request, res: Response) => 
     return res.status(200).json({
       success: true,
       data: {
-        tenant: {
-          tenantId: tenant?.tenantId,
-          name: tenant?.name,
-          code: tenant?.code,
-          contactEmail: tenant?.contactEmail,
-          contactPhone: tenant?.contactPhone,
-          brandingTokens: tenant?.brandingTokens,
-        },
+        isPlatformSuperAdmin,
+        isAllFleets,
+        selectedTenantId: ctx?.selectedTenantId || (isPlatformSuperAdmin ? 'all' : ctx?.tenantId),
+        activeFleetsCount: isPlatformSuperAdmin ? activeFleetsCount : undefined,
+        tenant: isAllFleets
+          ? {
+              tenantId: 'all',
+              name: 'Platform-Wide Aggregated Operations',
+              code: 'ALL_FLEETS',
+              contactEmail: 'subisha2002.m@gmail.com',
+              contactPhone: '9003241571',
+              brandingTokens: {
+                primaryColor: '#C04E24',
+                portalTitle: 'Platform Fleet Aggregator',
+              },
+            }
+          : {
+              tenantId: tenant?.tenantId,
+              name: tenant?.name,
+              code: tenant?.code,
+              contactEmail: tenant?.contactEmail,
+              contactPhone: tenant?.contactPhone,
+              brandingTokens: tenant?.brandingTokens,
+            },
         subscription: {
-          planTier: sub.planTier,
+          planTier: isAllFleets ? 'ENTERPRISE' : sub.planTier,
           status: isSuspended ? 'SUSPENDED' : isGracePeriod ? 'PAST_DUE' : sub.status,
           currentPeriodStart: sub.currentPeriodStart,
           currentPeriodEnd: sub.currentPeriodEnd,
           daysRemaining,
-          isRenewalWarning,
-          isGracePeriod,
-          isSuspended,
+          isRenewalWarning: isAllFleets ? false : isRenewalWarning,
+          isGracePeriod: isAllFleets ? false : isGracePeriod,
+          isSuspended: isAllFleets ? false : isSuspended,
           renewalUrl: '/admin/billing',
         },
         quotas: {
           vehicles: {
             current: vehicleCount,
-            limit: limits.vehicles,
-            percent: Math.min(100, Math.round((vehicleCount / limits.vehicles) * 100)),
+            limit: isAllFleets ? 999999 : limits.vehicles,
+            percent: isAllFleets ? 100 : Math.min(100, Math.round((vehicleCount / limits.vehicles) * 100)),
           },
           drivers: {
             current: driverCount,
-            limit: limits.drivers,
-            percent: Math.min(100, Math.round((driverCount / limits.drivers) * 100)),
+            limit: isAllFleets ? 999999 : limits.drivers,
+            percent: isAllFleets ? 100 : Math.min(100, Math.round((driverCount / limits.drivers) * 100)),
           },
           companies: {
             current: companyCount,
-            limit: limits.companies,
-            percent: Math.min(100, Math.round((companyCount / limits.companies) * 100)),
+            limit: isAllFleets ? 999999 : limits.companies,
+            percent: isAllFleets ? 100 : Math.min(100, Math.round((companyCount / limits.companies) * 100)),
           },
           employees: {
             current: employeeCount,
-            limit: limits.employees || 25,
-            percent: Math.min(100, Math.round((employeeCount / (limits.employees || 25)) * 100)),
+            limit: isAllFleets ? 999999 : (limits.employees || 25),
+            percent: isAllFleets ? 100 : Math.min(100, Math.round((employeeCount / (limits.employees || 25)) * 100)),
           },
         },
         pipeline: {

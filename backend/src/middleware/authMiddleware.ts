@@ -39,3 +39,43 @@ export const authMiddleware = (req: AuthenticatedRequest, res: Response, next: N
     return res.status(401).json({ message: 'Not valid' });
   }
 };
+
+/**
+ * Strict role-based guard for platform-level SuperAdmin operations.
+ * Blocks Fleet Admins, Company Managers, and Users with HTTP 403.
+ */
+export const requireSuperAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const role = req.role || req.roles;
+  const tenantId = req.tenantId;
+  const email = req.email;
+
+  // Root platform superadmin check
+  const isSuper = (role === 'superadmin' || role === 'SUPERADMIN') &&
+    (tenantId === 'e7b8a1c0-0000-0000-0000-000000000001' || !tenantId || email === 'subisha2002.m@gmail.com');
+
+  if (!isSuper) {
+    return res.status(403).json({
+      success: false,
+      message: 'Forbidden: Platform SuperAdmin privilege required.',
+    });
+  }
+
+  next();
+};
+
+/**
+ * Ensures caller is either Platform SuperAdmin or an authorized Fleet Admin.
+ */
+export const requireFleetAdminOrSuperAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const role = req.role || req.roles;
+  const isAuthorized = role === 'superadmin' || role === 'SUPERADMIN' || role === 'fleet_admin' || role === 'admin';
+
+  if (!isAuthorized) {
+    return res.status(403).json({
+      success: false,
+      message: 'Forbidden: Fleet Admin or SuperAdmin privilege required.',
+    });
+  }
+
+  next();
+};

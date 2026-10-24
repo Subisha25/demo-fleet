@@ -14,6 +14,7 @@ import { Drivers, VehicleMaster, PackageData } from '../models';
 import { Company } from "../models/company";
 import { ORDER, USERS } from "../utils/costants";
 import jwt from "jsonwebtoken";
+import { getFleetDocumentBranding } from '../services/fleetBrandingService';
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 const BASE_URL = process.env.API_BASE_URL || "https://gracecabs.com";
@@ -132,8 +133,10 @@ const numberToWords = (num: number): string => {
   return result + ' Only';
 };
 // Generate HTML with dynamic line item
-export const generateInvoiceHTML = (data: InvoiceData): string => {
-  //  const logoSrc = "https://gracecabs.com/images/logo.png";
+export const generateInvoiceHTML = (data: InvoiceData, branding?: any): string => {
+  const dynamicLogo = branding?.logoSrc || logoSrc;
+  const dynamicFleet = branding?.fleetName || "Grace Cabs";
+  const dynamicHeaderColor = branding?.headerColor || "rgb(39, 89, 129)";
 
   const lineItemsHTML = data.lineItems.map(item => {
     let rowClass = '';
@@ -169,7 +172,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grace Cabs Private Limited</title>
+    <title>${dynamicFleet}</title>
     <style>
         * {
             margin: 0;
@@ -216,10 +219,10 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
         }
 
         .section-header {
-            background-color:  rgba(82, 121, 152, 1);
+            background-color: ${dynamicHeaderColor};
             padding: 5px 12px;
             font-weight: bold;
-            color: #333;
+            color: #ffffff;
             margin: 12px 0 6px 0;
             font-size: 11px;
         }
@@ -277,9 +280,9 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
             justify-content: space-between;
             align-items: center;
             padding: 8px 12px;
-            background-color: rgba(82, 121, 152, 1);
+            background-color: ${dynamicHeaderColor};
             font-weight: bold;
-            color: #333;
+            color: #ffffff;
             margin: 12px 0 0 0;
             font-size: 11px;
         }
@@ -461,7 +464,7 @@ export const generateInvoiceHTML = (data: InvoiceData): string => {
         <!-- Header -->
        <div class="header">
     <div class="logo-section">
-    <img src="${logoSrc}" alt="Grace Cabs" class="logo-img" />
+    <img src="${dynamicLogo}" alt="${dynamicFleet}" class="logo-img" />
     </div>
             <div class="invoice-info">
                 <div><strong>Invoice Number:</strong> ${data.invoiceNumber}</div>
@@ -609,15 +612,15 @@ ${data.managerEmail ? `
         <div class="footer-info">
             <div class="footer-row">
                 <span class="footer-label">Regd.Office:</span>
-                <span>Grace Cabs  Pvt. Ltd., 7/621 NESAMANI NAGAR, PERUMBAKKAM, CHENNAI - 600100</span>
+                <span>${branding?.registeredAddress || 'Grace Cabs  Pvt. Ltd., 7/621 NESAMANI NAGAR, PERUMBAKKAM, CHENNAI - 600100'}</span>
             </div>
             <div class="footer-row">
                 <span class="footer-label">Website:</span>
-                <span>gracecabs.com</span>
+                <span>${branding?.portalTitle ? branding.portalTitle.toLowerCase().replace(/\s+/g, '') + '.com' : 'gracecabs.com'}</span>
             </div>
             <div class="footer-row">
                 <span class="footer-label">GSTIN:</span>
-                <span>33AAMCG2518C1Z0</span>
+                <span>${branding?.gstNumber || '33AAMCG2518C1Z0'}</span>
             </div>
             <div class="footer-row">
                 <span class="footer-label">PAN No.:</span>
@@ -1172,7 +1175,8 @@ attributes: ["userId", "username", "email"]    },
     console.log('Vehicle Data:', JSON.stringify(booking.vehicle, null, 2));
 
     const invoiceData = mapBookingToInvoiceData(booking);
-    const htmlContent = generateInvoiceHTML(invoiceData);
+    const branding = await getFleetDocumentBranding(booking.tenantId);
+    const htmlContent = generateInvoiceHTML(invoiceData, branding);
 
     const uploadsDir = path.join(process.cwd(), 'uploads', 'invoices');
     if (!fs.existsSync(uploadsDir)) {

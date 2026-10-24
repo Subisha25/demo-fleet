@@ -212,6 +212,8 @@ const Sidebar: React.FC = () => {
   const [openDropdown, setOpenDropdown] = useState<string[]>([]);
   const [collapsed, setCollapsed] = useState(false);
   const { currentTenant } = useTenant();
+  const role = localStorage.getItem('role') || '';
+  const isSuperAdmin = role === 'superadmin';
 
   const toggleDropdown = (label: string) => {
     setOpenDropdown((prev: any) =>
@@ -223,6 +225,14 @@ const Sidebar: React.FC = () => {
 
   const tenantName = currentTenant?.brandingTokens?.portalTitle || currentTenant?.name || 'Grace Cabs';
   const logoUrl = currentTenant?.brandingTokens?.logoUrl || '/images/favicon1.jpeg';
+
+  // Strict role-based menu filtering: platform SaaS Tenants & Configuration are SuperAdmin only
+  const visibleMenu = menu.filter((item) => {
+    if (item.label === 'SaaS Tenants' || item.label === 'Configuration') {
+      return isSuperAdmin;
+    }
+    return true;
+  });
 
   return (
     <aside
@@ -247,10 +257,10 @@ const Sidebar: React.FC = () => {
         {!collapsed && (
           <div className="mt-2 pt-2 border-t border-[#2E2A26]/80 flex items-center justify-between">
             <span className="text-xs font-bold text-white truncate max-w-[150px]">
-              {tenantName}
+              {isSuperAdmin ? 'Grace Cabs SaaS Platform' : (currentTenant?.name || tenantName)}
             </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#C04E24]/20 text-[#E9B195] border border-[#C04E24]/40 uppercase tracking-wider">
-              {currentTenant?.planTier || 'PRO'} Fleet
+              {isSuperAdmin ? 'Platform Admin' : `${currentTenant?.planTier || 'PRO'} Plan`}
             </span>
           </div>
         )}
@@ -259,7 +269,7 @@ const Sidebar: React.FC = () => {
       {/* Navigation Menu */}
       <nav className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent py-3 px-2 text-slate-300">
         <ul className="space-y-1">
-          {menu.map((item) => (
+          {visibleMenu.map((item) => (
             <li key={item.label}>
               {item.children ? (
                 <>

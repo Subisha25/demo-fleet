@@ -12,8 +12,8 @@ router.get("/getCompanyById/:id",authMiddleware,getCompanyById);
 // router.put("/companyUpdate/:id",authMiddleware,updateCompany);
 router.put(
   "/companyUpdate/:id",
-  uploadCompanyLogo.single("companyLogo"), // 👈 Added here
   authMiddleware,
+  uploadCompanyLogo.single("companyLogo"),
   updateCompany
 );
 router.delete("/companyDelete/:id",authMiddleware,deleteCompany);

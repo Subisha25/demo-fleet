@@ -11,8 +11,9 @@ import { Op } from 'sequelize';
 import { sendEmailFromTemplate, fetchAllEmailConfs } from "../services/emailConfServices";
 const { ROLES } = USERS;
 import { normalizeManagerEmails } from '../utils/email';
-import { ROOT_TENANT_ID } from '../context/tenantContext';
+import { ROOT_TENANT_ID, getTenantContext } from '../context/tenantContext';
 import { validateRegistrationAgainstPolicy } from '../services/policyService';
+import { generateUniqueCompanySlug } from '../utils/slugUtils';
 
 
 // Helper function to find user by mobile and return user data with type
@@ -111,6 +112,7 @@ export const empLogin = async (req: Request, res: Response) => {
         id: employee.employeeId,
         email: employee.email,
         role: employee.role,
+        tenantId: employee.tenantId || ROOT_TENANT_ID,
         accessToken: Security.generateJwtToken(
           { 
             userId: employee.employeeId, 
@@ -133,6 +135,7 @@ export const empLogin = async (req: Request, res: Response) => {
         id: vendor.vendorId,
         email: vendor.email,
         role: vendor.role,              //admin
+        tenantId: vendor.tenantId || ROOT_TENANT_ID,
         accessToken: Security.generateJwtToken(
           { 
             userId: vendor.vendorId, 
@@ -162,6 +165,7 @@ export const empLogin = async (req: Request, res: Response) => {
         companyId: user.companyId,
         email: user.email,
         role: userRole, // 👈 manager or user
+        tenantId: user.tenantId || ROOT_TENANT_ID,
         accessToken: Security.generateJwtToken(
           { 
             userId: user.userId, 
@@ -323,7 +327,7 @@ if (existingUserByMobile) {
   });
 }
     const company = await Company.findByPk(companyId, {
-      attributes: ["companyId", "companyName", "managerEmail"]
+      attributes: ["companyId", "companyName", "managerEmail", "tenantId", "seoUrl"]
     });
 
     if (!company) {
@@ -331,6 +335,17 @@ if (existingUserByMobile) {
         success: false,
         message: "Company not found with the provided companyId"
       });
+    }
+
+    // Enforce tenant boundary: Fleet Admin cannot create users in another fleet's company
+    const ctx = getTenantContext();
+    if (ctx?.tenantId && !ctx?.isPlatformSuperAdmin) {
+      if (company.tenantId && company.tenantId !== ctx.tenantId) {
+        return res.status(403).json({
+          success: false,
+          message: "You are not authorized to create users for a company belonging to another fleet.",
+        });
+      }
     }
 
     // Dynamic company policy validation (backward-compatible fallback for Danfoss)
@@ -342,16 +357,25 @@ if (existingUserByMobile) {
       });
     }
 
+    // Ensure company SEO URL is valid and never undefined
+    let companySeoUrl = company.seoUrl;
+    if (!companySeoUrl || companySeoUrl.trim() === "") {
+      companySeoUrl = await generateUniqueCompanySlug(company.companyName || "company", company.companyId);
+      await company.update({ seoUrl: companySeoUrl });
+    }
+
+    const webBaseUrl = (process.env.WEB_BASE_URL || config.baseurl?.webbaseurl || "http://localhost:3000").replace(/\/$/, "");
+    const companyPortalUrl = `${webBaseUrl}/Company/${encodeURIComponent(companySeoUrl)}`;
+    const commonLoginUrl = `${webBaseUrl}/login`;
+
     const managerEmails: string[] = normalizeManagerEmails(company.managerEmail as any);
     let isCompanyManager = managerEmails.includes(normalizedEmail);
-    if(isManager) {
+    if (isManager) {
       isCompanyManager = isManager;
     }
-    console.log("ismanager: ",isManager," iscompmanager: ", isCompanyManager)
-    // ✅ Auto-generate 6 digit password
-    const generatedPassword = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // ✅ Hash the generated password before storing in DB
+    // Auto-generate temporary password and hash securely
+    const generatedPassword = Math.floor(100000 + Math.random() * 900000).toString();
     const hashedPassword = await Security.hash(generatedPassword, 10);
 
     const newUser = await User.create({
@@ -381,23 +405,34 @@ if (existingUserByMobile) {
     });
 
     const createdUser = await User.findByPk(newUser.userId, {
-      include: [{ model: Company, attributes: ["companyId", "companyName"] }],
+      include: [{ model: Company, attributes: ["companyId", "companyName", "seoUrl"] }],
     });
 
+    let emailDelivered = false;
+    let emailError: string | null = null;
     try {
       await sendEmailFromTemplate("USER_REGISTRATION_EMAIL_TO_USER", {
         UserName: username,
         UserEmail: normalizedEmail,
         Password: generatedPassword,
+        CompanySeoUrl: companyPortalUrl,
+        LoginUrl: commonLoginUrl,
+        to: normalizedEmail,
       });
-      console.log("✅ Registration email sent to:", normalizedEmail);
-    } catch (emailErr) {
-      console.error("❌ Error sending registration email:", emailErr);
+      emailDelivered = true;
+    } catch (emailErr: any) {
+      emailError = emailErr?.message || "Failed to dispatch email";
+      console.error("User registration email dispatch failed:", emailError);
     }
 
     return res.status(201).json({
       success: true,
-      message: "User registered successfully and password sent to email",
+      message: emailDelivered
+        ? "User registered successfully and login details sent to email"
+        : "User registered successfully (email notification pending delivery)",
+      emailDelivered,
+      emailError,
+      companyPortalUrl,
       User: createdUser,
     });
 
@@ -854,7 +889,8 @@ const findUserByEmail = async (email: string) => {
         username: user.username,
         email: user.email,
         mobile: user.mobile,
-        role: user.role
+        role: user.role,
+        companyId: user.companyId
       }
     };
   }
@@ -907,6 +943,17 @@ export const forgetPasswordSendOtp = async (req: Request, res: Response) => {
     if (!userResult) {
       // Respond generically to avoid enumeration; do NOT create OTP
       return res.status(200).json({ success: true, message: "If the email exists, an OTP has been sent." });
+    }
+
+    // If company context is provided, verify user belongs to this specific company
+    const seoUrl = (req.body.seoUrl || "").trim();
+    if (seoUrl) {
+      const company = await Company.findOne({ where: { seoUrl } });
+      const userCompanyId = (userResult.userData as any)?.companyId || (userResult.user as any)?.companyId;
+      if (!company || userCompanyId !== company.companyId) {
+        // Return generic success to avoid enumeration, but abort OTP generation
+        return res.status(200).json({ success: true, message: "If the email exists, an OTP has been sent." });
+      }
     }
 
     const loginId = userResult.userId; // userId | vendorId | employeeId

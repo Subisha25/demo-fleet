@@ -107,35 +107,13 @@ const onSubmit = async (e: React.FormEvent) => {
 
     await login();
 
-  // 🔥 get companyId
-const companyId = User.companyId;
-
-try {
-  const res = await axiosInstance.get(`/company/getCompanyById/${companyId}`);
-  const company = res?.data?.data || res?.data;
-
-  const name = String(company?.companyName || "").toLowerCase();
-  const code = String(company?.companyCode || "").toLowerCase();
-  const seo = String(company?.seoUrl || "").toLowerCase();
-
-  const isDanfoss =
-    name.includes("danfoss") ||
-    code.includes("danfoss") ||
-    seo.includes("danfoss");
-
-  if (isDanfoss) {
-    navigate(
-      `/users/userinvoice/${User.userId}?companyId=${companyId}`,
-      { replace: true }
-    );
-  } else {
+  // Navigate to company booking page or dashboard
+  const companyId = User.companyId;
+  if (companyId) {
     navigate(`/users/userinvoice/${User.userId}?companyId=${companyId}`, { replace: true });
+  } else {
+    navigate(`/dashboard`, { replace: true });
   }
-
-} catch (err) {
-  console.error("Company fetch failed", err);
-  navigate(`/dashboard`, { replace: true });
-}
 
     showToast("Login successful", "success");
   } catch (err: any) {

@@ -49,15 +49,13 @@ const [companyName, setCompanyName] = useState("");
   // ✅ Add checkbox states
   const [needEmail, setNeedEmail] = useState<boolean>(false);
   const [allowTax, setAllowTax] = useState<boolean>(false);
-// ✅ Manager Approval checkbox state
-const [managerApproval, setManagerApproval] = useState<boolean>(false);
+// Manager Approval checkbox state (configurable for all corporate clients)
+  const [managerApproval, setManagerApproval] = useState<boolean>(false);
   // Edit modal state
   const [editOpen, setEditOpen] = useState(false);
   const [editRow, setEditRow] = useState<VehicleBookingRule | null>(null);
   const [editPriorMinutes, setEditPriorMinutes] = useState<string>("");
   const [editSaving, setEditSaving] = useState(false);
-const showManagerApproval =
-  companyName.toLowerCase().includes("danfoss");
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
@@ -348,22 +346,20 @@ formData.append("managerApproval", managerApproval ? "true" : "false");
                 </label>
               </div>
 
-              {/* ✅ Manager Approval checkbox */}
-{showManagerApproval && (
-  <div className="w-full">
-    <label className="flex items-center gap-2 cursor-pointer">
-      <input
-        type="checkbox"
-        checked={managerApproval}
-        onChange={(e) => setManagerApproval(e.target.checked)}
-        className="w-4 h-4"
-      />
-      <span className="font-medium">
-        Manager Approval Required
-      </span>
-    </label>
-  </div>
-)}
+              {/* Manager Approval checkbox - available for all corporate clients */}
+              <div className="w-full">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={managerApproval}
+                    onChange={(e) => setManagerApproval(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="font-medium">
+                    Manager Approval Required
+                  </span>
+                </label>
+              </div>
               
             </div>
           </div>

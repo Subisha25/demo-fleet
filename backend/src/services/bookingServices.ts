@@ -30,6 +30,8 @@ import { UniqueConstraintError } from "sequelize";
 import fs from 'fs';
 import { assertTenantOwnership, withTenant, isTenantError } from '../utils/tenantGuard';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
+import { dispatchAuditedSms } from './smsServices';
+import { getFleetDocumentBranding } from './fleetBrandingService';
 
 const logoPath = path.join(__dirname, "..", "images", "logo.png");
 const logoBase64 = fs.readFileSync(logoPath, "base64");
@@ -320,10 +322,18 @@ export const getAllOrders = async (req:any, res: Response) => {
     //     message: 'Access denied. You are not authorized to view orders.',
     //   });
     // }
-    console.log("userrrrrrrrr",User.findOne(userid));
+    if (userid) {
+      await User.findByPk(userid);
+    }
     const ctx = getTenantContext();
     const currentTenantId = ctx?.tenantId || ROOT_TENANT_ID;
     const isSuperAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isSuperAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : currentTenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId: currentTenantId };
 
     if(role === ROLES.USER) {
       const orders = await Booking.findAll({
@@ -347,7 +357,7 @@ export const getAllOrders = async (req:any, res: Response) => {
                               }
                             ]},
                  ],    
-                   where: isSuperAdmin ? { userId: userid } : { userId: userid, tenantId: currentTenantId },
+                   where: { userId: userid, ...tenantCondition },
                   order: [['createdAt', 'DESC']]
     });
     return res.status(200).json({
@@ -357,7 +367,7 @@ export const getAllOrders = async (req:any, res: Response) => {
     });
     } 
     else {
-      const whereCondition: any = isSuperAdmin ? {} : { tenantId: currentTenantId };
+      const whereCondition: any = { ...tenantCondition };
       const orders = await Booking.findAll({
         include: [
           { model: VehicleType, required: false,
@@ -470,13 +480,13 @@ export const editBooking = async (req: any, res: Response) => {
            // return;
           }
           else {
-              sendNotification(fcm_token, `Hi ${driverToken?.driverName}, Booking changed, pls check..`, `Booking changed for ${driverToken?.driverName}`);
+              await sendNotification(fcm_token, `Hi ${driverToken?.driverName}, Booking changed, pls check..`, `Booking changed for ${driverToken?.driverName}`);
           }
           if(!user_fcm_token) {
             console.log("No FCM token found for driver:", booking.userId);
            // return;
           } else {  
-            sendNotification(user_fcm_token, `Hi ${user?.username}, Booking changed, pls check..`, `Booking changed for ${user?.username}`);
+            await sendNotification(user_fcm_token, `Hi ${user?.username}, Booking changed, pls check..`, `Booking changed for ${user?.username}`);
           }
         
         
@@ -710,34 +720,28 @@ console.log("cancel needEmail:", needEmail);
   }
 
      
-    try{
+    try {
       const user = booking.user as any;
-      if(user?.mobile){
-              const apiKey =  process.env.TWO_FACTOR_API_KEY;
-        const senderId =  process.env.TWO_FACTOR_SENDER_ID;
-        const templateName = "Booking Cancellation";
-        if (!apiKey || !senderId) {
-          console.error(" SMS API configuration missing in environment variables");
-        } else {
-          // Build SMS URL with parameters
-          const smsUrl = `https://2factor.in/API/R1/?module=TRANS_SMS&apikey=${apiKey}&to=${user?.mobile}&from=${senderId}&templatename=${encodeURIComponent(templateName)}&var1=${encodeURIComponent(user?.username|| '',)}&var2=${encodeURIComponent(booking?.bookingCode || '',)}&var3=${encodeURIComponent(booking?.pickupArea || '',)}&var4=${encodeURIComponent(booking?.dropPoint || '',)}`;
- 
-          // Send SMS using fetch
-          const smsResponse = await fetch(smsUrl);
- 
-          if (!smsResponse.ok) {
-            throw new Error(`SMS API request failed with status: ${smsResponse.status}`);
-          }
- 
-          const smsResult = await smsResponse.json();
-          console.log(" SMS sent successfully:", smsResult);
-        }
+      if (user?.mobile) {
+        await dispatchAuditedSms({
+          recipient: user.mobile,
+          templateCode: 'BOOKING_CANCELLATION',
+          templateName: 'Booking Cancellation',
+          vars: [
+            user.username || '',
+            booking.bookingCode || '',
+            booking.pickupArea || '',
+            booking.dropPoint || '',
+          ],
+          message: `Grace Cabs: Your booking ${booking.bookingCode || ''} has been cancelled. Pickup: ${booking.pickupArea || ''}, Drop: ${booking.dropPoint || ''}.`,
+          referenceEntity: 'BOOKING',
+          referenceId: String(booking.bookingId || booking.id),
+        });
       } else {
-        console.log(" User mobile number not found");
+        console.log("User mobile number not found for cancellation SMS");
       }
- 
-    }catch(err){
-      console.log("1234",err)
+    } catch (err: any) {
+      console.error("Booking cancellation SMS dispatch error:", err?.message);
     }
 
     return res.status(200).json({
@@ -4464,7 +4468,10 @@ export const getPaymentPendingOrdersByUser = async (req: Request, res: Response)
 // </html>
 //   `;
 // };
-export const generateInvoiceHTMLForuser = (data: any): string => {
+export const generateInvoiceHTMLForuser = (data: any, branding?: any): string => {
+  const dynamicLogo = branding?.logoSrc || logoSrc;
+  const dynamicFleet = branding?.fleetName || "Grace Cabs";
+  const dynamicHeaderColor = branding?.headerColor || "rgba(82, 121, 152, 1)";
   // ✅ read cp (ClosePending) safely from multiple possible shapes
   const cp =
     data?.closePending ||
@@ -4559,14 +4566,14 @@ export const generateInvoiceHTMLForuser = (data: any): string => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Invoice</title>
+  <title>${dynamicFleet} Invoice</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body { font-family: Arial, sans-serif; background:#fff; padding:12px; font-size:11px; }
     .invoice-container { max-width:800px; margin:0 auto; background:#fff; border:1px solid #ddd; padding:18px; }
     .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; padding-bottom:10px; border-bottom:2px solid #333; }
     .invoice-info { text-align:right; font-size:11px; line-height:1.5; }
-    .section-header { background-color: rgba(82, 121, 152, 1); padding:5px 12px; font-weight:bold; color:#333; margin:12px 0 6px 0; font-size:12px; }
+    .section-header { background-color: ${dynamicHeaderColor}; padding:5px 12px; font-weight:bold; color:#ffffff; margin:12px 0 6px 0; font-size:12px; }
 
     .billing-booking-row { display:flex; justify-content:space-between; gap:40px; margin:20px 0; }
     .billing-section { flex:1; min-width:45%; }
@@ -4577,7 +4584,7 @@ export const generateInvoiceHTMLForuser = (data: any): string => {
 
     .trip-info { font-size:11px; margin:6px 0; }
 
-    .invoice-section-header { display:flex; justify-content:space-between; align-items:center; padding:6px 12px; background-color: rgba(82, 121, 152, 1); font-weight:bold; color:#333; margin:12px 0 0 0; font-size:12px; }
+    .invoice-section-header { display:flex; justify-content:space-between; align-items:center; padding:6px 12px; background-color: ${dynamicHeaderColor}; font-weight:bold; color:#ffffff; margin:12px 0 0 0; font-size:12px; }
 
     .invoice-table { width:100%; border-collapse:collapse; margin:0 0 12px 0; }
     .invoice-table td { padding:5px 12px; border:none; font-size:11px; vertical-align:top; }
@@ -4612,7 +4619,7 @@ export const generateInvoiceHTMLForuser = (data: any): string => {
 
     <div class="header">
       <div class="logo-section">
-        <img src="${logoSrc}" alt="Grace Cabs" class="logo-img" />
+        <img src="${dynamicLogo}" alt="${dynamicFleet}" class="logo-img" />
       </div>
       <div class="invoice-info">
         <p><strong>Invoice Number:</strong> ${data.invoiceNumber}</p>
@@ -4694,9 +4701,9 @@ export const generateInvoiceHTMLForuser = (data: any): string => {
     </table>
 
     <div class="footer-info">
-      <div class="footer-row"><span class="footer-label">Regd.Office:</span><span>Grace Cabs  Pvt. Ltd., 7/621 NESAMANI NAGAR, PERUMBAKKAM, CHENNAI - 600100</span></div>
-      <div class="footer-row"><span class="footer-label">Website:</span><span>gracecabs.com</span></div>
-      <div class="footer-row"><span class="footer-label">GSTIN:</span><span>33AAMCG2518C1Z0</span></div>
+      <div class="footer-row"><span class="footer-label">Regd.Office:</span><span>${branding?.registeredAddress || 'Grace Cabs  Pvt. Ltd., 7/621 NESAMANI NAGAR, PERUMBAKKAM, CHENNAI - 600100'}</span></div>
+      <div class="footer-row"><span class="footer-label">Website:</span><span>${branding?.portalTitle ? branding.portalTitle.toLowerCase().replace(/\s+/g, '') + '.com' : 'gracecabs.com'}</span></div>
+      <div class="footer-row"><span class="footer-label">GSTIN:</span><span>${branding?.gstNumber || '33AAMCG2518C1Z0'}</span></div>
       <div class="footer-row"><span class="footer-label">PAN No.:</span><span>AAMCG2518C</span></div>
       <div class="footer-row"><span class="footer-label">SAC:</span><span>996609</span></div>
       <div class="footer-row"><p>It is a system generated invoice which does not need a signature</p></div>
@@ -4922,7 +4929,8 @@ export const downloadUserInvoicePdf = async (req: any, res: Response) => {
       return res.status(404).json({ success: false, message: "Invoice not found for this booking" });
     }
 
-    const html = generateInvoiceHTMLForuser(data);
+    const branding = await getFleetDocumentBranding(booking.tenantId);
+    const html = generateInvoiceHTMLForuser(data, branding);
 
     const browser = await puppeteer.launch({
       headless: true,

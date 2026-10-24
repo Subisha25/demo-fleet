@@ -138,6 +138,13 @@ export class TenantRegistrationRequest extends Model {
   })
   termsConsent!: boolean;
 
+  @Column({
+    type: DataType.BOOLEAN,
+    defaultValue: false,
+    allowNull: false,
+  })
+  isNotificationRead!: boolean;
+
   @CreatedAt
   @Column(DataType.DATE)
   createdAt!: Date;

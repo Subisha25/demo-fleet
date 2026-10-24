@@ -18,7 +18,7 @@ router.get("/getBookingByVehicleAndDriver", authMiddleware, getBookingByVehicleA
 
 router.put("/acceptBooking", authMiddleware, acceptBooking);
 router.put("/startBooking", authMiddleware, startBooking);
-router.put("/endBooking",uploadSignature.single("signature"), authMiddleware, endBooking);
+router.put("/endBooking", authMiddleware, uploadSignature.single("signature"), endBooking);
 
 router.put("/updateDriverLocation",authMiddleware, updateDriverLocation);
 

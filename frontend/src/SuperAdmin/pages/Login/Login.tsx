@@ -39,28 +39,38 @@ const [otp, setOtp] = useState('');
 
     try {
       const res = await axiosInstance.post('/auth/emplogin', { email, password });
-      const { accessToken, role, id, companyId, name } = res.data;
+      const { accessToken, role, id, companyId, name, tenantId } = res.data;
 
       if (accessToken) {
-        // ✅ Store individual items
+        // Store individual items
         localStorage.setItem('token', accessToken);
         localStorage.setItem('role', role);
         localStorage.setItem('userId', id);
-        localStorage.setItem('username', name);
-        localStorage.setItem('companyId', companyId);
+        if (name) localStorage.setItem('username', name);
+        if (companyId) localStorage.setItem('companyId', companyId);
 
-        // ✅ CRITICAL FIX: Store complete user object
+        // Strict tenant scoping setup
+        if (role === 'superadmin') {
+          const savedScope = localStorage.getItem('selectedTenantId') || 'all';
+          localStorage.setItem('selectedTenantId', savedScope);
+          localStorage.setItem('tenantId', savedScope);
+        } else {
+          const userTenant = tenantId || 'e7b8a1c0-0000-0000-0000-000000000001';
+          localStorage.setItem('tenantId', userTenant);
+          localStorage.setItem('selectedTenantId', userTenant);
+        }
+
+        // Store complete user object
         const userObject = {
           userId: id,
           username: name,
           email: email,
           role: role,
           companyId: companyId,
+          tenantId: tenantId,
           token: accessToken
         };
         localStorage.setItem('user', JSON.stringify(userObject));
-
-        console.log('✅ User object stored:', userObject);
 
         login();
 
@@ -68,7 +78,7 @@ const [otp, setOtp] = useState('');
         if (role === "superadmin") {
           navigate('/dashboard');
         } 
-        else if (role === "admin") {
+        else if (role === "fleet_admin" || role === "admin") {
           navigate('/dashboard');
         }
         else if (role === "manager") {

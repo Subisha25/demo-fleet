@@ -320,9 +320,8 @@ export const verifyOTPLogin = async (req: Request, res: Response) => {
       config.security.accessTokenExpiry
     );
 
-    const managerApproval = userResult.userData?.company?.managerApproval === true;
-    const isDanfoss = userResult.userData?.company?.companyName.includes("Danfoss");
-    console.log("danfoss ",isDanfoss);
+    const managerApproval = Boolean(userResult.userData?.company?.managerApproval);
+    const isDanfoss = Boolean(userResult.userData?.company?.companyName?.includes("Danfoss"));
 
     res.status(200).json({
       success: true,

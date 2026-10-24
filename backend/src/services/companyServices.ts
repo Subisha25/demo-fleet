@@ -7,6 +7,7 @@ import {normalizeManagerEmails } from '../utils/email';
 import { ORDER } from '../utils/costants';
 import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
+import { generateUniqueCompanySlug } from '../utils/slugUtils';
 
 
 export const getCompanyBySeoUrl = async (req: Request, res: Response) => {
@@ -331,12 +332,19 @@ export const updateCompany = async (req: any, res: Response) => {
     //   normalizedManagers = normalizeManagerEmails(managerEmail);
     // }
 
+    let finalSeoUrl = company.seoUrl;
+    if (seoUrl && seoUrl.trim() !== "" && seoUrl !== company.seoUrl) {
+      finalSeoUrl = await generateUniqueCompanySlug(seoUrl, id);
+    } else if (!finalSeoUrl) {
+      finalSeoUrl = await generateUniqueCompanySlug(companyName || company.companyName || "company", id);
+    }
+
     const updateData: any = {
       companyName: companyName || company.companyName,
       companyPhno: companyPhno || company.companyPhno,
       domainName: domainName || company.domainName,
       managerEmail: normalizedManagers.join(", "),
-      seoUrl: seoUrl || company.seoUrl,
+      seoUrl: finalSeoUrl,
       allowTax: allowTax ?? company.allowTax,
       needEmail: needEmailBoolean,
       gstNo: gstNo ?? company.gstNo,

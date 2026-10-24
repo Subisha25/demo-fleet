@@ -49,8 +49,7 @@ const [costCenter, setCostCenter] = useState("");
   const [states, setStates] = useState<IState[]>([]);
   const [cities, setCities] = useState<ICity[]>([]);
 
-  const selectedCompany = companies.find((c) => c.companyId === companyId);
-  const isDanfoss = selectedCompany?.companyName?.toLowerCase().includes("danfoss");
+  const [submitting, setSubmitting] = useState(false);
 
   const fetchPincode = async (cityName: string, stateName: string) => {
     try {
@@ -165,6 +164,8 @@ const [costCenter, setCostCenter] = useState("");
     e.preventDefault();
     e.stopPropagation();
 
+    if (submitting) return;
+
     if (!username.trim()) {
       showToast("Username is required.", "warn");
       return;
@@ -181,26 +182,13 @@ const [costCenter, setCostCenter] = useState("");
       return;
     }
 
-    if (isDanfoss) {
-      const emailLower = email.trim().toLowerCase();
-      if (!emailLower.endsWith("@danfoss.com")) {
-        showToast("Danfoss users must use @danfoss.com email only.", "error");
+    if (managerEmail.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(managerEmail.trim())) {
+        showToast("Please enter a valid manager email address.", "error");
         return;
       }
     }
-if (isDanfoss) {
-  if (!managerEmail.trim()) {
-    showToast("Manager email is required for Danfoss users.", "warn");
-    return;
-  }
-
-  const managerEmailLower = managerEmail.trim().toLowerCase();
-
-  if (!managerEmailLower.endsWith("@danfoss.com")) {
-    showToast("Manager email must be a @danfoss.com email.", "error");
-    return;
-  }
-}
     try {
       const check = await axiosInstance.get(`/user/getAllUsers`, {
         params: { email: email.trim() },
@@ -250,6 +238,7 @@ if (isDanfoss) {
     }
 
     try {
+      setSubmitting(true);
       const payload = {
         username: username.trim(),
         email: email.trim(),
@@ -302,6 +291,8 @@ if (isDanfoss) {
       } else {
         showToast("Network error. Please try again.", "error");
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -452,11 +443,6 @@ if (isDanfoss) {
                   onChange={(e) => {
                     const selectedId = e.target.value;
                     setCompanyId(selectedId);
-
-                    const selectedCompany = companies.find((c) => c.companyId === selectedId);
-                    if (!selectedCompany?.companyName.toLowerCase().includes("danfoss")) {
-                      setIsManager(false);
-                    }
                   }}
                   className="w-full border rounded p-2"
                 >
@@ -468,10 +454,7 @@ if (isDanfoss) {
                   ))}
                 </select>
 
-                {companies
-                  .find((c) => c.companyId === companyId)
-                  ?.companyName.toLowerCase()
-                  .includes("danfoss") && (
+                {companyId && (
                   <div className="flex items-center mt-2">
                     <input
                       type="checkbox"
@@ -486,12 +469,12 @@ if (isDanfoss) {
                   </div>
                 )}
               </div>
-{isDanfoss && (
+{companyId && (
   <>
     <InputBox
-      label="User ID"
-       name="danfossuserId"
-      placeholder="Enter User ID"
+      label="Employee / User ID"
+      name="danfossuserId"
+      placeholder="Enter Employee / User ID"
       value={userId}
       onChange={(name, value) => setUserId(value)}
       icon={faUser}
@@ -559,10 +542,10 @@ if (isDanfoss) {
 
             <div className="flex justify-end pt-4">
               <CommonButton
-                text="Submit"
+                text={submitting ? "Saving..." : "Submit"}
                 type="submit"
                 variant="success"
-                disabled={loadingPincode}
+                disabled={loadingPincode || submitting}
               />
             </div>
           </form>
