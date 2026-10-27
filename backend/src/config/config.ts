@@ -36,7 +36,7 @@ const config = {
 
   twofactor: {
     apiKey: process.env.TWO_FACTOR_API_KEY || process.env.TWOFACTOR_API_KEY || '',
-    senderId: process.env.TWO_FACTOR_SENDER_ID || process.env.TWOFACTOR_SENDER_ID || 'GRCCAB',
+    senderId: process.env.TWO_FACTOR_SENDER_ID || process.env.TWOFACTOR_SENDER_ID || 'FLTFLW',
     templateName: process.env.TWOFACTOR_TEMPLATE_NAME || 'OTP1',
   },
  
@@ -56,7 +56,7 @@ const config = {
     superadmin_email: process.env.SUPERADMIN_EMAIL || "subisha2002.m@gmail.com",
   },
   companyurl: {
-    seo_base: process.env.SEO_BASE_URL || "http://gracecabs.com/Company/"
+    seo_base: process.env.SEO_BASE_URL || `${WEB_BASE_URL}/Company/`
   },
   paymentgateway: {
     pg_merchant_id: process.env.PG_MERCHANT_ID || "",

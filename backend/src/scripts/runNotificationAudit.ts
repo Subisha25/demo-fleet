@@ -162,8 +162,8 @@ async function runDiagnostic() {
 
   // Test SMS Dispatch Attempt (Honest, no fake delivery)
   console.log('\n--- 6. LIVE SMS DISPATCH TEST ---');
-  const testDestination = '9003241571';
-  const smsTest = await sendDirectSms(testDestination, 'Grace Cabs SuperAdmin', 'Booking Creation');
+  const testDestination = '9080280818';
+  const smsTest = await sendDirectSms(testDestination, 'Demo Fleet SuperAdmin', 'Booking Creation');
   console.log(` Target Phone: ${maskPhoneNumber(testDestination)}`);
   console.log(` Provider Status: ${smsTest.providerStatus}`);
   console.log(` Success Flag:    ${smsTest.success}`);

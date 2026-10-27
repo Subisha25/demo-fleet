@@ -7,12 +7,42 @@ import SearchBar from '../../../components/SearchBar';
 import { showToast, AlertContainer } from '../../../components/AlertBox';
 import axiosInstance from '../../../utils/axiosInstance';
 import { useTenant, TenantInfo } from '../../../context/TenantContext';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faEye,
+  faReceipt,
+  faSlidersH,
+  faShieldAlt,
+  faCrown,
+  faCheckCircle,
+  faClock,
+  faCalendarAlt,
+} from '@fortawesome/free-solid-svg-icons';
+
+interface EnrichedTenant extends TenantInfo {
+  usage?: {
+    vehicles: number;
+    drivers: number;
+    companies: number;
+    users?: number;
+  };
+  lastPayment?: {
+    date: string | null;
+    amount: number | null;
+    invoiceNumber: string | null;
+    transactionReference: string | null;
+  } | null;
+}
 
 const TenantList: React.FC = () => {
-  const [tenants, setTenants] = useState<TenantInfo[]>([]);
+  const [tenants, setTenants] = useState<EnrichedTenant[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [selectedTenantForEdit, setSelectedTenantForEdit] = useState<TenantInfo | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [planFilter, setPlanFilter] = useState<string>('ALL');
+
+  // Edit Quotas & Plan Modal
+  const [selectedTenantForEdit, setSelectedTenantForEdit] = useState<EnrichedTenant | null>(null);
   const [editPlan, setEditPlan] = useState<'BASIC' | 'PRO' | 'ENTERPRISE'>('PRO');
   const [editStatus, setEditStatus] = useState('ACTIVE');
   const [editVehicleQuota, setEditVehicleQuota] = useState(75);
@@ -20,7 +50,7 @@ const TenantList: React.FC = () => {
   const [editCompanyQuota, setEditCompanyQuota] = useState(20);
 
   const navigate = useNavigate();
-  const { currentTenant, switchTenant, refreshTenant, loadAllTenants } = useTenant();
+  const { currentTenant, refreshTenant, loadAllTenants } = useTenant();
 
   const fetchTenants = async () => {
     setLoading(true);
@@ -41,15 +71,7 @@ const TenantList: React.FC = () => {
     fetchTenants();
   }, []);
 
-  const handleSwitchTenant = (tenant: TenantInfo) => {
-    switchTenant(tenant.tenantId);
-    showToast(`Switched context to ${tenant.name}`, 'success');
-    setTimeout(() => {
-      navigate('/dashboard');
-    }, 500);
-  };
-
-  const openEditModal = (tenant: TenantInfo) => {
+  const openEditModal = (tenant: EnrichedTenant) => {
     setSelectedTenantForEdit(tenant);
     setEditPlan(tenant.planTier);
     setEditStatus(tenant.status);
@@ -79,59 +101,133 @@ const TenantList: React.FC = () => {
     }
   };
 
-  const filteredTenants = tenants.filter(
-    (t) =>
-      t.name.toLowerCase().includes(search.toLowerCase()) ||
-      t.code.toLowerCase().includes(search.toLowerCase()) ||
-      (t.contactEmail && t.contactEmail.toLowerCase().includes(search.toLowerCase()))
-  );
+  const formatDate = (dateStr?: string | null) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
 
-  const columns: Column<TenantInfo>[] = [
+  const formatCurrency = (amount?: number | null) => {
+    if (amount === undefined || amount === null) return '—';
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  // Authoritative filtering:
+  // 1. Exclude platform root / demo record from customer table
+  // 2. Filter by search query (name, code, email, phone)
+  // 3. Filter by status (ACTIVE, TRIALING, etc.)
+  // 4. Filter by plan (BASIC, PRO, ENTERPRISE)
+  const filteredTenants = tenants
+    .filter((t) => {
+      // Exclude platform root identity
+      if (t.tenantId === 'e7b8a1c0-0000-0000-0000-000000000001' || t.code === 'GC') {
+        return false;
+      }
+      return true;
+    })
+    .filter((t) => {
+      if (statusFilter !== 'ALL' && t.status !== statusFilter) return false;
+      if (planFilter !== 'ALL' && t.planTier !== planFilter) return false;
+      if (!search.trim()) return true;
+
+      const s = search.toLowerCase();
+      return (
+        t.name?.toLowerCase().includes(s) ||
+        t.code?.toLowerCase().includes(s) ||
+        t.contactEmail?.toLowerCase().includes(s) ||
+        t.contactPhone?.toLowerCase().includes(s) ||
+        t.subdomain?.toLowerCase().includes(s)
+      );
+    });
+
+  const columns: Column<EnrichedTenant>[] = [
     {
       header: 'Fleet Operator',
       accessor: 'name',
-      render: (tenant: TenantInfo) => (
-        <div>
-          <div className="font-semibold text-gray-900 flex items-center space-x-2">
-            <span>{tenant.name}</span>
-            {tenant.tenantId === currentTenant?.tenantId && (
-              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300">
-                Active Context
-              </span>
+      render: (tenant: EnrichedTenant) => {
+        const logo = tenant.brandingTokens?.logoUrl;
+        const color = tenant.brandingTokens?.primaryColor || '#1A365D';
+        return (
+          <div className="flex items-center gap-3">
+            {logo ? (
+              <img
+                src={logo}
+                alt={tenant.name}
+                className="w-10 h-10 rounded-lg object-contain border border-slate-200 bg-slate-50 p-0.5"
+              />
+            ) : (
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center font-black text-white text-sm shadow-sm"
+                style={{ backgroundColor: color }}
+              >
+                {tenant.code?.substring(0, 3)}
+              </div>
             )}
+            <div>
+              <div className="font-bold text-slate-900 flex items-center gap-2">
+                <span>{tenant.name}</span>
+              </div>
+              <div className="text-[11px] text-slate-500 font-mono flex items-center gap-2 mt-0.5">
+                <span className="bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200">
+                  {tenant.code}
+                </span>
+                {tenant.subdomain && <span>{tenant.subdomain}.fleetflow.com</span>}
+              </div>
+            </div>
           </div>
-          <div className="text-xs text-gray-500 font-mono">
-            Code: {tenant.code} | Subdomain: {tenant.subdomain || 'default'}
+        );
+      },
+    },
+    {
+      header: 'Administrator Contact',
+      accessor: 'contactEmail',
+      render: (tenant: EnrichedTenant) => (
+        <div className="text-xs">
+          <div className="font-semibold text-slate-800">{tenant.contactEmail || 'N/A'}</div>
+          <div className="text-slate-500 text-[11px] mt-0.5">{tenant.contactPhone || 'No Phone'}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Plan & Billing',
+      accessor: 'planTier',
+      render: (tenant: EnrichedTenant) => (
+        <div className="space-y-1">
+          <span
+            className={`inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+              tenant.planTier === 'ENTERPRISE'
+                ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                : tenant.planTier === 'PRO'
+                ? 'bg-teal-100 text-teal-800 border border-teal-300'
+                : 'bg-blue-100 text-blue-800 border border-blue-300'
+            }`}
+          >
+            {tenant.planTier}
+          </span>
+          <div className="text-[11px] text-slate-500">
+            Cycle: <strong className="text-slate-700">{(tenant.subscription as any)?.billingCycle || 'MONTHLY'}</strong>
           </div>
         </div>
       ),
     },
     {
-      header: 'Plan Tier',
-      accessor: 'planTier',
-      render: (tenant: TenantInfo) => (
-        <span
-          className={`badge-status ${
-            tenant.planTier === 'ENTERPRISE'
-              ? 'badge-status-enterprise'
-              : tenant.planTier === 'PRO'
-              ? 'badge-status-pro'
-              : 'badge-status-basic'
-          }`}
-        >
-          {tenant.planTier}
-        </span>
-      ),
-    },
-    {
       header: 'Status',
       accessor: 'status',
-      render: (tenant: TenantInfo) => (
+      render: (tenant: EnrichedTenant) => (
         <span
-          className={`badge-status ${
+          className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
             tenant.status === 'ACTIVE'
-              ? 'badge-status-active'
-              : 'badge-status-suspended'
+              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+              : tenant.status === 'TRIALING'
+              ? 'bg-sky-100 text-sky-800 border border-sky-300'
+              : 'bg-rose-100 text-rose-800 border border-rose-300'
           }`}
         >
           {tenant.status}
@@ -139,48 +235,88 @@ const TenantList: React.FC = () => {
       ),
     },
     {
-      header: 'Quotas (Vehicles / Drivers / Companies)',
+      header: 'Resource Usage (Used / Quota)',
       accessor: 'subscription',
-      render: (tenant: TenantInfo) => (
-        <div className="text-xs text-slate-700 space-y-0.5">
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400">Vehicles:</span>
-            <span className="font-bold text-slate-800">{tenant.subscription?.vehicleQuota ?? '—'}</span>
+      render: (tenant: EnrichedTenant) => {
+        const usage = tenant.usage || { vehicles: 0, drivers: 0, companies: 0 };
+        const sub = tenant.subscription;
+        const vMax = (sub?.vehicleQuota != null && sub.vehicleQuota >= 999999) ? '∞' : (sub?.vehicleQuota ?? 15);
+        const dMax = (sub?.driverQuota != null && sub.driverQuota >= 999999) ? '∞' : (sub?.driverQuota ?? 15);
+        const cMax = (sub?.companyQuota != null && sub.companyQuota >= 999999) ? '∞' : (sub?.companyQuota ?? 3);
+
+        return (
+          <div className="text-xs space-y-0.5">
+            <div className="text-slate-700">
+              Vehicles: <strong className="text-slate-900">{usage.vehicles}</strong> / {vMax}
+            </div>
+            <div className="text-slate-700">
+              Drivers: <strong className="text-slate-900">{usage.drivers}</strong> / {dMax}
+            </div>
+            <div className="text-slate-700">
+              Companies: <strong className="text-slate-900">{usage.companies}</strong> / {cMax}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400">Drivers:</span>
-            <span className="font-bold text-slate-800">{tenant.subscription?.driverQuota ?? '—'}</span>
+        );
+      },
+    },
+    {
+      header: 'Subscription Dates',
+      accessor: 'subscription',
+      render: (tenant: EnrichedTenant) => (
+        <div className="text-xs space-y-0.5">
+          <div className="text-slate-600">
+            Start: <strong className="text-slate-800">{formatDate(tenant.subscription?.currentPeriodStart)}</strong>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400">Companies:</span>
-            <span className="font-bold text-slate-800">{tenant.subscription?.companyQuota ?? '—'}</span>
+          <div className="text-slate-600">
+            Renewal: <strong className="text-slate-800">{formatDate(tenant.subscription?.currentPeriodEnd)}</strong>
           </div>
         </div>
       ),
     },
     {
-      header: 'Contact Email',
-      accessor: 'contactEmail',
-      render: (tenant: TenantInfo) => (
-        <span className="text-xs text-slate-600 font-medium">{tenant.contactEmail || 'N/A'}</span>
-      ),
+      header: 'Last Payment',
+      accessor: 'lastPayment',
+      render: (tenant: EnrichedTenant) => {
+        const lp = tenant.lastPayment;
+        return (
+          <div className="text-xs space-y-0.5">
+            <div className="font-bold text-slate-900">{lp ? formatCurrency(lp.amount) : 'None Recorded'}</div>
+            <div className="text-[11px] text-slate-500">{lp ? formatDate(lp.date) : 'Pending Callback'}</div>
+          </div>
+        );
+      },
     },
     {
       header: 'Actions',
       accessor: 'tenantId',
-      render: (tenant: TenantInfo) => (
-        <div className="flex items-center space-x-2">
+      render: (tenant: EnrichedTenant) => (
+        <div className="flex items-center space-x-1.5">
+          {/* Primary View / Inspect Action */}
           <button
-            onClick={() => handleSwitchTenant(tenant)}
-            className="px-2.5 py-1 text-xs font-semibold rounded bg-teal-600 hover:bg-teal-700 text-white transition shadow-sm"
+            onClick={() => navigate(`/tenants/overview/${tenant.tenantId}`)}
+            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-teal-600 hover:bg-teal-700 text-white transition shadow-sm flex items-center gap-1"
+            title="Open Dedicated Read-Only Fleet Overview Dashboard"
           >
-            Switch To
+            <FontAwesomeIcon icon={faEye} />
+            View
           </button>
+
+          {/* Billing & Payment History */}
+          <button
+            onClick={() => navigate(`/tenants/billing-history/${tenant.tenantId}`)}
+            className="px-2 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition"
+            title="View Subscription & Payment History"
+          >
+            <FontAwesomeIcon icon={faReceipt} />
+          </button>
+
+          {/* Quotas & Plan Modal */}
           <button
             onClick={() => openEditModal(tenant)}
-            className="px-2.5 py-1 text-xs font-semibold rounded bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 transition"
+            className="px-2 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition"
+            title="Adjust Quotas & Plan Tier"
           >
-            Quotas & Plan
+            <FontAwesomeIcon icon={faSlidersH} />
           </button>
         </div>
       ),
@@ -192,14 +328,21 @@ const TenantList: React.FC = () => {
       <AlertContainer />
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Fleet Operator Tenants (SaaS)</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Manage independent fleet operators, subscription entitlements, and quotas.</p>
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Fleet Operator Tenants (SaaS)</h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Inspect authoritative customer fleet telemetry, subscription lifecycle, quotas, and payment history.
+          </p>
         </div>
         <div className="flex items-center space-x-2.5">
           <CommonButton
             text="+ Provision Fleet Tenant"
             onClick={() => navigate('/tenants/add')}
             className="bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg shadow-sm"
+          />
+          <CommonButton
+            text="SaaS Plans"
+            onClick={() => navigate('/tenants/plans')}
+            className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg shadow-sm"
           />
           <CommonButton
             text="Corporate Policies"
@@ -209,129 +352,147 @@ const TenantList: React.FC = () => {
         </div>
       </div>
 
-      <div className="mb-4">
-        <SearchBar
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search fleet operators by name, code, or email..."
-        />
+      {/* Search and Filters Bar */}
+      <div className="mb-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex-1">
+          <SearchBar
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by fleet name, code, email, phone, or subdomain..."
+          />
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-xs text-slate-600">
+            <span className="font-semibold">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="border border-slate-300 rounded-lg p-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="TRIALING">TRIALING</option>
+              <option value="PAST_DUE">PAST_DUE</option>
+              <option value="SUSPENDED">SUSPENDED</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs text-slate-600">
+            <span className="font-semibold">Plan:</span>
+            <select
+              value={planFilter}
+              onChange={(e) => setPlanFilter(e.target.value)}
+              className="border border-slate-300 rounded-lg p-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+            >
+              <option value="ALL">All Plans</option>
+              <option value="BASIC">BASIC</option>
+              <option value="PRO">PRO</option>
+              <option value="ENTERPRISE">ENTERPRISE</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <DataTable
         columns={columns}
         data={filteredTenants}
         loading={loading}
+        emptyMessage="No customer fleet operators match the selected criteria."
       />
 
-      {/* Edit Quotas Modal */}
+      {/* Edit Quotas & Plan Modal */}
       {selectedTenantForEdit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 animate-fadeIn">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
-              Edit SaaS Plan & Quotas
-            </h3>
-            <p className="text-xs text-gray-500 mb-4">
-              Configuring fleet operator: <strong className="text-gray-800">{selectedTenantForEdit.name}</strong> ({selectedTenantForEdit.code})
-            </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-lg w-full p-6">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="text-base font-bold text-slate-900">
+                Adjust Quotas & Plan — {selectedTenantForEdit.name}
+              </h3>
+              <button
+                onClick={() => setSelectedTenantForEdit(null)}
+                className="text-slate-400 hover:text-slate-600 text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
 
-            <div className="space-y-3">
+            <div className="mt-4 space-y-4 text-xs">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Plan Tier
-                </label>
+                <label className="font-bold text-slate-700 block mb-1">Plan Tier</label>
                 <select
                   value={editPlan}
-                  onChange={(e) => {
-                    const plan = e.target.value as 'BASIC' | 'PRO' | 'ENTERPRISE';
-                    setEditPlan(plan);
-                    if (plan === 'BASIC') {
-                      setEditVehicleQuota(15);
-                      setEditDriverQuota(15);
-                      setEditCompanyQuota(3);
-                    } else if (plan === 'PRO') {
-                      setEditVehicleQuota(75);
-                      setEditDriverQuota(75);
-                      setEditCompanyQuota(20);
-                    } else {
-                      setEditVehicleQuota(999999);
-                      setEditDriverQuota(999999);
-                      setEditCompanyQuota(999999);
-                    }
-                  }}
-                  className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                  onChange={(e: any) => setEditPlan(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-2"
                 >
-                  <option value="BASIC">BASIC (15 Vehicles / 15 Drivers / 3 Companies)</option>
-                  <option value="PRO">PRO (75 Vehicles / 75 Drivers / 20 Companies)</option>
-                  <option value="ENTERPRISE">ENTERPRISE (Unlimited)</option>
+                  <option value="BASIC">BASIC (Starter Mobility)</option>
+                  <option value="PRO">PRO (Growth Fleet Pro)</option>
+                  <option value="ENTERPRISE">ENTERPRISE (Mobility Suite)</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Status
-                </label>
+                <label className="font-bold text-slate-700 block mb-1">Subscription Status</label>
                 <select
                   value={editStatus}
                   onChange={(e) => setEditStatus(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                  className="w-full border border-slate-300 rounded-lg p-2"
                 >
                   <option value="ACTIVE">ACTIVE</option>
+                  <option value="TRIALING">TRIALING</option>
                   <option value="PAST_DUE">PAST_DUE</option>
                   <option value="SUSPENDED">SUSPENDED</option>
                   <option value="CANCELED">CANCELED</option>
                 </select>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Vehicle Quota
-                  </label>
+                  <label className="text-slate-600 block mb-1 font-semibold">Max Vehicles</label>
                   <input
                     type="number"
                     value={editVehicleQuota}
-                    onChange={(e) => setEditVehicleQuota(parseInt(e.target.value) || 0)}
-                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm font-semibold"
+                    onChange={(e) => setEditVehicleQuota(Number(e.target.value))}
+                    className="w-full border border-slate-300 rounded p-1.5"
+                    min="1"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Driver Quota
-                  </label>
+                  <label className="text-slate-600 block mb-1 font-semibold">Max Drivers</label>
                   <input
                     type="number"
                     value={editDriverQuota}
-                    onChange={(e) => setEditDriverQuota(parseInt(e.target.value) || 0)}
-                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm font-semibold"
+                    onChange={(e) => setEditDriverQuota(Number(e.target.value))}
+                    className="w-full border border-slate-300 rounded p-1.5"
+                    min="1"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Company Quota
-                  </label>
+                  <label className="text-slate-600 block mb-1 font-semibold">Max Companies</label>
                   <input
                     type="number"
                     value={editCompanyQuota}
-                    onChange={(e) => setEditCompanyQuota(parseInt(e.target.value) || 0)}
-                    className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm font-semibold"
+                    onChange={(e) => setEditCompanyQuota(Number(e.target.value))}
+                    className="w-full border border-slate-300 rounded p-1.5"
+                    min="1"
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="mt-6 flex justify-end space-x-3">
-              <button
-                onClick={() => setSelectedTenantForEdit(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-100 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveSubscription}
-                className="px-4 py-2 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg shadow-sm transition"
-              >
-                Save Changes
-              </button>
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setSelectedTenantForEdit(null)}
+                  className="px-3.5 py-1.5 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveSubscription}
+                  className="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold shadow-sm"
+                >
+                  Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </div>

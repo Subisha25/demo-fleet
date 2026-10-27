@@ -2,7 +2,7 @@ import React from "react";
 import { Mail, Phone } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import config from "../../../../src/config/config";
-import gracelogo from "../../../assets/logo.png";
+import FleetFlowLogo from "../../../components/FleetFlowLogo";
 
 type CompanyData = {
   companyId: string;
@@ -27,12 +27,12 @@ const UserLoginHeader: React.FC<{ companyData: CompanyData | null }> = ({ compan
       <div className="w-full bg-[#f8f9fa] border-b border-gray-200 text-sm">
         <div className="container mx-auto px-4 py-1 flex justify-between items-center text-gray-700">
           <div className="flex items-center space-x-2">
-            <Mail size={14} className="text-green-600" />
-            <span className="text-[13px]">traveldesk@gracecabs.com</span>
+            <Mail size={14} className="text-[#C04E24]" />
+            <span className="text-[13px]">support@fleetflow.com</span>
           </div>
 
           <div className="flex items-center space-x-2">
-            <Phone size={14} className="text-green-600" />
+            <Phone size={14} className="text-[#C04E24]" />
             <span className="text-[13px]">+91 98417 22675</span>
           </div>
         </div>
@@ -44,11 +44,7 @@ const UserLoginHeader: React.FC<{ companyData: CompanyData | null }> = ({ compan
         {/* ✅ LEFT SIDE – PLATFORM LOGO (DO NOT REMOVE) */}
         <div>
           <Link to={`/company/${seoUrl}`}>
-            <img
-              src={gracelogo}
-              alt="Platform Logo"
-              className="h-12 object-contain cursor-pointer"
-            />
+            <FleetFlowLogo size="sm" showTagline={false} />
           </Link>
         </div>
 

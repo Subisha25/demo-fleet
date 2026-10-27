@@ -669,11 +669,11 @@ export const createPackageData = async (req: any, res: Response) => {
     }
 
 // ✅ add to valid types
-const validPackageTypes = ["Out Station", "Local City Use", "Monthly Bookings"];
+const validPackageTypes = ["Out Station", "Local City Use", "Monthly Bookings", "Public Per-KM Package"];
     if (!validPackageTypes.includes(packageType)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid packageType. Must be either "Out Station" or "Local City Use"',
+        message: 'Invalid packageType. Must be one of: "Out Station", "Local City Use", "Monthly Bookings", "Public Per-KM Package"',
       });
     }
 
@@ -834,6 +834,51 @@ if (packageType === "Monthly Bookings") {
 
   uniqueKey = buildLocalKey(defs); // reuse your same uniqueKey logic
 }
+
+    /* ---------------- PUBLIC PER-KM PACKAGE ---------------- */
+    if (packageType === "Public Per-KM Package") {
+      const pkgName = parsedPackages.packageName || parsedPackages.name;
+      const rate = parsedPackages.amountPerKm ?? parsedPackages.ratePerKm ?? parsedPackages.perKm;
+
+      if (!pkgName || typeof pkgName !== "string" || !pkgName.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Package name is mandatory",
+        });
+      }
+
+      const numRate = Number(rate);
+      if (rate == null || isNaN(numRate) || numRate <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Per-km amount must be a valid positive monetary value",
+        });
+      }
+
+      parsedPackages.packageName = pkgName.trim();
+      parsedPackages.amountPerKm = Math.round(numRate * 100) / 100;
+
+      // Duplicate package-name check within company scope
+      const normNewName = pkgName.trim().toLowerCase();
+      const existingPerKm = await PackageData.findAll({
+        where: { packageType: "Public Per-KM Package", companyId, isDeleted: false },
+      });
+
+      for (const rec of existingPerKm) {
+        try {
+          const ep = typeof rec.packages === "string" ? JSON.parse(rec.packages) : rec.packages;
+          const epName = (ep.packageName || ep.name || "").trim().toLowerCase();
+          if (epName === normNewName) {
+            return res.status(409).json({
+              success: false,
+              message: `A Public Per-KM Package with name "${pkgName.trim()}" already exists for this company`,
+            });
+          }
+        } catch (e) {
+          // ignore corrupted json
+        }
+      }
+    }
 
     const existingRecords = await PackageData.findAll({
       where: { packageType, companyId, isDeleted: false },

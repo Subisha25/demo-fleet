@@ -47,6 +47,38 @@ export class EmailConfiguration extends Model {
   @Column(DataType.STRING)
   emailBcc!: string;
 
+  @Column({
+    type: DataType.STRING,
+    allowNull: true,
+  })
+  tenantId!: string;
+
+  @Column({
+    type: DataType.ENUM('FLEET', 'PLATFORM'),
+    allowNull: false,
+    defaultValue: 'FLEET',
+  })
+  scope!: 'FLEET' | 'PLATFORM';
+
+  @Column({
+    type: DataType.STRING(50),
+    allowNull: false,
+    defaultValue: 'OPERATIONAL',
+  })
+  category!: string;
+
+  @Column({
+    type: DataType.TEXT,
+    allowNull: true,
+  })
+  placeholders!: string | null;
+
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+  })
+  isActive!: boolean;
 
   @CreatedAt
   @Column(DataType.DATE)

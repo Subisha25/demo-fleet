@@ -1,30 +1,35 @@
 import { Request, Response } from 'express';
-import axios from 'axios';
-import { Pickuparea } from '../models';
+import { Pickuparea, Pickupcity } from '../models';
 import { USERS } from "../utils/costants";
 import { Op } from 'sequelize';
+import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
+import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 const { ROLES } = USERS;
 
-
-
-// GET SINGLE AREA BY ID
-
-export const listPickUpArea = async (req: Request, res: Response) => {
+export const listPickUpArea = async (req: any, res: Response) => {
   try {
     const { status } = req.query;
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
 
-    let whereCondition = {};
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
+    let whereCondition: any = { ...tenantCondition };
 
     if (status === "1") {
-      // Return only deleted entries
-      whereCondition = { isDeleted: true };
+      whereCondition.isDeleted = true;
     } else {
-      // Return only active entries
-      whereCondition = { isDeleted: false };
+      whereCondition.isDeleted = false;
     }
 
     const pickuparea = await Pickuparea.unscoped().findAll({
-      where: whereCondition
+      where: whereCondition,
+      order: [['createdAt', 'DESC']]
     });
 
     res.status(200).json({
@@ -39,7 +44,7 @@ export const listPickUpArea = async (req: Request, res: Response) => {
   }
 };
 
-export const getPickupAreaById = async (req: Request, res: Response) => {
+export const getPickupAreaById = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
     if (!id) {
@@ -55,12 +60,16 @@ export const getPickupAreaById = async (req: Request, res: Response) => {
     if (!area) {
       return res.status(404).json({ message: 'Pickup area not found' });
     }
+    assertTenantOwnership(area, 'PickupArea');
 
     res.status(200).json({
       message: 'Pickup area retrieved successfully',
       data: area,
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     res.status(500).json({
       message: 'Error retrieving pickup area',
       error: error.message,
@@ -68,11 +77,11 @@ export const getPickupAreaById = async (req: Request, res: Response) => {
   }
 };
 
-// UPDATE AREA ONLY (Separate from city updates)
+// UPDATE AREA ONLY
 export const updatePickupArea = async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const { pickupCity, pickupArea} = req.body; // Only allow area-specific fields
+    const { pickupCity, pickupArea } = req.body;
     const role = req.role;
 
     if (role === ROLES.USER) {
@@ -92,30 +101,44 @@ export const updatePickupArea = async (req: any, res: Response) => {
     if (!area) {
       return res.status(404).json({ message: 'Pickup area not found' });
     }
+    assertTenantOwnership(area, 'PickupArea');
 
-    // Check for duplicate area name if changing
-    if (pickupArea && pickupArea !== area.pickupArea) {
-      const duplicate = await Pickuparea.findOne({
-        where: {
-      
-          pickupCity: area.pickupCity,
-          pickupArea:area.pickupArea,
-          areaId:{ [Op.ne]: id } 
-        }
+    const ctx = getTenantContext();
+    const tenantId = area.tenantId || ctx?.tenantId || ROOT_TENANT_ID;
+
+    // Validate that pickupCity belongs to this fleet if changing city
+    if (pickupCity && pickupCity !== area.pickupCity) {
+      const cityExists = await Pickupcity.findOne({
+        where: { pickupCity, tenantId }
       });
-
-      if (duplicate) {
+      if (!cityExists) {
         return res.status(400).json({
-          message: 'An area with this name already exists in the same city',
+          message: 'Referenced pickup city does not exist in your fleet',
         });
       }
     }
 
-    // Update ONLY area-specific fields
+    // Check for duplicate area name within the city and fleet
+    const targetCity = pickupCity || area.pickupCity;
+    const targetArea = pickupArea || area.pickupArea;
+    const duplicate = await Pickuparea.findOne({
+      where: {
+        pickupCity: targetCity,
+        pickupArea: targetArea,
+        tenantId,
+        areaId: { [Op.ne]: id } 
+      }
+    });
+
+    if (duplicate) {
+      return res.status(400).json({
+        message: 'An area with this name already exists in this city for your fleet',
+      });
+    }
+
     await area.update({
-       pickupCity:pickupCity || area.pickupCity,
-      pickupArea: pickupArea || area.pickupArea
-      // Note: country, state, pickupCity are NOT updated here
+      pickupCity: targetCity,
+      pickupArea: targetArea
     });
 
     res.status(200).json({
@@ -123,6 +146,9 @@ export const updatePickupArea = async (req: any, res: Response) => {
       data: area,
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     res.status(500).json({
       message: 'Error updating pickup area',
       error: error.message,
@@ -153,14 +179,18 @@ export const deletePickupArea = async (req: any, res: Response) => {
     if (!area) {
       return res.status(404).json({ message: 'Pickup area not found' });
     }
+    assertTenantOwnership(area, 'PickupArea');
 
-    await area.update({isDeleted:true});
+    await area.update({ isDeleted: true });
 
     res.status(200).json({
       message: 'Pickup area deleted successfully',
-      deletedArea:area
+      deletedArea: area
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     res.status(500).json({
       message: 'Error deleting pickup area',
       error: error.message,
@@ -189,8 +219,8 @@ export const restorePickupArea = async (req: any, res: Response) => {
     if (!area) {
       return res.status(404).json({ message: 'Pickup area not found' });
     }
+    assertTenantOwnership(area, 'PickupArea');
 
-    // Set isDeleted to false
     await area.update({ isDeleted: false });
 
     res.status(200).json({
@@ -198,10 +228,12 @@ export const restorePickupArea = async (req: any, res: Response) => {
       restoredArea: area
     });
   } catch (error: any) {
+    if (isTenantError(error)) {
+      return res.status(403).json({ message: error.message });
+    }
     res.status(500).json({
       message: 'Error restoring pickup area',
       error: error.message,
     });
   }
 };
-

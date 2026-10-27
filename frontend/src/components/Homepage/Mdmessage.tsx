@@ -72,30 +72,29 @@ const MDMessageSection: React.FC = () => {
 <div className="md-right-block w-full lg:w-2/3 pb-2 mt-6 lg:mt-0">
 <div className="md-name-block mb-6 lg:mb-8">
   <h3 className="text-lg sm:text-xl font-bold text-blue-900">
-    Dr. Robert Jayakumar
+    Leadership Team
   </h3>
-  <p className="text-sm text-slate-600 font-medium">Managing Director</p>
-  <p className="text-xs text-slate-500">Grace Cabs Private Limited</p>
+  <p className="text-sm text-slate-600 font-medium">Operations & Fleet Direction</p>
+  <p className="text-xs text-slate-500">FleetFlow Mobility Platform</p>
 </div>
 
            
 
             <div className="space-y-3 sm:space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed text-justify">
               <p >
-                On behalf of the entire team at Grace Cabs Private Limited, I am
+                On behalf of the entire team at FleetFlow, we are
                 thrilled to welcome you to our world of exceptional travel
                 experiences.
               </p>
               <p >
-                We are a premier travel company dedicated to crafting unforgettable
+                We are a premier mobility platform dedicated to crafting seamless
                 journeys tailored to your unique preferences and desires.
               </p>
              
               <p>
-                Grace Cabs Private Limited is the leading provider of premium
+                FleetFlow is a leading provider of premium
                 integrated end-to-end transportation solutions for the corporate
-                sector across the metro cities in Southern India. Since its
-                establishment in 2003, Grace Cabs has been committed to providing
+                sector across major metro hubs. FleetFlow is committed to providing
                 unparalleled travel arrangements that cater to the individual needs
                 and preferences of our clients.
               </p>

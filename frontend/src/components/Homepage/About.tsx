@@ -17,7 +17,7 @@ const About: React.FC = () => {
           {/* Left Text Content (Span 4 cols) */}
           <div className="md:col-span-4 lg:col-span-4 space-y-8 pr-4">
             <span className="text-[#49386D] font-bold tracking-wider text-sm uppercase">
-              About Grace Cabs
+              About FleetFlow
             </span>
             {/* LEFT TITLE TEXT – TAB VIEW FIXED */}
             <h2
@@ -45,11 +45,10 @@ const About: React.FC = () => {
 
 
             <p className="text-gray-600 text-sm leading-relaxed text-justify">
-              Grace Cabs is an affordable Car travels and car rentals service
-              provider in Chennai, Tamil Nadu. With a variety of the latest cars
-              and high petrol-efficiency cabs, we are your perfect choice when
-              it comes to renting or hiring cars for pleasant vacations, tours
-              and happy trips in Chennai or elsewhere in Tamil Nadu.
+              FleetFlow is an enterprise mobility and fleet management platform
+              powering commercial transport providers across the region. With verified fleets,
+              compliant billing, and real-time dispatch, we ensure dependable operations for corporate
+              delegations, employee commutes, and outstation travels.
             </p>
           </div>
 

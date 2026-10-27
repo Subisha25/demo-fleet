@@ -3,13 +3,14 @@ import { createInvoice,getPendingInvoices, sendInvoiceReminder,getInvoicesPayHol
     getAllInvoices,getAllCompanyInvoices,getInvoicesByUserId,getcompanyOrderSummery,getUserOrderStats,getInvoiceStatusCount, cancelInvoice, 
     resendClosePendingInvoiceEmail} from "../services/invServices"
 import { authMiddleware } from '../middleware/authMiddleware';
+import { requirePaidForModification } from '../middleware/entitlementMiddleware';
  
 const router = Router();
  
 
 router.post("/sendInvoiceReminder", authMiddleware, sendInvoiceReminder);
 
-router.post("/createInvoice", authMiddleware, createInvoice);
+router.post("/createInvoice", authMiddleware, requirePaidForModification, createInvoice);
 router.post(
   "/invoice/resend-closepending-email",
   authMiddleware,
@@ -26,7 +27,7 @@ router.get("/getcompanyOrderSummery", authMiddleware, getcompanyOrderSummery);
 router.get("/user-order-stats/:userId", authMiddleware, getUserOrderStats);
 router.get("/invoice/status-count", authMiddleware, getInvoiceStatusCount);
 
-router.put("/invoice/cancelInvoice", authMiddleware, cancelInvoice);
+router.put("/invoice/cancelInvoice", authMiddleware, requirePaidForModification, cancelInvoice);
 export default router;
  
 

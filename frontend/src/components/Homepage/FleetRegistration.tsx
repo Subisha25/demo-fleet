@@ -13,6 +13,10 @@ interface PlanDetail {
   clients: string;
 }
 
+const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+const SAC_REGEX = /^[0-9]{6}$/;
+
 const PLANS: Record<string, PlanDetail> = {
   BASIC: {
     tier: 'BASIC',
@@ -49,20 +53,34 @@ export default function FleetRegistration() {
 
   const [formData, setFormData] = useState({
     fleetName: '',
+    legalName: '',
+    displayName: '',
     businessCode: '',
     ownerName: '',
     contactEmail: '',
     contactPhone: '',
     city: '',
     state: '',
+    pinCode: '',
+    registeredAddress: '',
+    gstin: '',
+    panNumber: '',
+    sacCode: '996609',
+    website: '',
+    businessEmail: '',
+    businessPhone: '',
+    billingFooterText: '',
+    logoUrl: '',
     requestedPlanTier: 'PRO' as 'BASIC' | 'PRO' | 'ENTERPRISE',
     billingCycle: 'MONTHLY' as 'MONTHLY' | 'ANNUAL',
     fleetSize: '16-75',
     termsConsent: false,
   });
 
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [successData, setSuccessData] = useState<{
     requestId: string;
     fleetName: string;
@@ -82,19 +100,85 @@ export default function FleetRegistration() {
     }
   }, [location.search]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
       setFormData((prev) => ({ ...prev, [name]: checked }));
     } else if (name === 'businessCode') {
-      // Format as uppercase alphanumeric only
       const clean = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
       setFormData((prev) => ({ ...prev, businessCode: clean }));
+    } else if (name === 'gstin' || name === 'panNumber') {
+      const clean = value.toUpperCase().trim();
+      setFormData((prev) => {
+        const copy = { ...prev, [name]: clean };
+        if (name === 'gstin' && clean.length === 15 && !prev.panNumber) {
+          copy.panNumber = clean.substring(2, 12);
+        }
+        return copy;
+      });
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
     setErrorMessage('');
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => {
+        const copy = { ...prev };
+        delete copy[name];
+        return copy;
+      });
+    }
+  };
+
+  const handleLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'].includes(file.type)) {
+      setErrorMessage('Logo must be a valid PNG, JPG, WebP, or SVG file.');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setErrorMessage('Logo file size must not exceed 2MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setLogoPreview(dataUrl);
+      setFormData((prev) => ({ ...prev, logoUrl: dataUrl }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoPreview(null);
+    setFormData((prev) => ({ ...prev, logoUrl: '' }));
+  };
+
+  const validateInputs = () => {
+    const errors: Record<string, string> = {};
+
+    if (formData.businessCode.length < 2) {
+      errors.businessCode = 'Business code must be at least 2 alphanumeric characters.';
+    }
+
+    if (formData.gstin && !GSTIN_REGEX.test(formData.gstin)) {
+      errors.gstin = 'Invalid GSTIN format. Expected 15 characters (e.g., 33AAACA1111A1Z1).';
+    }
+
+    if (formData.panNumber && !PAN_REGEX.test(formData.panNumber)) {
+      errors.panNumber = 'Invalid PAN format. Expected 10 alphanumeric characters (e.g., AAACA1111A).';
+    }
+
+    if (formData.sacCode && !SAC_REGEX.test(formData.sacCode)) {
+      errors.sacCode = 'Invalid SAC code. Expected 6 digits (default: 996609).';
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -104,8 +188,8 @@ export default function FleetRegistration() {
       return;
     }
 
-    if (formData.businessCode.length < 2) {
-      setErrorMessage('Business code must be at least 2 alphanumeric characters.');
+    if (!validateInputs()) {
+      setErrorMessage('Please fix the errors highlighted below.');
       return;
     }
 
@@ -113,7 +197,16 @@ export default function FleetRegistration() {
     setErrorMessage('');
 
     try {
-      const response = await axiosInstance.post('/public/register-fleet', formData);
+      const payload = {
+        ...formData,
+        legalName: formData.legalName.trim() || formData.fleetName.trim(),
+        displayName: formData.displayName.trim() || formData.fleetName.trim(),
+        businessEmail: formData.businessEmail.trim() || formData.contactEmail.trim(),
+        businessPhone: formData.businessPhone.trim() || formData.contactPhone.trim(),
+        sacCode: formData.sacCode.trim() || '996609',
+      };
+
+      const response = await axiosInstance.post('/public/register-fleet', payload);
       if (response.data?.success) {
         setSuccessData({
           requestId: response.data.data.requestId,
@@ -206,7 +299,7 @@ export default function FleetRegistration() {
                 Fleet Self-Service Onboarding
               </span>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                Launch Your Transport Fleet on Grace Cabs SaaS
+                Launch Your Transport Fleet on FleetFlow SaaS
               </h1>
               <p className="mt-2 text-[#EDE9E3] text-sm sm:text-base max-w-2xl">
                 Get full corporate billing, live vehicle tracking, dynamic route card consolidation, and enterprise compliance ready in minutes.
@@ -228,16 +321,16 @@ export default function FleetRegistration() {
                 <h2 className="text-base font-bold uppercase tracking-wider text-[#7A7570] mb-4 pb-2 border-b border-[#FAF8F5]">
                   1. Fleet & Organization Identity
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
                     <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
-                      Fleet / Company Legal Name *
+                      Fleet Display Name *
                     </label>
                     <input
                       type="text"
                       name="fleetName"
                       required
-                      placeholder="e.g. Apex Mobility Logistics Ltd"
+                      placeholder="e.g. Apex Express"
                       value={formData.fleetName}
                       onChange={handleChange}
                       className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
@@ -246,7 +339,21 @@ export default function FleetRegistration() {
 
                   <div>
                     <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
-                      Short Business Code (2–8 Characters) *
+                      Legal Registered Entity Name
+                    </label>
+                    <input
+                      type="text"
+                      name="legalName"
+                      placeholder="e.g. Apex Mobility Solutions Pvt. Ltd."
+                      value={formData.legalName}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                      Short Business Code (2–8 Chars) *
                     </label>
                     <div className="relative">
                       <input
@@ -254,24 +361,124 @@ export default function FleetRegistration() {
                         name="businessCode"
                         required
                         maxLength={8}
-                        placeholder="e.g. APX, BLU, GC"
+                        placeholder="e.g. APX, BLU"
                         value={formData.businessCode}
                         onChange={handleChange}
-                        className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] font-mono font-bold text-sm tracking-wider uppercase focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
+                        className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.businessCode ? 'border-red-500' : 'border-[#E0DAD1]'} font-mono font-bold text-sm tracking-wider uppercase focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white`}
                       />
                       <span className="absolute right-3 top-2.5 text-xs text-[#7A7570] font-mono">
                         {formData.businessCode.length}/8
                       </span>
                     </div>
-                    <p className="text-[11px] text-[#5C5752] mt-1">Used for unique vehicle codes, invoice numbers, and dispatch identifiers.</p>
+                    {fieldErrors.businessCode && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.businessCode}</p>}
                   </div>
                 </div>
               </div>
 
-              {/* Section 2: Primary Administrator */}
+              {/* Section 2: Fleet Legal Identity (For Invoices & PDFs) */}
               <div>
                 <h2 className="text-base font-bold uppercase tracking-wider text-[#7A7570] mb-4 pb-2 border-b border-[#FAF8F5]">
-                  2. Primary Administrator & Operations Contact
+                  2. Tax & Legal Details (For Issued Invoices & Trip Sheets)
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                      Fleet GSTIN (15 Chars)
+                    </label>
+                    <input
+                      type="text"
+                      name="gstin"
+                      maxLength={15}
+                      placeholder="e.g. 33AAACA1111A1Z1"
+                      value={formData.gstin}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.gstin ? 'border-red-500' : 'border-[#E0DAD1]'} font-mono uppercase text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white`}
+                    />
+                    {fieldErrors.gstin && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.gstin}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                      Fleet PAN Number (10 Chars)
+                    </label>
+                    <input
+                      type="text"
+                      name="panNumber"
+                      maxLength={10}
+                      placeholder="e.g. AAACA1111A"
+                      value={formData.panNumber}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.panNumber ? 'border-red-500' : 'border-[#E0DAD1]'} font-mono uppercase text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white`}
+                    />
+                    {fieldErrors.panNumber && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.panNumber}</p>}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                      SAC Code (Passenger Transport)
+                    </label>
+                    <input
+                      type="text"
+                      name="sacCode"
+                      maxLength={6}
+                      placeholder="996609"
+                      value={formData.sacCode}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.sacCode ? 'border-red-500' : 'border-[#E0DAD1]'} font-mono text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white`}
+                    />
+                    {fieldErrors.sacCode && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.sacCode}</p>}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                    Registered Office Address (Invoice Footer)
+                  </label>
+                  <textarea
+                    name="registeredAddress"
+                    rows={2}
+                    placeholder="e.g. 101 Corporate Towers, Anna Salai, Guindy, Chennai - 600032"
+                    value={formData.registeredAddress}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
+                  />
+                </div>
+
+
+
+                {/* Fleet Logo Upload */}
+                <div className="mt-4 p-4 bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl flex flex-col sm:flex-row items-center gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                      Upload Fleet Logo (PNG, JPG, SVG, max 2MB)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                      onChange={handleLogoFile}
+                      className="text-xs text-[#5C5752] file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#C04E24]/10 file:text-[#C04E24] hover:file:bg-[#C04E24]/20 cursor-pointer"
+                    />
+                    <p className="text-[10px] text-[#7A7570] mt-1">Logo will appear on your generated invoices, trip sheets, and portal header.</p>
+                  </div>
+                  {logoPreview && (
+                    <div className="flex items-center gap-2">
+                      <img src={logoPreview} alt="Logo Preview" className="h-12 w-auto max-w-[120px] object-contain border border-[#E0DAD1] rounded p-1 bg-white" />
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className="text-xs text-red-600 hover:text-red-800 font-semibold underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Section 3: Primary Administrator */}
+              <div>
+                <h2 className="text-base font-bold uppercase tracking-wider text-[#7A7570] mb-4 pb-2 border-b border-[#FAF8F5]">
+                  3. Primary Administrator & Operations Contact
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
@@ -320,7 +527,7 @@ export default function FleetRegistration() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-4">
                   <div>
                     <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
                       Primary Operating City *
@@ -329,7 +536,7 @@ export default function FleetRegistration() {
                       type="text"
                       name="city"
                       required
-                      placeholder="e.g. Chennai, Bengaluru, Mumbai"
+                      placeholder="e.g. Chennai"
                       value={formData.city}
                       onChange={handleChange}
                       className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
@@ -344,8 +551,23 @@ export default function FleetRegistration() {
                       type="text"
                       name="state"
                       required
-                      placeholder="e.g. Tamil Nadu, Karnataka"
+                      placeholder="e.g. Tamil Nadu"
                       value={formData.state}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                      PIN Code
+                    </label>
+                    <input
+                      type="text"
+                      name="pinCode"
+                      maxLength={6}
+                      placeholder="600032"
+                      value={formData.pinCode}
                       onChange={handleChange}
                       className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
                     />
@@ -353,42 +575,43 @@ export default function FleetRegistration() {
                 </div>
               </div>
 
-              {/* Section 3: Plan Selection & Billing Cycle */}
+              {/* Section 4: Subscription Plan Selection */}
               <div>
-                <h2 className="text-base font-bold uppercase tracking-wider text-[#7A7570] mb-4 pb-2 border-b border-[#FAF8F5]">
-                  3. Select SaaS Plan & Billing Cycle
-                </h2>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-2 border-b border-[#FAF8F5]">
+                  <h2 className="text-base font-bold uppercase tracking-wider text-[#7A7570]">
+                    4. Choose Your Mobility Plan
+                  </h2>
 
-                <div className="flex items-center justify-between mb-4 bg-[#FAF8F5] p-3 rounded-xl border border-[#E0DAD1]">
-                  <span className="text-sm font-semibold text-[#1C1A18]">Choose Billing Frequency:</span>
-                  <div className="flex bg-[#EDE9E3] p-1 rounded-lg">
+                  {/* Billing Frequency Toggle */}
+                  <div className="inline-flex items-center p-1 bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl">
                     <button
                       type="button"
                       onClick={() => setFormData((prev) => ({ ...prev, billingCycle: 'MONTHLY' }))}
-                      className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                         formData.billingCycle === 'MONTHLY'
-                          ? 'bg-[#C04E24] text-white shadow-sm'
+                          ? 'bg-[#1C1A18] text-white shadow-sm'
                           : 'text-[#5C5752] hover:text-[#1C1A18]'
                       }`}
                     >
-                      Monthly Billing
+                      Monthly
                     </button>
                     <button
                       type="button"
                       onClick={() => setFormData((prev) => ({ ...prev, billingCycle: 'ANNUAL' }))}
-                      className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
                         formData.billingCycle === 'ANNUAL'
-                          ? 'bg-[#C04E24] text-white shadow-sm'
+                          ? 'bg-[#1C1A18] text-white shadow-sm'
                           : 'text-[#5C5752] hover:text-[#1C1A18]'
                       }`}
                     >
-                      Annual Billing <span className="bg-emerald-700 text-white text-[10px] px-1.5 py-0.5 rounded font-extrabold">Save 15%</span>
+                      <span>Annual</span>
+                      <span className="text-[10px] px-1.5 py-0.2 bg-[#C04E24] text-white rounded-full">Save ~15%</span>
                     </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {(Object.keys(PLANS) as Array<'BASIC' | 'PRO' | 'ENTERPRISE'>).map((tier) => {
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  {(['BASIC', 'PRO', 'ENTERPRISE'] as const).map((tier) => {
                     const plan = PLANS[tier];
                     const isSelected = formData.requestedPlanTier === tier;
                     const price = formData.billingCycle === 'ANNUAL' ? plan.annualINR : plan.monthlyINR;
@@ -450,7 +673,7 @@ export default function FleetRegistration() {
                 </div>
               </div>
 
-              {/* Section 4: Terms Consent & Submission */}
+              {/* Section 5: Terms Consent & Submission */}
               <div className="pt-2">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
@@ -494,4 +717,3 @@ export default function FleetRegistration() {
     </PublicLayout>
   );
 }
-

@@ -1066,7 +1066,7 @@ await new Promise(resolve => setTimeout(resolve, 1000));
 
                     await sendEmailFromTemplate(orderConfirmConf.emailCode, {
                     UserName: invoiceWithDetails.user.username ?? "",
-                    UserEmail:  "gracecabs1975@gmail.com,traveldesk@gracecabs.com",
+                    UserEmail:  "subisha2002.m@gmail.com,traveldesk@gracecabs.com",
                     OrderNumber: booking.bookingCode ?? "",
                     // InvoiceTemple: `
                     //     Amount: ${invoiceWithDetails.invoiceAmount}<br/>
@@ -1419,7 +1419,7 @@ const toNum = (v: any) => {
 //         await sendEmailFromTemplate(
 //           orderConfirmConf.emailCode,
 //           {
-//             to: "gracecabs1975@gmail.com,traveldesk@gracecabs.com",
+//             to: "subisha2002.m@gmail.com,traveldesk@gracecabs.com",
 //             OrderNumber: (result.inv as any).invoiceNumber,
 //             BookingNumber: (result.createdMonthly as any).monthlyInvoiceId,
 //             InvoiceTemple: "",
@@ -1682,7 +1682,7 @@ const extraChargeAmt = extraChargesArr.reduce((sum, x) => sum + x.amount, 0);
         await sendEmailFromTemplate(
           orderConfirmConf.emailCode,
           {
-            to: "gracecabs1975@gmail.com,traveldesk@gracecabs.com",
+            to: "subisha2002.m@gmail.com,traveldesk@gracecabs.com",
           //  to: "deviarul12@gmail.com",  
           OrderNumber: (result.inv as any).invoiceNumber,
             BookingNumber: (result.createdMonthly as any).monthlyInvoiceId,
@@ -1800,7 +1800,7 @@ export const resendMonthlyInvoice = async (req: Request, res: Response) => {
         await sendEmailFromTemplate(
           orderConfirmConf.emailCode,
           {
-            to: "gracecabs1975@gmail.com,traveldesk@gracecabs.com",
+            to: "subisha2002.m@gmail.com,traveldesk@gracecabs.com",
             OrderNumber: (createdMonthly as any).invoiceNumber,
             BookingNumber: (createdMonthly as any).monthlyInvoiceId,
             InvoiceTemple: "",
@@ -3209,7 +3209,7 @@ const extraChargesArr: { type: string; amount: number }[] =
       await sendEmailFromTemplate(
         orderConfirmConf.emailCode,
         {
-          to: "gracecabs1975@gmail.com,traveldesk@gracecabs.com",
+          to: "subisha2002.m@gmail.com,traveldesk@gracecabs.com",
           OrderNumber: result.invoice.invoiceNumber,
           BookingNumber: monthlyInvoiceId,
           InvoiceTemple: "",

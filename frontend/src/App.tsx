@@ -6,6 +6,8 @@ import PrivateRoute, { SuperAdminRoute } from './routes/PrivateRoutes';
 import Login from './SuperAdmin/pages/Login/Login';
 import Sidebar from './components/Sidebar';
 import { AlertContainer } from './components/AlertBox';
+import FleetLogin from './SuperAdmin/pages/Login/FleetLogin';
+import SubscriptionRequiredModal from './components/SubscriptionRequiredModal';
 
 // SaaS Tenants
 import TenantList from './SuperAdmin/pages/Tenants/TenantList';
@@ -13,6 +15,16 @@ import AddTenant from './SuperAdmin/pages/Tenants/AddTenant';
 import CompanyPolicies from './SuperAdmin/pages/Tenants/CompanyPolicies';
 import RegistrationsQueue from './SuperAdmin/pages/Tenants/RegistrationsQueue';
 import SubscriptionCheckout from './SuperAdmin/pages/Billing/SubscriptionCheckout';
+import FleetInspection from './SuperAdmin/pages/Tenants/FleetInspection';
+import PlanManagement from './SuperAdmin/pages/Tenants/PlanManagement';
+import TenantBillingHistory from './SuperAdmin/pages/Tenants/TenantBillingHistory';
+
+// SaaS Subscriptions & Billing
+import CurrentPlan from './SuperAdmin/pages/Billing/CurrentPlan';
+import SubscriptionHistory from './SuperAdmin/pages/Billing/SubscriptionHistory';
+import SuperAdminSubscriptionReports from './SuperAdmin/pages/Billing/SuperAdminSubscriptionReports';
+import NotificationAuditLogs from './SuperAdmin/pages/Configuration/NotificationAuditLogs';
+import ProfileManagement from './SuperAdmin/pages/Profile/ProfileManagement';
 
 // SaaS Public Pages
 import FleetRegistration from './components/Homepage/FleetRegistration';
@@ -40,12 +52,15 @@ import Configuration from './SuperAdmin/pages/Configuration/Configuration';
 import EmailConfiguration from './SuperAdmin/pages/Configuration/EmailConfiguration';
 import EditEmail from './SuperAdmin/pages/Configuration/EditEmail';
 import EditMainTemplate from './SuperAdmin/pages/Configuration/EditMainTemplate';
+import SmsConfiguration from './SuperAdmin/pages/Configuration/SmsConfiguration';
+import EditSms from './SuperAdmin/pages/Configuration/EditSms';
 
 // Payment Mode
 import AddPaymentMode from './SuperAdmin/pages/PaymentMode/AddPaymentMode';
 import ListPaymentMode from './SuperAdmin/pages/PaymentMode/ListPaymentMode';
 
 // Vehicle
+import AddVehicle from './SuperAdmin/pages/Vehicle/AddVehicle';
 import AddVehicleType from './SuperAdmin/pages/Vehicle/VehicleType/AddVehicleType';
 import ListVehicleType from './SuperAdmin/pages/Vehicle/VehicleType/ListVehicleType';
 import AddVehicleModel from './SuperAdmin/pages/Vehicle/VehicleModel/AddVehicleModel';
@@ -146,6 +161,7 @@ import AboutPage from './components/PublicSite/AboutPage';
 import ServicesPage from './components/PublicSite/ServicesPage';
 import PortfolioPage from './components/PublicSite/PortfolioPage';
 import ContactPage from './components/PublicSite/ContactPage';
+import PublicBookingWizard from './components/PublicSite/PublicBookingWizard';
 import TermsAndConditions from './components/Homepage/TermsAndConditions';
 import PrivacyPolicy from './components/Homepage/PrivacyPolicy';
 import CancelReservation from './components/Homepage/CancelReservation';
@@ -159,15 +175,40 @@ import Oncallinvoice from './SuperAdmin/pages/Users/Bookings/oncallbooking';
 import OnCallInvoiceView from './SuperAdmin/pages/Orders/view/Oncallinvoiceview';
 
 const Layout = () => {
-
   const role = localStorage.getItem("role");
+  const [subModalOpen, setSubModalOpen] = React.useState(false);
+  const [subModalTitle, setSubModalTitle] = React.useState<string | undefined>();
+  const [subModalMessage, setSubModalMessage] = React.useState<string | undefined>();
+
+  React.useEffect(() => {
+    const handleSubRequired = (event: any) => {
+      const detail = event?.detail || {};
+      setSubModalTitle(detail.title || 'Subscription Required');
+      setSubModalMessage(
+        detail.message ||
+          'You have reached the limits of your current subscription or your plan has expired. Please subscribe to continue creating or modifying records.'
+      );
+      setSubModalOpen(true);
+    };
+
+    window.addEventListener('fleetflow:subscription_required', handleSubRequired);
+    return () => {
+      window.removeEventListener('fleetflow:subscription_required', handleSubRequired);
+    };
+  }, []);
 
   return (
     <div className="flex h-screen bg-gray-100">
       {/* {role !== "manager" &&<Sidebar />} */}
-            {role !== "user" && role !== "manager" && <Sidebar />}
+      {role !== "user" && role !== "manager" && <Sidebar />}
 
       <AlertContainer />
+      <SubscriptionRequiredModal
+        isOpen={subModalOpen}
+        onClose={() => setSubModalOpen(false)}
+        title={subModalTitle}
+        message={subModalMessage}
+      />
       <main
         className={`flex-1 bg-gray-100 p-2 overflow-auto ${
           role !== "manager" ? "ml-74" : ""
@@ -182,11 +223,30 @@ const Layout = () => {
           {/* SaaS Multi-Tenant Routes (SuperAdmin Only) */}
           <Route path="/tenants/list" element={<SuperAdminRoute><TenantList /></SuperAdminRoute>} />
           <Route path="/tenants/add" element={<SuperAdminRoute><AddTenant /></SuperAdminRoute>} />
+          <Route path="/tenants/plans" element={<SuperAdminRoute><PlanManagement /></SuperAdminRoute>} />
+          <Route path="/tenants/inspect/:tenantId" element={<SuperAdminRoute><FleetInspection /></SuperAdminRoute>} />
+          <Route path="/tenants/overview/:tenantId" element={<SuperAdminRoute><FleetInspection /></SuperAdminRoute>} />
+          <Route path="/tenants/billing-history/:tenantId" element={<SuperAdminRoute><TenantBillingHistory /></SuperAdminRoute>} />
           <Route path="/tenants/policies" element={<SuperAdminRoute><CompanyPolicies /></SuperAdminRoute>} />
           <Route path="/tenants/registrations" element={<SuperAdminRoute><RegistrationsQueue /></SuperAdminRoute>} />
           <Route path="/admin/registrations" element={<SuperAdminRoute><RegistrationsQueue /></SuperAdminRoute>} />
           <Route path="/admin/billing" element={<SuperAdminRoute><SubscriptionCheckout /></SuperAdminRoute>} />
-          <Route path="/billing" element={<SuperAdminRoute><SubscriptionCheckout /></SuperAdminRoute>} />
+          <Route path="/admin/billing/reports" element={<SuperAdminRoute><SuperAdminSubscriptionReports /></SuperAdminRoute>} />
+          <Route path="/admin/notifications/audit" element={<SuperAdminRoute><NotificationAuditLogs /></SuperAdminRoute>} />
+          <Route path="/admin/notifications/audit-logs" element={<SuperAdminRoute><NotificationAuditLogs /></SuperAdminRoute>} />
+          <Route path="/admin/configuration/email" element={<SuperAdminRoute><EmailConfiguration /></SuperAdminRoute>} />
+
+          {/* SaaS Tenant Subscriptions & Billing Routes */}
+          <Route path="/billing" element={<CurrentPlan />} />
+          <Route path="/billing/checkout" element={<SubscriptionCheckout />} />
+          <Route path="/billing/current" element={<CurrentPlan />} />
+          <Route path="/billing/history" element={<SubscriptionHistory />} />
+          <Route path="/subscription/current" element={<CurrentPlan />} />
+          <Route path="/subscription/history" element={<SubscriptionHistory />} />
+
+          {/* Profile Management Routes */}
+          <Route path="/profile" element={<ProfileManagement />} />
+          <Route path="/settings/profile" element={<ProfileManagement />} />
           {/* Master Routes */}
           <Route path="/master/tax/add" element={<AddTax />} />
           <Route path="/master/tax/list" element={<ListTax />} />
@@ -199,20 +259,25 @@ const Layout = () => {
           <Route path="/company/edit/:companyId" element={<EditCompany />} />
           <Route path="/master/package/add" element={<AddPackage />} />
           <Route path="/master/package/list" element={<ListPackage />} />
-          {/* Configuration Routes (SuperAdmin Only) */}
-          <Route path="/configuration/master" element={<SuperAdminRoute><Configuration /></SuperAdminRoute>} />
-          <Route path="/configuration/email" element={<SuperAdminRoute><EmailConfiguration /></SuperAdminRoute>} />
-          <Route path="/email/configurations/edit/:id" element={<SuperAdminRoute><EditEmail /></SuperAdminRoute>} />
-          <Route path="/email/configurations/edit-main-template" element={<SuperAdminRoute><EditMainTemplate /></SuperAdminRoute>} />
+          {/* Configuration Routes (Accessible by SuperAdmin and Fleet Admin) */}
+          <Route path="/configuration/master" element={<Configuration />} />
+          <Route path="/configuration/email" element={<EmailConfiguration />} />
+          <Route path="/email/configurations" element={<EmailConfiguration />} />
+          <Route path="/email/configurations/edit/:id" element={<EditEmail />} />
+          <Route path="/email/configurations/edit-main-template" element={<EditMainTemplate />} />
+          <Route path="/configuration/sms" element={<SmsConfiguration />} />
+          <Route path="/sms/configurations" element={<SmsConfiguration />} />
+          <Route path="/sms/configurations/edit/:id" element={<EditSms />} />
           {/* Payment Mode Routes */}
           <Route path="/paymentmode/add" element={<AddPaymentMode />} />
           <Route path="/paymentmode/list" element={<ListPaymentMode />} />
           {/* Vehicle Routes */}
+          <Route path="/vehicle/add" element={<AddVehicle />} />
           <Route path="/vehicle/vehicletype/add" element={<AddVehicleType />} />
           <Route path="/vehicle/vehicletype/list" element={<ListVehicleType />} />
           <Route path="/vehicle/vehiclemodel/add" element={<AddVehicleModel />} />
           <Route path="/vehicle/vehiclemodel/list" element={<ListVehicleModel />} />
-          <Route path="/vehicle/vehiclemaster/add" element={<AddVehicleMaster />} />
+          <Route path="/vehicle/vehiclemaster/add" element={<AddVehicle />} />
           <Route path="/vehicle/vehiclemaster/list" element={<ListVehicleMaster />} />
           {/* Orders Routes */}
           <Route path="/orders/confirmpending" element={<ConfirmPendingList />} />
@@ -313,9 +378,18 @@ const App: React.FC = () => {
           <Route path="/activate-account" element={<ActivateAccount />} />
           <Route path="/activate" element={<ActivateAccount />} />
 
+          {/* Public Cab Booking Routes */}
+          <Route path="/book" element={<PublicBookingWizard />} />
+          <Route path="/book-a-ride" element={<PublicBookingWizard />} />
+          <Route path="/book-cab" element={<PublicBookingWizard />} />
+          <Route path="/fleet/:slug/book" element={<PublicBookingWizard />} />
+          <Route path="/:slug/book" element={<PublicBookingWizard />} />
+
           {/* Auth Routes */}
           <Route path="/adminlogin" element={<Login />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/login/:slug" element={<FleetLogin />} />
+          <Route path="/:slug/login" element={<FleetLogin />} />
           <Route path="/forgetpasword" element={<ForgotPassword />} />
 
           <Route path="/managerusers/list/:id" element={<ManagerUserList />} />

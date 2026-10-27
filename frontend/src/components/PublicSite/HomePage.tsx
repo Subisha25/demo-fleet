@@ -135,16 +135,17 @@ export default function HomePage() {
             {/* Action CTAs */}
             <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
               <button
-                onClick={() => navigate("/register-fleet")}
-                className="w-full sm:w-auto px-8 py-4 text-base font-bold text-white bg-[#C04E24] hover:bg-[#A83F1A] rounded-xl shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5"
+                onClick={() => navigate("/book")}
+                className="w-full sm:w-auto px-8 py-4 text-base font-extrabold text-white bg-[#C04E24] hover:bg-[#A83F1A] rounded-xl shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
               >
-                Register Your Fleet Now
+                <span>🚕</span>
+                <span>Book a Cab Online</span>
               </button>
               <button
-                onClick={() => navigate("/pricing")}
+                onClick={() => navigate("/register-fleet")}
                 className="w-full sm:w-auto px-8 py-4 text-base font-bold text-[#1C1A18] bg-[#FFFFFF] hover:bg-[#FAF8F5] border border-[#E0DAD1] hover:border-[#1C1A18]/40 rounded-xl shadow-sm transition-all duration-200"
               >
-                Explore Plans (From ₹299/mo)
+                Register Your Fleet
               </button>
               <button
                 onClick={() => navigate("/login")}
@@ -349,7 +350,7 @@ export default function HomePage() {
               onClick={() => navigate("/register-fleet")}
               className="w-full sm:w-auto px-8 py-4 text-base font-bold text-white bg-[#C04E24] hover:bg-[#A83F1A] rounded-xl shadow-md hover:shadow-lg transition-all"
             >
-              Get Started with Grace Cabs
+              Get Started with FleetFlow
             </button>
             <button
               onClick={() => navigate("/contact")}

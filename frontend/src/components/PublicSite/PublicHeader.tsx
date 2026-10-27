@@ -18,6 +18,7 @@ export default function PublicHeader() {
 
   const navLinks = [
     { name: "Home", path: "/" },
+    { name: "Book a Cab", path: "/book" },
     { name: "About", path: "/about" },
     { name: "Services", path: "/services" },
     { name: "Portfolio", path: "/portfolio" },
@@ -46,10 +47,10 @@ export default function PublicHeader() {
             <GraceCabsLogo className="h-10 w-auto" />
             <div className="flex flex-col">
               <span className="text-xl font-extrabold tracking-tight text-[#1C1A18] leading-none group-hover:text-[#C04E24] transition-colors">
-                GRACE CABS
+                FLEETFLOW
               </span>
               <span className="text-[10px] font-bold tracking-widest text-[#7A7570] uppercase mt-1">
-                Fleet Mobility SaaS
+                Mobility Cloud Platform
               </span>
             </div>
           </Link>
@@ -76,6 +77,13 @@ export default function PublicHeader() {
 
           {/* Action Buttons */}
           <div className="hidden md:flex items-center gap-3">
+            <button
+              onClick={() => navigate("/book")}
+              className="px-4 py-2 text-sm font-bold text-[#C04E24] border border-[#C04E24] rounded-lg hover:bg-[#C04E24]/10 transition-all flex items-center gap-1.5 shadow-xs"
+            >
+              <span>🚕</span>
+              <span>Book a Cab</span>
+            </button>
             <button
               onClick={() => navigate("/login")}
               className="px-4 py-2 text-sm font-bold text-[#1C1A18] border border-[#1C1A18]/20 rounded-lg hover:border-[#1C1A18] hover:bg-[#1C1A18]/5 transition-all"
@@ -129,6 +137,16 @@ export default function PublicHeader() {
             ))}
           </div>
           <div className="pt-4 border-t border-[#E0DAD1] space-y-2">
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                navigate("/book");
+              }}
+              className="w-full text-center px-4 py-2.5 text-sm font-bold text-white bg-[#C04E24] hover:bg-[#A83F1A] rounded-lg shadow-sm transition-all flex items-center justify-center gap-2"
+            >
+              <span>🚕</span>
+              <span>Book a Cab Online</span>
+            </button>
             <button
               onClick={() => {
                 setMobileMenuOpen(false);

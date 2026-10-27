@@ -1,5 +1,5 @@
 import express from 'express';
-import {uploadUsersFromExcel, getCurrentUser,getUsersByStatus, getAllUsers, getUserById, updateUser,updateUserStatus, deleteUser,logout, getAllUserByCompany,
+import {uploadUsersFromExcel, getCurrentUser, getUserProfile, updateUserProfile, getUsersByStatus, getAllUsers, getUserById, updateUser,updateUserStatus, deleteUser,logout, getAllUserByCompany,
     getUsersByConfirmationStatus, getUsersByGender, confirmUser, addNewAddress, 
     getUserAddresses, getUserByManager, updateUserAddress, deleteUserAddress, restoreUser, permanentDeleteUser,
     getCompanyManagers,
@@ -9,14 +9,17 @@ import {uploadUsersFromExcel, getCurrentUser,getUsersByStatus, getAllUsers, getU
     getUsersByCompany
  } from '../services/userServices';
 import { authMiddleware } from '../middleware/authMiddleware';
+import { requirePaidForModification } from '../middleware/entitlementMiddleware';
 import multer from "multer";
 
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 
 // Protected routes (authentication required)
-router.post("/upload-users", authMiddleware, upload.single("file"), uploadUsersFromExcel);
+router.post("/upload-users", authMiddleware, requirePaidForModification, upload.single("file"), uploadUsersFromExcel);
 
+router.get('/profile', authMiddleware, getUserProfile);
+router.put('/profile', authMiddleware, updateUserProfile);
 router.get('/getCurrentUser', authMiddleware, getCurrentUser);
 router.get('/getUsersByStatus/:status', authMiddleware, getUsersByStatus);
 router.post('/logout', logout);
@@ -31,9 +34,9 @@ router.put('/confirmUser/:id', authMiddleware, confirmUser);
 
 router.get('/:id',authMiddleware, getUserById);
  
-router.put('/updateUser/:id',authMiddleware, updateUser);
-router.put('/:id/status',authMiddleware, updateUserStatus);
-router.delete('/deleteUser/:id',authMiddleware, deleteUser);
+router.put('/updateUser/:id', authMiddleware, requirePaidForModification, updateUser);
+router.put('/:id/status', authMiddleware, requirePaidForModification, updateUserStatus);
+router.delete('/deleteUser/:id', authMiddleware, requirePaidForModification, deleteUser);
 
 router.post('/:id/address', authMiddleware, addNewAddress);
 router.get('/:id/addresses', authMiddleware, getUserAddresses);
@@ -43,8 +46,8 @@ router.delete('/:id/address/:idx', authMiddleware, deleteUserAddress);
 
 router.get('/:userId/getUsersManager', authMiddleware, getUserByManager);
 
-router.put('/restoreUser/:id', authMiddleware, restoreUser);
-router.delete('/permanentDeleteUser/:id', authMiddleware, permanentDeleteUser);
+router.put('/restoreUser/:id', authMiddleware, requirePaidForModification, restoreUser);
+router.delete('/permanentDeleteUser/:id', authMiddleware, requirePaidForModification, permanentDeleteUser);
 router.get("/company/:companyId/managers", authMiddleware, getCompanyManagers);
 
 router.put("/app/appMapCount", appMapCount);

@@ -5,8 +5,22 @@ import { Drivers } from '../models/drivers';
 import { Booking } from '../models/booking'; 
 import { USERS } from "../utils/costants";
 import { Op, Transaction } from "sequelize";
-import { PackageData } from "../models/packageData"; // ✅ make sure path is correct
+import { PackageData } from "../models/packageData";
+import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
+import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 const { ROLES } = USERS;
+
+function getVehicleTypeTenantCondition(req: any) {
+  const ctx = getTenantContext();
+  const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+  const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+  return isPlatformAdmin && !req.headers['x-tenant-id']
+    ? {}
+    : tenantId === ROOT_TENANT_ID
+      ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+      : { tenantId };
+}
 
 // ✅ helper: safely parse JSON
 const safeJson = (v: any) => {
@@ -103,29 +117,29 @@ export const updateVehicleType = async (req: any, res: Response) => {
     if (!existingVehicleType) {
       return res.status(404).json({ message: "Vehicle type not found" });
     }
+    assertTenantOwnership(existingVehicleType, 'VehicleType');
 
+    const ctx = getTenantContext();
+    const tenantId = existingVehicleType.tenantId || ctx?.tenantId || ROOT_TENANT_ID;
     
     if (newImages.length > 0) {
       updateData.vehicleImg = newImages;
     }
 
-        if (updateData.vehicleType && updateData.vehicleType !== existingVehicleType.vehicleType) {
-            const existing = await VehicleType.findOne({
-                where: { vehicleType: updateData.vehicleType }
-            });
-            if (existing) {
-                return res.status(400).json({ message: 'Vehicle name already exists' });
-            }
-        }
-
     const oldName = String(existingVehicleType.vehicleType || "");
     const newName = vehicleType !== undefined ? String(vehicleType) : oldName;
 
-    // ✅ prevent duplicates
+    // prevent duplicates within this fleet
     if (vehicleType && vehicleType !== existingVehicleType.vehicleType) {
-      const duplicate = await VehicleType.findOne({ where: { vehicleType } });
-      if (duplicate && duplicate.vehicleTypeId !== id) {
-        return res.status(400).json({ message: "Vehicle type name already exists" });
+      const duplicate = await VehicleType.findOne({
+        where: {
+          vehicleType,
+          tenantId,
+          vehicleTypeId: { [Op.ne]: id }
+        }
+      });
+      if (duplicate) {
+        return res.status(400).json({ message: "Vehicle type name already exists in this fleet" });
       }
     }
 
@@ -178,12 +192,8 @@ export const getAllVehicleTypesforWeb = async (req: Request, res: Response) => {
   try {
     const { status } = req.query;
 
-    let whereClause: any = {};
-    if (status === '1') {
-      whereClause = { isDeleted: true };  // Trash view
-    } else {
-      whereClause = { isDeleted: false }; // Active view
-    }
+    let whereClause: any = status === '1' ? { isDeleted: true } : { isDeleted: false };
+    whereClause = { ...whereClause, ...getVehicleTypeTenantCondition(req) };
 
     const vehicleTypes = await VehicleType.unscoped().findAll({
       where: whereClause,
@@ -212,12 +222,8 @@ export const getAllVehicleTypes = async (req: Request, res: Response) => {
   try {
     const { status } = req.query;
 
-    let whereClause: any = {};
-    if (status === "1") {
-      whereClause = { isDeleted: true }; // Trash view
-    } else {
-      whereClause = { isDeleted: false }; // Active view
-    }
+    let whereClause: any = status === "1" ? { isDeleted: true } : { isDeleted: false };
+    whereClause = { ...whereClause, ...getVehicleTypeTenantCondition(req) };
 
     const vehicleTypes = await VehicleType.unscoped().findAll({
       where: whereClause,
@@ -263,13 +269,17 @@ export const getVehicleTypeById = async (req: Request, res: Response) => {
     if (!vehicleType) {
       return res.status(404).json({ message: 'Vehicle type not found' });
     }
+    assertTenantOwnership(vehicleType, 'VehicleType');
 
     res.status(200).json({
       message: 'Vehicle type retrieved successfully',
       data: vehicleType
     });
 
-  } catch (err) {
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(err.status).json({ message: err.message });
+    }
     console.error('Error fetching vehicle type:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -382,7 +392,7 @@ export const deleteVehicleType = async (req: any, res: Response) => {
   
   try {
     const role = req.role;
-        if (role === ROLES.USER) {
+    if (role === ROLES.USER) {
       return res.status(403).json({ message: 'Not Authorized' });
     }
 
@@ -394,15 +404,19 @@ export const deleteVehicleType = async (req: any, res: Response) => {
     if (!vehicleType) {
       return res.status(404).json({ message: 'Vehicle type not found' });
     }
+    assertTenantOwnership(vehicleType, 'VehicleType');
 
-    await vehicleType.update({isDeleted :1});
+    await vehicleType.update({ isDeleted: 1 });
 
     res.status(200).json({
       message: 'Vehicle type deleted successfully',
       data: { vehicleTypeId: id }
     });
 
-  } catch (err) {
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(err.status).json({ message: err.message });
+    }
     console.error('Error deleting vehicle type:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -427,6 +441,7 @@ export const restoreVehicleType = async (req: any, res: Response) => {
     if (!vehicleType) {
       return res.status(404).json({ message: 'Vehicle type not found' });
     }
+    assertTenantOwnership(vehicleType, 'VehicleType');
 
     if (!vehicleType.isDeleted) {
       return res.status(400).json({ message: 'Vehicle type is already active' });
@@ -439,7 +454,10 @@ export const restoreVehicleType = async (req: any, res: Response) => {
       data: { vehicleTypeId: id }
     });
 
-  } catch (err) {
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(err.status).json({ message: err.message });
+    }
     console.error('Error restoring vehicle type:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -473,7 +491,7 @@ export const getVehicleTypeWithVehicles = async (req: Request, res: Response) =>
           required: false, // Include even if no vehicles exist
         },
       ],
-      where: { isDeleted: false },
+      where: { isDeleted: false, ...getVehicleTypeTenantCondition(req) },
       order: [["createdAt", "DESC"]],
     });
 
@@ -511,6 +529,7 @@ export const getAllVehicleTypeByType = async (req: Request, res: Response) => {
     // ✅ bookingType filter (default = regular)
     const bt = (bookingType || "regular").toString().trim().toLowerCase();
     whereClause.bookingType = bt; // "regular" or "monthly"
+    Object.assign(whereClause, getVehicleTypeTenantCondition(req));
 
     const vehicleTypes = await VehicleType.unscoped().findAll({
       where: whereClause,

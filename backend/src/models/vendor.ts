@@ -55,10 +55,7 @@ export class Vendor extends Model {
   })
   fcm_token!: string;
 
-  @Column({
-    type: DataType.STRING,
-    unique: true,
-  })
+  @Column(DataType.STRING)
   phno!: string;
 
   @Column(DataType.STRING)

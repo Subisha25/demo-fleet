@@ -26,6 +26,7 @@ import { Sequelize } from "sequelize";
 import { InvoiceSequence } from "../models/invoice_sequence";
 import { assertTenantOwnership, isTenantError } from "../utils/tenantGuard";
 import { getTenantContext, ROOT_TENANT_ID } from "../context/tenantContext";
+import { getFleetDocumentBranding } from './fleetBrandingService';
 //const logoPath = path.join(__dirname, "..", "images", "logo.png");
 // const logoPath = path.join(process.cwd(), "public", "images", "logo.png");
 // const logoBase64 = fs.readFileSync(logoPath, "base64");
@@ -197,7 +198,16 @@ export function buildRemainderEmailInvoiceBlockFromRaw(completeBooking: any, cp:
   `;
 }
 
-export function buildEmailInvoiceBlockFromRaw(completeBooking: any, cp: any, inv: any) {
+export function buildEmailInvoiceBlockFromRaw(completeBooking: any, cp: any, inv: any, branding?: any) {
+  const fleetLogo = branding?.logoSrc || "";
+  const fleetLegalName = branding?.legalName || branding?.displayName || branding?.fleetName || "Fleet Mobility";
+  const fleetAddress = branding?.registeredAddress || "";
+  const fleetGstin = branding?.gstNumber || "";
+  const fleetPan = branding?.panNumber || "";
+  const fleetSac = branding?.sacCode || "996609";
+  const fleetWebsite = branding?.website || "";
+  const fleetFooterText = branding?.billingFooterText || "";
+
   console.log("📧 EMAIL VEHICLE DEBUG", {
     hasRootVehicleMaster: !!completeBooking?.vehicleMaster,
     rootVehicleNumber: completeBooking?.vehicleMaster?.vehicleNumber,
@@ -381,9 +391,7 @@ export function buildEmailInvoiceBlockFromRaw(completeBooking: any, cp: any, inv
   <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #333;">
     <tr>
       <td style="width: 50%; vertical-align: top;">
-        <img src="https://gracecabs.com/images/logo.png"
-             alt="Grace Cabs"
-             style="max-height: 70px; display: block;" />
+        ${fleetLogo ? `<img src="${fleetLogo}" alt="${fleetLegalName}" style="max-height: 70px; display: block;" />` : `<div style="font-size: 20px; font-weight: bold; color: #1a4f7a;">${fleetLegalName}</div>`}
       </td>
       <td style="width: 50%; vertical-align: top; text-align: right; font-size: 12px;">
         <div style="margin-bottom: 5px;"><strong>Invoice Number:</strong> ${invoiceNumber}</div>
@@ -651,11 +659,12 @@ export function buildEmailInvoiceBlockFromRaw(completeBooking: any, cp: any, inv
 
       <!-- Footer Information -->
       <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 10px; line-height: 1.4; color: #666;">
-        <div style="margin-bottom: 2px;"><strong>Regd.Office:</strong> Grace Cabs Pvt. Ltd., 7/621 NESAMANI NAGAR, PERUMBAKKAM, CHENNAI - 600100</div>
-        <div style="margin-bottom: 2px;"><strong>Website:</strong> gracecabs.com</div>
-        <div style="margin-bottom: 2px;"><strong>GSTIN:</strong> 33AAMCG2518C1Z0</div>
-        <div style="margin-bottom: 2px;"><strong>PAN No.:</strong> AAMCG2518C</div>
-        <div style="margin-bottom: 2px;"><strong>SAC:</strong> 996609</div>
+        ${fleetAddress ? `<div style="margin-bottom: 2px;"><strong>Regd.Office:</strong> ${fleetAddress}</div>` : ''}
+        ${fleetWebsite ? `<div style="margin-bottom: 2px;"><strong>Website:</strong> ${fleetWebsite}</div>` : ''}
+        ${fleetGstin ? `<div style="margin-bottom: 2px;"><strong>GSTIN:</strong> ${fleetGstin}</div>` : ''}
+        ${fleetPan ? `<div style="margin-bottom: 2px;"><strong>PAN No.:</strong> ${fleetPan}</div>` : ''}
+        <div style="margin-bottom: 2px;"><strong>SAC:</strong> ${fleetSac}</div>
+        ${fleetFooterText ? `<div style="margin-top: 5px;">${fleetFooterText}</div>` : ''}
         <div style="margin-top: 10px; font-style: italic;">It is a system generated invoice which does not need a signature</div>
       </div>
     </div>
@@ -749,6 +758,75 @@ export const createClosePending = async (req: any, res: Response) => {
 
 
 
+    let finalPackageAmount = Number(packageAmount) || 0;
+    let finalTotalAmount = Number(totalAmount) || 0;
+    let finalTotalDue = Number(totalDue) || 0;
+
+    // Detect Public Per-KM Package and compute base amount from actual completed kilometres
+    let isPerKm = false;
+    let perKmRate = 0;
+
+    let parsedSelectedPkg: any = null;
+    if (selectedPackageData) {
+      parsedSelectedPkg = typeof selectedPackageData === 'string' ? JSON.parse(selectedPackageData) : selectedPackageData;
+    } else if (booking?.notes) {
+      try {
+        const notesObj = JSON.parse(booking.notes);
+        if (notesObj?.packageSnapshot) {
+          parsedSelectedPkg = notesObj.packageSnapshot;
+        }
+      } catch (e) {
+        // notes was plain text
+      }
+    }
+
+    if (
+      packageData?.packageType === 'Public Per-KM Package' ||
+      parsedSelectedPkg?.packageType === 'Public Per-KM Package' ||
+      parsedSelectedPkg?.amountPerKm != null
+    ) {
+      isPerKm = true;
+      if (parsedSelectedPkg?.amountPerKm != null) {
+        perKmRate = Number(parsedSelectedPkg.amountPerKm);
+      } else if (packageData?.packages) {
+        try {
+          const pp = typeof packageData.packages === 'string' ? JSON.parse(packageData.packages) : packageData.packages;
+          perKmRate = Number(pp.amountPerKm ?? pp.ratePerKm ?? 0);
+        } catch (e) {}
+      }
+    }
+
+    if (isPerKm) {
+      if (
+        (guestKms != null && Number(guestKms) < 0) ||
+        (garageKms != null && Number(garageKms) < 0) ||
+        (guestCloseKm != null && guestOpenKm != null && Number(guestCloseKm) < Number(guestOpenKm))
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Actual completed kilometres must be non-negative',
+        });
+      }
+
+      const actualKms = guestKms != null && !isNaN(Number(guestKms)) && Number(guestKms) > 0
+        ? Number(guestKms)
+        : (guestCloseKm != null && guestOpenKm != null && Number(guestCloseKm) >= Number(guestOpenKm))
+          ? (Number(guestCloseKm) - Number(guestOpenKm))
+          : (garageKms != null && !isNaN(Number(garageKms)) && Number(garageKms) > 0 ? Number(garageKms) : 0);
+
+      if (actualKms < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Actual completed kilometres must be non-negative',
+        });
+      }
+
+      finalPackageAmount = Math.round(actualKms * perKmRate * 100) / 100;
+      finalTotalAmount = finalPackageAmount + (Number(additionalKmsAmount) || 0) + (Number(additionalHoursAmount) || 0) + (Number(extraCharges) || 0) - (Number(discountAmount) || 0);
+      const taxSum = (Number(cgstAmount) || 0) + (Number(sgstAmount) || 0) + (Number(igstAmount) || 0) || (Number(totalTaxAmount) || 0);
+      finalTotalDue = Math.max(0, Math.round((finalTotalAmount + taxSum - (Number(advanceAmount) || 0)) * 100) / 100);
+    }
+
     const newClosePending = await ClosePending.create({
       tripSheetNumber: tripSheetNumber ? String(tripSheetNumber).trim() : null,
 
@@ -778,14 +856,14 @@ export const createClosePending = async (req: any, res: Response) => {
       cgstApplicable: cgstApplicable || false,
       igstApplicable: igstApplicable || false,
       sgstApplicable: sgstApplicable || false,
-      packageAmount: packageAmount || 0.00,
+      packageAmount: finalPackageAmount,
       additionalKmsAmount: additionalKmsAmount || 0.00,
       additionalHoursAmount: additionalHoursAmount || 0.00,
-      totalAmount: totalAmount || 0.00,
+      totalAmount: finalTotalAmount,
       extraCharges: extraCharges || 0.00,
-      total: total || 0.00,
+      total: total || finalTotalAmount,
       extraChargesBreakup: extraChargesBreakup || [],
-      totalDue: totalDue || 0.00,
+      totalDue: finalTotalDue,
       cgstAmount: cgstAmount || 0.00,
       igstAmount: igstAmount || 0.00,
       sgstAmount: sgstAmount || 0.00,
@@ -1073,8 +1151,10 @@ export const createClosePending = async (req: any, res: Response) => {
         // Map booking data to invoice format using the same function as generateInvoicePDF
         const invoiceData = mapBookingToInvoiceData(bookingWithClosePending);
 
+        const branding = await getFleetDocumentBranding(completeBooking?.tenantId || (req as any).tenantId);
+
         // Generate HTML content using the detailed template
-        const htmlContent = generateInvoiceHTML(invoiceData);
+        const htmlContent = generateInvoiceHTML(invoiceData, branding);
 
         // Use same HTML for email body
         emailInvoiceBlock = htmlContent;
@@ -1171,7 +1251,7 @@ export const createClosePending = async (req: any, res: Response) => {
 
           await sendEmailFromTemplate(orderConfirmConf.emailCode, {
             UserName: invoiceWithDetails.user.username ?? "",
-            UserEmail: "gracecabs1975@gmail.com,traveldesk@gracecabs.com",
+            UserEmail: invoiceWithDetails.user.email || "",
             OrderNumber: booking.bookingCode ?? "",
             // InvoiceTemple: `
             //     Amount: ${invoiceWithDetails.invoiceAmount}<br/>
@@ -1527,7 +1607,7 @@ const toNum = (v: any) => {
 //         await sendEmailFromTemplate(
 //           orderConfirmConf.emailCode,
 //           {
-//             to: "gracecabs1975@gmail.com,traveldesk@gracecabs.com",
+//             to: "subisha2002.m@gmail.com,traveldesk@gracecabs.com",
 //             OrderNumber: (result.inv as any).invoiceNumber,
 //             BookingNumber: (result.createdMonthly as any).monthlyInvoiceId,
 //             InvoiceTemple: "",
@@ -1740,7 +1820,7 @@ export const createMonthlyInvoice = async (req: Request, res: Response) => {
       );
 
       await (createdMonthly as any).update(
-        { 
+        {
           invoiceId: (inv as any).invoiceId,
           monthlyBookingCode: (inv as any).invoiceNumber,
         },
@@ -1763,7 +1843,7 @@ export const createMonthlyInvoice = async (req: Request, res: Response) => {
     // PDF GENERATION
     let pdfFileName: string | null = null;
     try {
-      const BASE_URL = "http://localhost:5000";
+      const BASE_URL = config.baseurl.apibaseurl || "http://localhost:5000";
       const pdfResponse = await axios.post(
         `${BASE_URL}/app/appInvoiceRoutes/month-generate-invoice-pdf`,
         { monthlyInvoiceId: (result.createdMonthly as any).monthlyInvoiceId },
@@ -1786,10 +1866,11 @@ export const createMonthlyInvoice = async (req: Request, res: Response) => {
         const monthlyPdfPath = path.join(
           process.cwd(), "uploads", "invoices", "monthly", pdfFileName
         );
+        const targetEmail = (req as any).user?.email || "";
         await sendEmailFromTemplate(
           orderConfirmConf.emailCode,
           {
-            to: "gracecabs1975@gmail.com,traveldesk@gracecabs.com",
+            to: targetEmail,
             OrderNumber: (result.inv as any).invoiceNumber,
             BookingNumber: (result.createdMonthly as any).monthlyInvoiceId,
             InvoiceTemple: "",
@@ -2087,7 +2168,7 @@ export const resendMonthlyInvoice = async (req: Request, res: Response) => {
     let pdfFileName: string | null = null;
 
     try {
-      const BASE_URL = "http://localhost:5000";
+      const BASE_URL = config.baseurl.apibaseurl || "http://localhost:5000";
       const pdfResponse = await axios.post(
         `${BASE_URL}/app/appInvoiceRoutes/month-generate-invoice-pdf`,
         { monthlyInvoiceId: (createdMonthly as any).monthlyInvoiceId },
@@ -2106,11 +2187,12 @@ export const resendMonthlyInvoice = async (req: Request, res: Response) => {
 
       if (orderConfirmConf && pdfFileName) {
         const monthlyPdfPath = path.join(process.cwd(), "uploads", "invoices", "monthly", pdfFileName);
+        const targetEmail = (req as any).user?.email || "";
 
         await sendEmailFromTemplate(
           orderConfirmConf.emailCode,
           {
-            to: "gracecabs1975@gmail.com,traveldesk@gracecabs.com",
+            to: targetEmail,
             OrderNumber: (createdMonthly as any).invoiceNumber,
             BookingNumber: (createdMonthly as any).monthlyInvoiceId,
             InvoiceTemple: "",
@@ -2488,7 +2570,7 @@ export const getAllMonthlyInvoiceDetails = async (req: Request, res: Response) =
 
       return {
         ...json,
-            invoiceNumber: json.monthlyBookingCode,
+        invoiceNumber: json.monthlyBookingCode,
 
         status: statusLabel, // ✅ new field
       };
@@ -3687,7 +3769,7 @@ export const editMonthlyInvoice = async (req: Request, res: Response) => {
     // 7. Regenerate PDF
     let pdfFileName: string | null = null;
     try {
-      const BASE_URL = "http://localhost:5000";
+      const BASE_URL = config.baseurl.apibaseurl || "http://localhost:5000";
       const pdfResponse = await axios.post(
         `${BASE_URL}/app/appInvoiceRoutes/month-generate-invoice-pdf`,
         { monthlyInvoiceId },
@@ -3709,10 +3791,11 @@ export const editMonthlyInvoice = async (req: Request, res: Response) => {
         const monthlyPdfPath = path.join(
           process.cwd(), "uploads", "invoices", "monthly", pdfFileName
         );
+        const targetEmail = (req as any).user?.email || "";
         await sendEmailFromTemplate(
           orderConfirmConf.emailCode,
           {
-            to: "gracecabs1975@gmail.com,traveldesk@gracecabs.com",
+            to: targetEmail,
             OrderNumber: existingMonthly.monthlyBookingCode,
             BookingNumber: monthlyInvoiceId,
             InvoiceTemple: "",

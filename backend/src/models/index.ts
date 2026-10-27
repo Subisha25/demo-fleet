@@ -37,8 +37,11 @@ import { TenantUsageMeter } from './tenantUsageMeter';
 import { CompanyPolicy } from './companyPolicy';
 import { TenantRegistrationRequest } from './tenantRegistrationRequest';
 import { TenantActivationToken } from './tenantActivationToken';
+import { TenantInitialAllowance } from './tenantInitialAllowance';
 import { SubscriptionInvoice } from './subscriptionInvoice';
 import { NotificationLog } from './notificationLog';
+import { SaaSPlan } from './saasPlan';
+import { SmsTemplate } from './smsTemplate';
 
 const connectDB = async () => {
   try {
@@ -46,13 +49,142 @@ const connectDB = async () => {
     
     // Safely and additively ensure SaaS tables exist without touching legacy tables
     await Tenant.sync();
-    await TenantSubscription.sync();
+    await TenantSubscription.sync({ alter: true });
     await TenantUsageMeter.sync();
     await CompanyPolicy.sync();
     await TenantRegistrationRequest.sync();
     await TenantActivationToken.sync();
     await SubscriptionInvoice.sync();
     await NotificationLog.sync();
+    await SaaSPlan.sync({ alter: true });
+
+    // Seed canonical SaaS plans if saas_plans is empty
+    try {
+      const planCount = await SaaSPlan.count();
+      if (planCount === 0) {
+        await SaaSPlan.bulkCreate([
+          {
+            planTier: 'BASIC',
+            name: 'Starter Mobility',
+            description: 'Essential fleet and trip dispatch operations for emerging operators.',
+            priceMonthlyINR: 299,
+            priceAnnualINR: 3050,
+            priceMonthlyUSD: 4,
+            currency: 'INR',
+            billingFrequency: 'MONTHLY',
+            billingCycles: ['MONTHLY', 'ANNUAL'],
+            maxVehicles: 15,
+            maxDrivers: 15,
+            maxCompanies: 3,
+            maxUsers: 5,
+            monthlyTripQuota: 1000,
+            isUnlimitedVehicles: false,
+            isUnlimitedDrivers: false,
+            isUnlimitedCompanies: false,
+            isUnlimitedUsers: false,
+            isUnlimitedTrips: false,
+            features: [
+              'Fleet & Driver Operations (Up to 15 Vehicles / 15 Drivers)',
+              'Up to 3 Corporate Client Accounts',
+              'Basic Booking-to-Invoice Lifecycle & Dispatch',
+              'Automated Standard Tax & Trip Rate Calculation',
+              'Standard PDF Invoice Generation',
+              'Email Notification Support',
+            ],
+            featureEntitlements: {
+              customBranding: false,
+              advancedReports: false,
+              customDomain: false,
+              multiBranch: false,
+              dedicatedPolicyEngine: false,
+              pdfCustomizationTier: 'STANDARD',
+            },
+            isActive: true,
+          },
+          {
+            planTier: 'PRO',
+            name: 'Growth Fleet Pro',
+            description: 'Scalable multi-company corporate transit with customized branding.',
+            priceMonthlyINR: 349,
+            priceAnnualINR: 3560,
+            priceMonthlyUSD: 5,
+            currency: 'INR',
+            billingFrequency: 'MONTHLY',
+            billingCycles: ['MONTHLY', 'ANNUAL'],
+            maxVehicles: 75,
+            maxDrivers: 75,
+            maxCompanies: 20,
+            maxUsers: 25,
+            monthlyTripQuota: 10000,
+            isUnlimitedVehicles: false,
+            isUnlimitedDrivers: false,
+            isUnlimitedCompanies: false,
+            isUnlimitedUsers: false,
+            isUnlimitedTrips: false,
+            features: [
+              'Expanded Fleet Management (Up to 75 Vehicles / 75 Drivers)',
+              'Up to 20 Corporate Client Accounts',
+              'On-Call, Monthly Consolidated & Spot Trip Invoicing',
+              'Advanced Tenant Branding & Portal Theming',
+              'Dynamic Corporate Booking Policies & Domain Validation',
+              'Route Card Aggregation & Financial Summary Reports',
+              'Custom Email/SMS Reminders & Payment Tracking',
+            ],
+            featureEntitlements: {
+              customBranding: true,
+              advancedReports: true,
+              customDomain: false,
+              multiBranch: true,
+              dedicatedPolicyEngine: true,
+              pdfCustomizationTier: 'BRANDED',
+            },
+            isActive: true,
+          },
+          {
+            planTier: 'ENTERPRISE',
+            name: 'Enterprise Mobility Suite',
+            description: 'High-volume platform with full tenant scoping, custom domains, and VIP telemetry.',
+            priceMonthlyINR: 549,
+            priceAnnualINR: 5600,
+            priceMonthlyUSD: 7,
+            currency: 'INR',
+            billingFrequency: 'MONTHLY',
+            billingCycles: ['MONTHLY', 'ANNUAL'],
+            maxVehicles: 250,
+            maxDrivers: 250,
+            maxCompanies: 100,
+            maxUsers: 100,
+            monthlyTripQuota: 50000,
+            isUnlimitedVehicles: false,
+            isUnlimitedDrivers: false,
+            isUnlimitedCompanies: false,
+            isUnlimitedUsers: false,
+            isUnlimitedTrips: false,
+            features: [
+              'High-Volume Fleet Operations (Up to 250 Vehicles / 250 Drivers)',
+              'Up to 100 Corporate Client Accounts',
+              'Full Multi-Tenant SaaS Isolation & Custom Domains',
+              'Dedicated Database Tenant Scoping & Policy Engine',
+              'Consolidated Monthly Corporate Route Invoicing',
+              'Multi-Role Server Authorization',
+              'Priority Support & High-Volume Telemetry Metering',
+            ],
+            featureEntitlements: {
+              customBranding: true,
+              advancedReports: true,
+              customDomain: true,
+              multiBranch: true,
+              dedicatedPolicyEngine: true,
+              pdfCustomizationTier: 'ADVANCED',
+            },
+            isActive: true,
+          },
+        ]);
+        console.log('Authoritative canonical SaaS plans initialized in saas_plans.');
+      }
+    } catch (planSeedErr) {
+      console.warn('SaaS plan initialization notice:', planSeedErr);
+    }
 
     // Idempotently ensure default root tenant exists for Grace Cabs
     try {
@@ -99,5 +231,5 @@ export { sequelize, connectDB, Employee, Company, Drivers,Vehicle,Vendor,User, B
   VehicleType, Tax, Pickuparea, Pickupcity, VehicleMaster,OTP,PaymentMode,Payment,orderSummery,Package,PackageData,Configuration,
   ClosePending, BookingSequence, PaymentSequence, InvoiceSequence, ShortLink, MonthlyBookingSequence, MapCount, OnCallInvoice,
   OnCallInvoiceItems, MonthlyInvoice, MonthlyInvoiceItems, Tenant, TenantSubscription, TenantUsageMeter, CompanyPolicy,
-  TenantRegistrationRequest, TenantActivationToken, SubscriptionInvoice, NotificationLog
+  TenantRegistrationRequest, TenantActivationToken, TenantInitialAllowance, SubscriptionInvoice, NotificationLog, SaaSPlan, SmsTemplate
 };

@@ -21,6 +21,7 @@ import { generateInvoiceHTML, mapBookingToInvoiceData } from "../appServices/app
 import puppeteer from "puppeteer";
 import { assertTenantOwnership, isTenantError } from "../utils/tenantGuard";
 import { getTenantContext, ROOT_TENANT_ID } from "../context/tenantContext";
+import { getFleetDocumentBranding } from "./fleetBrandingService";
 
 export const createInvoice = async (req: any, res: Response) => {
   try {
@@ -332,7 +333,7 @@ export const sendInvoiceReminder = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: "No invoices found" });
     }
 
-     /* ---------------- REMOVE DUPLICATES (IMPORTANT) ---------------- */
+    /* ---------------- REMOVE DUPLICATES (IMPORTANT) ---------------- */
     const uniqueInvoiceMap = new Map<string, any>();
 
     for (const inv of invoices) {
@@ -403,22 +404,24 @@ export const sendInvoiceReminder = async (req: Request, res: Response) => {
       </div>
     `;
 
-        let recipientEmail = user0.email;
-console.log("User Email: ", recipientEmail);
+    let recipientEmail = user0.email;
+    console.log("User Email: ", recipientEmail);
     if (user0.companyId) {
       const company = await Company.findByPk(user0.companyId, {
         attributes: ["needEmail"],
       });
 
       if (company?.needEmail === false) {
-      recipientEmail = ["gracecabs1975@gmail.com","traveldesk@gracecabs.com"];
-       
+        return res.json({
+          success: true,
+          message: "Email notifications are disabled for this company. No reminder dispatched.",
+        });
       }
     }
-           
+
     await sendEmailFromTemplate(invoiceMsgConf.emailCode, {
       UserName: user0.username ?? "Customer",
-      UserEmail:recipientEmail,
+      UserEmail: recipientEmail,
       InvoiceList: emailInvoiceBlock,
       PaymentLink: payLink,
     });
@@ -426,7 +429,7 @@ console.log("User Email: ", recipientEmail);
     return res.json({
       success: true,
       message: "Invoice reminder email sent successfully (selected invoices only)",
-       sentTo: recipientEmail,
+      sentTo: recipientEmail,
     });
   } catch (error) {
     console.error("Reminder mail error:", error);
@@ -529,24 +532,24 @@ export const getFilteredPendingInvoices = async (req: Request, res: Response) =>
     }
 
     // Company filter
-// Company filter
-if (company && company !== "all") {
-  userWhere.companyId = company;
-}
+    // Company filter
+    if (company && company !== "all") {
+      userWhere.companyId = company;
+    }
 
 
     // Date range filter
-   // Date range filter
-if (fromDate && toDate) {
-  const start = new Date(fromDate as string);
-  const end = new Date(toDate as string);
-  end.setHours(23, 59, 59, 999);
+    // Date range filter
+    if (fromDate && toDate) {
+      const start = new Date(fromDate as string);
+      const end = new Date(toDate as string);
+      end.setHours(23, 59, 59, 999);
 
-  invoiceWhere.createdAt = {
-    [Op.gte]: start,
-    [Op.lte]: end,
-  };
-}
+      invoiceWhere.createdAt = {
+        [Op.gte]: start,
+        [Op.lte]: end,
+      };
+    }
 
 
     const invoices = await Invoice.findAll({
@@ -621,24 +624,24 @@ export const getCompletedInvoices = async (req: Request, res: Response) => {
       userWhere.username = { [Op.like]: `%${username}%` };
     }
 
-// Company filter
-if (company && company !== "all") {
-  userWhere.companyId = company;
-}
+    // Company filter
+    if (company && company !== "all") {
+      userWhere.companyId = company;
+    }
 
 
     // Date range filter
-   // Date range filter
-if (fromDate && toDate) {
-  const start = new Date(fromDate as string);
-  const end = new Date(toDate as string);
-  end.setHours(23, 59, 59, 999);
+    // Date range filter
+    if (fromDate && toDate) {
+      const start = new Date(fromDate as string);
+      const end = new Date(toDate as string);
+      end.setHours(23, 59, 59, 999);
 
-  invoiceWhere.createdAt = {
-    [Op.gte]: start,
-    [Op.lte]: end,
-  };
-}
+      invoiceWhere.createdAt = {
+        [Op.gte]: start,
+        [Op.lte]: end,
+      };
+    }
 
 
     const invoices = await Invoice.findAll({
@@ -733,16 +736,16 @@ export const getAllInvoices = async (req: Request, res: Response) => {
 
     // Date range filter
     // Date range filter
-if (fromDate && toDate) {
-  const start = new Date(fromDate as string);
-  const end = new Date(toDate as string);
-  end.setHours(23, 59, 59, 999);
+    if (fromDate && toDate) {
+      const start = new Date(fromDate as string);
+      const end = new Date(toDate as string);
+      end.setHours(23, 59, 59, 999);
 
-  invoiceWhere.createdAt = {
-    [Op.gte]: start,
-    [Op.lte]: end,
-  };
-}
+      invoiceWhere.createdAt = {
+        [Op.gte]: start,
+        [Op.lte]: end,
+      };
+    }
 
 
     // Fetch all invoices with filters
@@ -816,80 +819,80 @@ export const getAllCompanyInvoices = async (req: Request, res: Response) => {
 
     const companies = await Company.findAll({ where: tenantCondition });
 
-    if (!companies || companies.length === 0) {
-      return res.status(404).json({ success: false, message: "No companies found!" });
-    }
+    if (!companies || companies.length === 0) {
+      return res.status(404).json({ success: false, message: "No companies found!" });
+    }
 
-    const companySummaries: any[] = [];
+    const companySummaries: any[] = [];
 
-    for (const company of companies) {
-      // Get all bookings for this company
-      const bookings = await Booking.findAll({
-        include: [
-          {
-            model: User,
-            as: "user",
-            where: { companyId: company.companyId },
-            attributes: []
-          }
-        ]
-      });
+    for (const company of companies) {
+      // Get all bookings for this company
+      const bookings = await Booking.findAll({
+        include: [
+          {
+            model: User,
+            as: "user",
+            where: { companyId: company.companyId },
+            attributes: []
+          }
+        ]
+      });
 
-      const bookingsCount = bookings.length;
+      const bookingsCount = bookings.length;
 
-      // ClosePending amounts (for company) - FIXING DOUBLE COUNTING ISSUE AND RENAMING
-      let totalDue = 0; // RENAMED: totalAmount -> totalDue
-      let taxAmount = 0;
-    
-      //  IMPORTANT FIX: Fetch ClosePending records ONCE outside of the booking loop
-      const cps = await ClosePending.findAll({
-        where: { companyId: company.companyId }
-      });
+      // ClosePending amounts (for company) - FIXING DOUBLE COUNTING ISSUE AND RENAMING
+      let totalDue = 0; // RENAMED: totalAmount -> totalDue
+      let taxAmount = 0;
 
-      for (const cp of cps) {
-        // Summing totalDue and taxAmount
-        totalDue += Number(cp.totalDue || 0); // RENAMED: totalAmount variable used here
-        taxAmount += Number(cp.totalTaxAmount || 0);
-      }
-      // The redundant and incorrect loops have been removed from here.
+      //  IMPORTANT FIX: Fetch ClosePending records ONCE outside of the booking loop
+      const cps = await ClosePending.findAll({
+        where: { companyId: company.companyId }
+      });
 
-      // Invoices (for company)
-      const invoices = await Invoice.findAll({
-        where: { companyId: company.companyId }
-      });
+      for (const cp of cps) {
+        // Summing totalDue and taxAmount
+        totalDue += Number(cp.totalDue || 0); // RENAMED: totalAmount variable used here
+        taxAmount += Number(cp.totalTaxAmount || 0);
+      }
+      // The redundant and incorrect loops have been removed from here.
 
-      let paidAmount = 0;
-      for (const inv of invoices) {
-        if (inv.invoiceStatus === ORDER.STATUS.PAYMENTCOMPLETED.toString()) {
-          paidAmount += Number(inv.invoiceAmount || 0);
-        }
-      }
+      // Invoices (for company)
+      const invoices = await Invoice.findAll({
+        where: { companyId: company.companyId }
+      });
 
-      const pendingAmount = totalDue - paidAmount; // RENAMED: totalAmount -> totalDue
+      let paidAmount = 0;
+      for (const inv of invoices) {
+        if (inv.invoiceStatus === ORDER.STATUS.PAYMENTCOMPLETED.toString()) {
+          paidAmount += Number(inv.invoiceAmount || 0);
+        }
+      }
 
-      companySummaries.push({
-        companyId: company.companyId,
-        companyName: company.companyName,
-        bookingsCount,
-        totalDue: totalDue, // Mapped to the correct variable name
-        taxAmount,
-        paidAmount,
-        pendingAmount
-      });
-    }
+      const pendingAmount = totalDue - paidAmount; // RENAMED: totalAmount -> totalDue
 
-    return res.status(200).json({
-      success: true,
-      data: companySummaries
-    });
-  } catch (error: any) {
-    console.error("Error fetching all company invoices:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch company invoice summaries",
-      error: error.message
-    });
-  }
+      companySummaries.push({
+        companyId: company.companyId,
+        companyName: company.companyName,
+        bookingsCount,
+        totalDue: totalDue, // Mapped to the correct variable name
+        taxAmount,
+        paidAmount,
+        pendingAmount
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: companySummaries
+    });
+  } catch (error: any) {
+    console.error("Error fetching all company invoices:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch company invoice summaries",
+      error: error.message
+    });
+  }
 };
 
 
@@ -1066,33 +1069,33 @@ export const getInvoicesByUserId = async (req: Request, res: Response) => {
     }
     assertTenantOwnership(targetUser, 'User');
 
-const invoices = await Invoice.findAll({
-  where: {
-    userId,
-    invoiceStatus: ORDER.STATUS.PENDING,
-  },
-  include: [
-    {
-      model: Booking,
-      as: "booking",
-      attributes: ["bookingDate", "bookingId", "pickupPoint"],
+    const invoices = await Invoice.findAll({
+      where: {
+        userId,
+        invoiceStatus: ORDER.STATUS.PENDING,
+      },
       include: [
         {
-          model: User,
-          as: "user",
-          attributes: ["username", "email", "mobile"], // Include email and phone
+          model: Booking,
+          as: "booking",
+          attributes: ["bookingDate", "bookingId", "pickupPoint"],
+          include: [
+            {
+              model: User,
+              as: "user",
+              attributes: ["username", "email", "mobile"], // Include email and phone
+            },
+          ],
+        },
+        {
+          model: Payment,
+          as: "payment", // alias matches the @BelongsTo alias
+          attributes: ["transactionId"], // Just get the transactionId
         },
       ],
-    },
-    {
-      model: Payment,
-      as: "payment", // alias matches the @BelongsTo alias
-      attributes: ["transactionId"], // Just get the transactionId
-    },
-  ],
-  attributes: ["invoiceId", "invoiceNumber", "invoiceAmount", "createdAt"],
-  order: [["createdAt", "DESC"]],
-});
+      attributes: ["invoiceId", "invoiceNumber", "invoiceAmount", "createdAt"],
+      order: [["createdAt", "DESC"]],
+    });
 
     // Transform the response
     const result = invoices.map((inv) => ({
@@ -1104,8 +1107,8 @@ const invoices = await Invoice.findAll({
       pickupDate: inv.booking ? inv.booking.bookingDate : null,
       pickupType: inv.booking ? inv.booking.pickupPoint : null,
       username: inv.booking?.user ? inv.booking.user.username : null, // common username
-      email:  inv.booking?.user ? inv.booking.user.email : null,
-      phno:  inv.booking?.user ? inv.booking.user.mobile : null,
+      email: inv.booking?.user ? inv.booking.user.email : null,
+      phno: inv.booking?.user ? inv.booking.user.mobile : null,
       transactionId: inv.payment ? inv.payment.transactionId : null, // <-- Added this line
 
     }));
@@ -1154,7 +1157,7 @@ export const getUserOrderStats = async (req: Request, res: Response) => {
     );
 
     const completedInvoices = await Invoice.findAll({
-      where: { userId, invoiceStatus:  ORDER.STATUS.PAYMENTCOMPLETED },
+      where: { userId, invoiceStatus: ORDER.STATUS.PAYMENTCOMPLETED },
       attributes: ["invoiceAmount"],
     });
     const invoiceCompletedCount = completedInvoices.length;
@@ -1174,7 +1177,7 @@ export const getUserOrderStats = async (req: Request, res: Response) => {
         invoicepaidOrderCount: invoiceCompletedCount,
         invoicePaidOrderAmount: invoiceCompletedAmount,
         paymentPendingOrderCount: invoicePendingCount,
-       paymentPendingOrderAmount: invoicePendingAmount,
+        paymentPendingOrderAmount: invoicePendingAmount,
         paymentCompletedOrderCount: invoiceCompletedCount,
         paymentCompletedOrderAmount: invoiceCompletedAmount,
 
@@ -1254,17 +1257,17 @@ export const cancelInvoice = async (req: any, res: Response) => {
     }
     assertTenantOwnership(booking);
 
-    const invoice = await Invoice.findOne({ where: {bookingId : booking?.bookingId  }});
+    const invoice = await Invoice.findOne({ where: { bookingId: booking?.bookingId } });
     if (invoice) {
       assertTenantOwnership(invoice);
     }
-   // console.log("bef ",booking);
+    // console.log("bef ",booking);
     // Update booking + related records
     const [affected] = await Booking.update(
       { confirmStatus: ORDER.STATUS.CONFIRMED },
       { where: { bookingId } }
     );
- // console.log("aft ",booking);
+    // console.log("aft ",booking);
     if (booking.paymentId) {
       await Payment.update(
         { status: ORDER.STATUS.CANCELLED },
@@ -1289,128 +1292,126 @@ export const cancelInvoice = async (req: any, res: Response) => {
     let needEmail = false;
     let companyName;
 
-if (booking.user?.companyId) {
-  const company = await Company.findByPk(
-    booking.user.companyId,
-    { attributes: ["needEmail"] }
-  );
-  needEmail = company?.needEmail === true;
-  companyName = company?.companyName;
-}
-
-console.log("cancelll needEmail:", needEmail);
-  if(needEmail)
-    {
-    try {
-      const user = booking.user as any;
-      console.log("inveoice cancelled ",user," ", user.email);
-      if (!user?.email) throw new Error("User email not found");
-
-      const bookingDateTime = new Date(booking.bookingDate);
-      const formattedBookingDate = formatDateTime(bookingDateTime);
-
-      const emailConfigs = await fetchAllEmailConfs();
-      const cancelClientConf = emailConfigs.find(
-        (c: any) => c.emailCode === "ORDER_CANCEL_EMAIL_TO_ADMIN"
+    if (booking.user?.companyId) {
+      const company = await Company.findByPk(
+        booking.user.companyId,
+        { attributes: ["needEmail"] }
       );
-      console.log("cwn in bef if ",cancelClientConf, cancelClientConf?.emailCode);
-      if (cancelClientConf) {
-        console.log("inside if ",user.email);
-        await sendEmailFromTemplate(cancelClientConf.emailCode, {
-          UserName: user.username || "",
-          UserEmail: user.email,
-          OrderNumber: booking.bookingCode,
-          CancelRemarks: remarks || "No remarks provided",
-          InvoiceDetails: `
+      needEmail = company?.needEmail === true;
+      companyName = company?.companyName;
+    }
+
+    console.log("cancelll needEmail:", needEmail);
+    if (needEmail) {
+      try {
+        const user = booking.user as any;
+        console.log("inveoice cancelled ", user, " ", user.email);
+        if (!user?.email) throw new Error("User email not found");
+
+        const bookingDateTime = new Date(booking.bookingDate);
+        const formattedBookingDate = formatDateTime(bookingDateTime);
+
+        const emailConfigs = await fetchAllEmailConfs();
+        const cancelClientConf = emailConfigs.find(
+          (c: any) => c.emailCode === "ORDER_CANCEL_EMAIL_TO_ADMIN"
+        );
+        console.log("cwn in bef if ", cancelClientConf, cancelClientConf?.emailCode);
+        if (cancelClientConf) {
+          console.log("inside if ", user.email);
+          await sendEmailFromTemplate(cancelClientConf.emailCode, {
+            UserName: user.username || "",
+            UserEmail: user.email,
+            OrderNumber: booking.bookingCode,
+            CancelRemarks: remarks || "No remarks provided",
+            InvoiceDetails: `
             payment: ${invoice?.invoiceAmount} <br/>
           `,
-          BookingDetails: `
+            BookingDetails: `
             Pickup: ${booking.pickupArea}, ${booking.pickupCity}<br/>
             Drop: ${booking.dropPoint}<br/>
             Date: ${formattedBookingDate}<br/>
           `,
-        });
+          });
+        }
+      } catch (emailError) {
+        console.error("Invoice booking email error:", emailError);
       }
-    } catch (emailError) {
-      console.error("Invoice booking email error:", emailError);
     }
-  }
-  else 
-  {
-       try {
-     const user = booking.user as any;
-      const bookingDateTime = new Date(booking.bookingDate);
-      const formattedBookingDate = formatDateTime(bookingDateTime);
+    else {
+      try {
+        const user = booking.user as any;
+        const bookingDateTime = new Date(booking.bookingDate);
+        const formattedBookingDate = formatDateTime(bookingDateTime);
 
-      const emailConfigs = await fetchAllEmailConfs();
-      const cancelClientConf = emailConfigs.find(
-        (c: any) => c.emailCode === "ORDER_CANCEL_EMAIL_TO_ADMIN"
-      );
-      console.log("cwn in bef if ",cancelClientConf, cancelClientConf?.emailCode);
-      if (cancelClientConf) {
-      //  console.log("inside if ",user.email);
-        await sendEmailFromTemplate(cancelClientConf.emailCode, {
-          UserName: "Sir",
-          UserEmail: "gracecabs1975@gmail.com,traveldesk@gracecabs.com",
-          OrderNumber: booking.bookingCode,
-          CancelRemarks: remarks || "No remarks provided",
-          InvoiceDetails: `
+        const emailConfigs = await fetchAllEmailConfs();
+        const cancelClientConf = emailConfigs.find(
+          (c: any) => c.emailCode === "ORDER_CANCEL_EMAIL_TO_ADMIN"
+        );
+        console.log("cwn in bef if ", cancelClientConf, cancelClientConf?.emailCode);
+        if (cancelClientConf) {
+          //  console.log("inside if ",user.email);
+          await sendEmailFromTemplate(cancelClientConf.emailCode, {
+            UserName: "Admin",
+            UserEmail: (req as any).tenant?.contactEmail || (booking as any)?.company?.email || "admin@fleetflow.app",
+            OrderNumber: booking.bookingCode,
+            CancelRemarks: remarks || "No remarks provided",
+            InvoiceDetails: `
             payment: ${invoice?.invoiceAmount} <br/>
           `,
-          BookingDetails: `
+            BookingDetails: `
             username: ${user.username} <br/>
             Pickup: ${booking.pickupArea}, ${booking.pickupCity}<br/>
             Drop: ${booking.dropPoint}<br/>
             Date: ${formattedBookingDate}<br/>
           `,
-        });
+          });
+        }
+      } catch (emailError) {
+        console.error("Invoice booking email error:", emailError);
       }
-    } catch (emailError) {
-      console.error("Invoice booking email error:", emailError);
+
     }
 
-  }
-
-     try {
-     const user = booking.user as any;
-   if (user?.mobile) {
-    const mobileNumber = user.mobile;
-   
     try {
-      // 2Factor API configuration from environment variables
-      const apiKey = process.env.TWO_FACTOR_API_KEY;
-      const senderId = process.env.TWO_FACTOR_SENDER_ID;
-      const templateName = "Invoice Cancel";
-     
-      if (!apiKey || !senderId) {
-        throw new Error("SMS API configuration missing in environment variables");
+      const user = booking.user as any;
+      if (user?.mobile) {
+        const mobileNumber = user.mobile;
+
+        try {
+          // 2Factor API configuration from environment variables
+          const apiKey = process.env.TWO_FACTOR_API_KEY;
+          const senderId = process.env.TWO_FACTOR_SENDER_ID;
+          const templateName = "Invoice Cancel";
+
+          if (!apiKey || !senderId) {
+            throw new Error("SMS API configuration missing in environment variables");
+          }
+
+          // Build SMS URL with parameters
+          const smsUrl = `https://2factor.in/API/R1/?module=TRANS_SMS&apikey=${apiKey}&to=${mobileNumber}&from=${senderId}&templatename=${encodeURIComponent(templateName)}&var1=${encodeURIComponent(user.username || '')}&var2=${encodeURIComponent(booking?.bookingCode || '')}&var3=${encodeURIComponent(invoice?.invoiceNumber || '')}`;
+
+          // Send SMS using fetch
+          const smsResponse = await fetch(smsUrl);
+
+          if (!smsResponse.ok) {
+            throw new Error(`SMS API request failed with status: ${smsResponse.status}`);
+          }
+
+          const smsResult = await smsResponse.json();
+
+          console.log(" SMS sent successfully:", smsResult);
+        } catch (smsError: any) {
+          console.error(" SMS send error:", smsError.message);
+
+        }
+      } else {
+        console.log(" User mobile number not found");
       }
-     
-      // Build SMS URL with parameters
-      const smsUrl = `https://2factor.in/API/R1/?module=TRANS_SMS&apikey=${apiKey}&to=${mobileNumber}&from=${senderId}&templatename=${encodeURIComponent(templateName)}&var1=${encodeURIComponent(user.username || '')}&var2=${encodeURIComponent(booking?.bookingCode || '')}&var3=${encodeURIComponent(invoice?.invoiceNumber || '')}`;
- 
-      // Send SMS using fetch
-      const smsResponse = await fetch(smsUrl);
-     
-      if (!smsResponse.ok) {
-        throw new Error(`SMS API request failed with status: ${smsResponse.status}`);
-      }
-     
-      const smsResult = await smsResponse.json();
-     
-      console.log(" SMS sent successfully:", smsResult);
-    } catch (smsError: any) {
-      console.error(" SMS send error:", smsError.message);
-     
+    } catch (error: any) {
+      console.error(" Unexpected error in SMS sending process:", error);
     }
-  } else {
-    console.log(" User mobile number not found");
-  }
-} catch (error: any) {
-  console.error(" Unexpected error in SMS sending process:", error);
-}
-   
- 
+
+
 
     return res.status(200).json({
       message:
@@ -1527,17 +1528,18 @@ export const resendClosePendingInvoiceEmail = async (req: any, res: Response) =>
 
     // ✅ Build same email block used in createClosePending
     // ✅ Use same HTML as PDF so email body matches PDF
-const invoiceData = mapBookingToInvoiceData(bookingForPdf);
-const htmlContent = generateInvoiceHTML(invoiceData);
+    const invoiceData = mapBookingToInvoiceData(bookingForPdf);
+    const fleetBranding = await getFleetDocumentBranding(bookingForPdf?.tenantId);
+    const htmlContent = generateInvoiceHTML(invoiceData, fleetBranding);
 
-const emailInvoiceBlock = htmlContent;
+    const emailInvoiceBlock = htmlContent;
 
     // ✅ Generate PDF (same as close pending)
     let pdfPath: string | null = null;
     let pdfFileName: string | null = null;
 
     try {
- 
+
       const uploadsDir = path.join(process.cwd(), "uploads", "invoices");
       if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
@@ -1592,9 +1594,14 @@ const emailInvoiceBlock = htmlContent;
       needEmail = company?.needEmail === true;
     }
 
-    const toEmail = needEmail
-      ? userEmail
-      : "robertjayakumar@gmail.com,traveldesk@gracecabs.com";
+    if (!needEmail) {
+      return res.status(200).json({
+        success: true,
+        message: "Invoice email skipped: Company email notifications are disabled.",
+      });
+    }
+
+    const toEmail = userEmail;
 
     await sendEmailFromTemplate(
       conf.emailCode,

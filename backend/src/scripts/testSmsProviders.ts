@@ -109,7 +109,7 @@ async function testSms() {
   }
 
   console.log('\n--- 4. SINGLE TEST SMS DISPATCH ---');
-  const testNumber = '9003241571';
+  const testNumber = '9080280818';
 
   if (activeProvider === '2FACTOR') {
     console.log(`Attempting real 2Factor template SMS to authorized number: ${maskPhoneNumber(testNumber)}`);

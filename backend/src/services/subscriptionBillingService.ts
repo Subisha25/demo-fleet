@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Op } from 'sequelize';
 import { v4 as uuidv4 } from 'uuid';
 import { SubscriptionInvoice } from '../models/subscriptionInvoice';
 import { Tenant } from '../models/tenant';
@@ -19,6 +20,30 @@ function generateSubscriptionInvoiceNumber(): string {
 }
 
 /**
+ * Exact calendar date calculation for subscription periods.
+ * Handles month-end rollovers (e.g. Jan 31 -> Feb 28/29), leap years, and exact anniversaries.
+ */
+export function calculateSubscriptionPeriodEnd(startDate: Date, billingCycle: 'MONTHLY' | 'ANNUAL'): Date {
+  const result = new Date(startDate.getTime());
+  if (billingCycle === 'ANNUAL') {
+    const curYear = result.getFullYear();
+    const curMonth = result.getMonth();
+    result.setFullYear(curYear + 1);
+    // In case of Feb 29 on leap year rolling to March 1 on non-leap year:
+    if (result.getMonth() !== curMonth) {
+      result.setDate(0);
+    }
+  } else {
+    const originalDay = result.getDate();
+    result.setMonth(result.getMonth() + 1);
+    if (result.getDate() !== originalDay) {
+      result.setDate(0); // Roll back to last day of target month
+    }
+  }
+  return result;
+}
+
+/**
  * Initiate subscription checkout order and generate draft invoice.
  */
 export const createSubscriptionCheckout = async (req: Request, res: Response) => {
@@ -32,7 +57,8 @@ export const createSubscriptionCheckout = async (req: Request, res: Response) =>
       ? String(planTier).toUpperCase()
       : 'PRO') as 'BASIC' | 'PRO' | 'ENTERPRISE';
 
-    const normalizedCycle = String(billingCycle).toUpperCase() === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY';
+    const upperCycle = String(billingCycle).toUpperCase();
+    const normalizedCycle = (upperCycle === 'ANNUAL' || upperCycle === 'YEARLY') ? 'ANNUAL' : 'MONTHLY';
 
     const plan = PLAN_CATALOG[normalizedTier];
     if (!plan) {
@@ -60,10 +86,9 @@ export const createSubscriptionCheckout = async (req: Request, res: Response) =>
 
     const subscription = await getOrCreateSubscription(tenantId);
     const invoiceNumber = generateSubscriptionInvoiceNumber();
-    const periodDays = normalizedCycle === 'ANNUAL' ? 365 : 30;
 
     const now = new Date();
-    const periodEnd = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
+    const periodEnd = calculateSubscriptionPeriodEnd(now, normalizedCycle);
 
     const invoice = await SubscriptionInvoice.create({
       subscriptionInvoiceId: uuidv4(),
@@ -201,9 +226,8 @@ export const verifySubscriptionPayment = async (req: Request, res: Response) => 
 
     // Promote Tenant & Subscription
     const limits = PLAN_LIMITS[invoice.planTier];
-    const periodDays = invoice.billingCycle === 'ANNUAL' ? 365 : 30;
     const now = new Date();
-    const newEnd = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
+    const newEnd = calculateSubscriptionPeriodEnd(now, invoice.billingCycle);
 
     const sub = await getOrCreateSubscription(tenantId);
     await sub.update({
@@ -226,17 +250,19 @@ export const verifySubscriptionPayment = async (req: Request, res: Response) => 
       });
     }
 
-    // Send payment confirmation notification
-    const recipientEmail = tenant?.contactEmail || (await getSuperAdminEmail());
-    await sendNotification({
-      channel: 'EMAIL',
-      recipient: recipientEmail,
-      templateCode: 'SUBSCRIPTION_PAYMENT_SUCCESS',
-      subject: `Payment Receipt: ${invoice.invoiceNumber} (${invoice.planTier} Plan)`,
-      body: `Thank you for your payment!\n\nInvoice Number: ${invoice.invoiceNumber}\nPlan: ${invoice.planTier} (${invoice.billingCycle})\nTotal Amount: ₹${invoice.totalAmount} INR\nTransaction Reference: ${txnRef}\nValid Until: ${newEnd.toDateString()}\n\nYour fleet subscription has been activated with full enterprise access.`,
-      referenceEntity: 'SUBSCRIPTION_INVOICE',
-      referenceId: invoice.subscriptionInvoiceId,
-    });
+    // Send payment confirmation notification only to the intended tenant contact email
+    const recipientEmail = tenant?.contactEmail;
+    if (recipientEmail) {
+      await sendNotification({
+        channel: 'EMAIL',
+        recipient: recipientEmail,
+        templateCode: 'SUBSCRIPTION_PAYMENT_SUCCESS',
+        subject: `Payment Receipt: ${invoice.invoiceNumber} (${invoice.planTier} Plan)`,
+        body: `Thank you for your payment!\n\nInvoice Number: ${invoice.invoiceNumber}\nPlan: ${invoice.planTier} (${invoice.billingCycle})\nTotal Amount: ₹${invoice.totalAmount} INR\nTransaction Reference: ${txnRef}\nValid Until: ${newEnd.toDateString()}\n\nYour fleet subscription has been activated with full enterprise access.`,
+        referenceEntity: 'SUBSCRIPTION_INVOICE',
+        referenceId: invoice.subscriptionInvoiceId,
+      });
+    }
 
     const jsonInv = invoice.toJSON ? invoice.toJSON() : invoice;
     return res.status(200).json({
@@ -296,3 +322,222 @@ export const getTenantSubscriptionInvoices = async (req: Request, res: Response)
     return res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };
+
+/**
+ * SuperAdmin: Aggregated Subscription Revenue Summary Cards.
+ * Broken down separately into Monthly and Annual billing cycles,
+ * with separate sub-totals for BASIC, PRO, and ENTERPRISE.
+ * Strictly counts verified PAID invoices only (never pending, failed, or mock).
+ */
+export const getSubscriptionRevenueSummary = async (req: Request, res: Response) => {
+  try {
+    const paidInvoices = await SubscriptionInvoice.findAll({
+      where: {
+        paymentStatus: 'PAID',
+      },
+      order: [['paidAt', 'ASC']],
+    });
+
+    const initTierStats = () => ({
+      amount: 0,
+      count: 0,
+    });
+
+    const monthlyStats = {
+      BASIC: initTierStats(),
+      PRO: initTierStats(),
+      ENTERPRISE: initTierStats(),
+      totalAmount: 0,
+      totalCount: 0,
+    };
+
+    const annualStats = {
+      BASIC: initTierStats(),
+      PRO: initTierStats(),
+      ENTERPRISE: initTierStats(),
+      totalAmount: 0,
+      totalCount: 0,
+    };
+
+    let overallAmount = 0;
+    let overallCount = 0;
+
+    let earliestDate: Date | null = null;
+    let latestDate: Date | null = null;
+
+    for (const inv of paidInvoices) {
+      const amount = Number(inv.totalAmount) || 0;
+      const tier = (inv.planTier || 'PRO') as 'BASIC' | 'PRO' | 'ENTERPRISE';
+      const cycle = inv.billingCycle === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY';
+      const paidDate = inv.paidAt || inv.createdAt;
+
+      if (!earliestDate || paidDate < earliestDate) earliestDate = paidDate;
+      if (!latestDate || paidDate > latestDate) latestDate = paidDate;
+
+      overallAmount += amount;
+      overallCount += 1;
+
+      if (cycle === 'ANNUAL') {
+        if (annualStats[tier]) {
+          annualStats[tier].amount += amount;
+          annualStats[tier].count += 1;
+        }
+        annualStats.totalAmount += amount;
+        annualStats.totalCount += 1;
+      } else {
+        if (monthlyStats[tier]) {
+          monthlyStats[tier].amount += amount;
+          monthlyStats[tier].count += 1;
+        }
+        monthlyStats.totalAmount += amount;
+        monthlyStats.totalCount += 1;
+      }
+    }
+
+    const summaryData = {
+      totalCollected: overallAmount,
+      totalInvoices: overallCount,
+      currency: 'INR',
+      dateRange: {
+        from: earliestDate ? earliestDate.toISOString() : null,
+        to: latestDate ? latestDate.toISOString() : null,
+      },
+      monthly: {
+        totalAmount: monthlyStats.totalAmount,
+        invoiceCount: monthlyStats.totalCount,
+        byPlan: {
+          BASIC: monthlyStats.BASIC,
+          PRO: monthlyStats.PRO,
+          ENTERPRISE: monthlyStats.ENTERPRISE,
+        },
+      },
+      annual: {
+        totalAmount: annualStats.totalAmount,
+        invoiceCount: annualStats.totalCount,
+        byPlan: {
+          BASIC: annualStats.BASIC,
+          PRO: annualStats.PRO,
+          ENTERPRISE: annualStats.ENTERPRISE,
+        },
+      },
+      monthlyCollections: monthlyStats,
+      annualCollections: annualStats,
+      overallRevenue: {
+        totalAmount: overallAmount,
+        totalCount: overallCount,
+      },
+    };
+
+    return res.status(200).json({
+      success: true,
+      ...summaryData,
+      data: summaryData,
+    });
+  } catch (error: any) {
+    console.error('Error calculating subscription revenue summary:', error);
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+/**
+ * SuperAdmin: List all subscription invoices across all fleets with filters & search.
+ */
+export const getAllSubscriptionInvoices = async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(1, parseInt(String(req.query.page || '1')));
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '20'))));
+    const offset = (page - 1) * limit;
+
+    const {
+      tenantId,
+      planTier,
+      billingCycle,
+      paymentStatus,
+      fromDate,
+      toDate,
+      search,
+    } = req.query;
+
+    const where: any = {};
+
+    if (tenantId && tenantId !== 'all') {
+      where.tenantId = tenantId;
+    }
+    if (planTier && ['BASIC', 'PRO', 'ENTERPRISE'].includes(String(planTier).toUpperCase())) {
+      where.planTier = String(planTier).toUpperCase();
+    }
+    if (billingCycle && ['MONTHLY', 'ANNUAL'].includes(String(billingCycle).toUpperCase())) {
+      where.billingCycle = String(billingCycle).toUpperCase();
+    }
+    if (paymentStatus && ['PENDING', 'PAID', 'FAILED', 'REFUNDED'].includes(String(paymentStatus).toUpperCase())) {
+      where.paymentStatus = String(paymentStatus).toUpperCase();
+    }
+
+    if (fromDate || toDate) {
+      where.createdAt = {};
+      if (fromDate) where.createdAt[Op.gte] = new Date(String(fromDate));
+      if (toDate) where.createdAt[Op.lte] = new Date(String(toDate));
+    }
+
+    if (search) {
+      where[Op.or] = [
+        { invoiceNumber: { [Op.like]: `%${search}%` } },
+        { transactionReference: { [Op.like]: `%${search}%` } },
+      ];
+    }
+
+    const { count, rows } = await SubscriptionInvoice.findAndCountAll({
+      where,
+      include: [
+        {
+          model: Tenant,
+          attributes: ['tenantId', 'name', 'code', 'contactEmail', 'contactPhone'],
+          required: false,
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
+    });
+
+    // Compute total successfully paid amount matching current filter
+    const paidFilter = { ...where, paymentStatus: 'PAID' };
+    const allPaidMatching = await SubscriptionInvoice.findAll({
+      where: paidFilter,
+      attributes: ['totalAmount'],
+    });
+    const totalCollectedFiltered = allPaidMatching.reduce(
+      (sum, inv) => sum + (Number(inv.totalAmount) || 0),
+      0
+    );
+
+    const mapped = rows.map((inv: any) => {
+      const json = inv.toJSON ? inv.toJSON() : inv;
+      return {
+        ...json,
+        id: json.subscriptionInvoiceId,
+        subscriptionInvoiceId: json.subscriptionInvoiceId,
+        fleetName: json.tenant?.name || 'Fleet Operator',
+        businessCode: json.tenant?.code || '',
+        contactEmail: json.tenant?.contactEmail || '',
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: mapped,
+      totalCollected: totalCollectedFiltered,
+      currency: 'INR',
+      pagination: {
+        total: count,
+        page,
+        limit,
+        totalPages: Math.ceil(count / limit),
+      },
+    });
+  } catch (error: any) {
+    console.error('Error fetching all subscription invoices:', error);
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+

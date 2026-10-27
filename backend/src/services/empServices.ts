@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Vendor } from '../models/vendor';
-import { Op, where } from 'sequelize';
+import { Op, where, Sequelize } from 'sequelize';
 import bcrypt from 'bcrypt';
 import { Booking } from '../models/booking';
 import { Vehicle } from '../models/vehicle';
@@ -1288,9 +1288,24 @@ export const createCompany = async (req: any, res: Response) => {
     const ctx = getTenantContext();
     const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
 
-    const existing = await Company.findOne({ where: { companyName, tenantId } });
+    const cleanCompanyName = String(companyName || '').trim();
+    if (!cleanCompanyName || cleanCompanyName.length < 2) {
+      return res.status(400).json({ success: false, message: "Company name is required (minimum 2 characters)." });
+    }
+
+    const existing = await Company.findOne({
+      where: {
+        tenantId,
+        [Op.and]: [
+          Sequelize.where(
+            Sequelize.fn('LOWER', Sequelize.fn('TRIM', Sequelize.col('companyName'))),
+            cleanCompanyName.toLowerCase()
+          ),
+        ],
+      },
+    });
     if (existing) {
-      return res.status(400).json({ message: "Company already exists in this fleet" });
+      return res.status(409).json({ success: false, message: `Company '${cleanCompanyName}' already exists in this fleet.` });
     }
 
     //  normalize/split and store as array
@@ -1701,25 +1716,41 @@ export const addTax = async (req: any, res: Response) => {
     if (req.role === ROLES.USER) {
       return res.status(403).json({ message: 'Not Authorized' });
     }
-    const existing = await Tax.findOne({ where: { taxName } });
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+
+    const existing = await Tax.findOne({ where: { taxName, tenantId } });
 
     if (existing) {
       return res.status(400).json({ message: 'Tax already registered' });
     }
 
-    const tax = await Tax.create({ taxName, taxPercent, isActive });
+    const tax = await Tax.create({ taxName, taxPercent, isActive, tenantId });
     res.status(201).json({ message: 'Registered successfully', tax });
 
   } catch (err: any) {
-    console.error('Create Vendor Error:', err);
+    console.error('Create Tax Error:', err);
     res.status(500).json({ error: err.message || 'Something went wrong' });
   }
 };
 
 
-export const taxList = async (req: Request, res: Response) => {
+export const taxList = async (req: any, res: Response) => {
   try {
-    const taxes = await Tax.findAll();
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
+    const taxes = await Tax.findAll({
+      where: tenantCondition,
+      order: [['createdAt', 'DESC']]
+    });
 
     res.status(200).json({
       message: 'Tax list get successfully',
@@ -1748,6 +1779,7 @@ export const editTax = async (req: any, res: Response) => {
     if (!tax) {
       return res.status(404).json({ message: 'Tax not found' });
     }
+    assertTenantOwnership(tax, 'Tax');
 
     tax.taxName = taxName ?? tax.taxName;
     tax.taxPercent = taxPercent ?? tax.taxPercent;
@@ -1757,6 +1789,9 @@ export const editTax = async (req: any, res: Response) => {
 
     res.status(200).json({ message: 'Tax updated successfully', tax });
   } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
     console.error('Edit Tax Error:', err);
     res.status(500).json({ error: err.message || 'Something went wrong' });
   }
@@ -1772,16 +1807,19 @@ export const deleteTax = async (req: any, res: Response) => {
       return res.status(403).json({ message: 'Not Authorized' });
     }
 
-    const deleted = await Tax.destroy({
-      where: { taxId }
-    });
-
-    if (deleted === 0) {
+    const tax = await Tax.findByPk(taxId);
+    if (!tax) {
       return res.status(404).json({ message: 'Tax not found or already deleted' });
     }
+    assertTenantOwnership(tax, 'Tax');
+
+    await tax.destroy();
 
     res.status(200).json({ message: 'Tax deleted successfully' });
   } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
     console.error('Delete Tax Error:', err);
     res.status(500).json({ error: err.message || 'Something went wrong' });
   }

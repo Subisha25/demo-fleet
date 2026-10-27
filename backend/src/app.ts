@@ -39,11 +39,13 @@ import userFilterRoutes from "./routes/userFilterRoutes";
 import closePendingRoutes from "./routes/closependingRoutes";
 import invoiceRoutes from "./routes/invoiceRoutes";
 import emailConfRoutes from "./routes/emailConfRoutes";
+import smsTemplateRoutes from "./routes/smsTemplateRoutes";
 import paymentRoutes from "./routes/paymentRoutes";
 import redirectRoute from './routes/redirectRoute';
 import onCallRoutes from './routes/onCallRoutes';
 
 import downloadPdf from './routes/downloadPdf';
+import publicBookingRoutes from './routes/publicBookingRoutes';
 
 import config from "../src/config/config"; 
 
@@ -77,7 +79,17 @@ app.use(cors({
   },
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   credentials: true,
-  allowedHeaders: ["Content-Type", "Authorization", "X-Tenant-ID", "x-tenant-id"]
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Tenant-ID",
+    "x-tenant-id",
+    "X-Selected-Tenant-ID",
+    "x-selected-tenant-id",
+    "X-Inspection-Mode",
+    "x-inspection-mode"
+  ],
+  exposedHeaders: ["X-Tenant-ID", "X-Inspection-Mode"]
 }));
 
 // Multi-tenant context resolution
@@ -89,6 +101,7 @@ app.use('/uploads/signature', authMiddleware, express.static(path.join(process.c
 app.use('/uploads/companyLogo', express.static(path.join(process.cwd(), 'uploads', 'companyLogo'))); 
 app.use('/uploads/fleetLogo', express.static(path.join(process.cwd(), 'uploads', 'fleetLogo'))); 
 
+app.use('/api/public/booking', publicBookingRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/tenants', tenantRoutes);
 app.use('/api/public', tenantRoutes);
@@ -178,6 +191,8 @@ app.use('/api/invoiceRoutes',invoiceRoutes );
 app.use('/api/downloadPdf',downloadPdf );
 
 app.use('/api/emailConfRoutes',emailConfRoutes );
+app.use('/api/smsTemplateRoutes', smsTemplateRoutes);
+app.use('/api/sms', smsTemplateRoutes);
 
 app.use('/api/paymentRoutes',paymentRoutes);
 app.use('/api/oncallinvoice',onCallRoutes);

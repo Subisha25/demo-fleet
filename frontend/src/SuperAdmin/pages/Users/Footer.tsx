@@ -17,10 +17,10 @@ export default function Footer() {
     <div className="w-full px-3 sm:px-4 md:px-8 lg:px-1 -mt-5 pb-4 py-5">
 
       {/* MAIN FOOTER CARD */}
-     <div
-  className=" footer-desktop-bg w-full text-white bg-no-repeat bg-top pt-10 sm:pt-12 md:pt-12 lg:pt-16 pb-5 md:rounded-3xl bg-[length:100%_100%] /* <-- WHITE SPACE FIX */ "
-  style={{ backgroundImage: `url(${FooterMobileBg})` }}
->
+      <div
+        className=" footer-desktop-bg w-full text-white bg-no-repeat bg-top pt-10 sm:pt-12 md:pt-12 lg:pt-16 pb-5 md:rounded-3xl bg-[length:100%_100%] /* <-- WHITE SPACE FIX */ "
+        style={{ backgroundImage: `url(${FooterMobileBg})` }}
+      >
 
         <style>
           {`
@@ -105,10 +105,10 @@ export default function Footer() {
           <div className="hidden lg:block w-[calc(90%-120px)] lg:ml-[310px] h-[2px] bg-white/30"></div>
         </div>
 
-      <>
-  {/* ⭐ TAB ONLY STYLES (768–1020px) ⭐ */}
-  <style>
-    {`
+        <>
+          {/* ⭐ TAB ONLY STYLES (768–1020px) ⭐ */}
+          <style>
+            {`
       @media (min-width: 768px) and (max-width: 1020px) {
         .tab-small-text { font-size: 13px !important; }
         .tab-small-heading { font-size: 14px !important; }
@@ -116,11 +116,11 @@ export default function Footer() {
         .tab-w-85 { width: 85% !important; }
       }
     `}
-  </style>
+          </style>
 
-  {/* MIDDLE SECTION */}
-  <div
-    className="
+          {/* MIDDLE SECTION */}
+          <div
+            className="
       grid grid-cols-1 
       md:grid-cols-3      /* ⭐ Always 3 columns from tablet & above */
       gap-6 
@@ -128,79 +128,79 @@ export default function Footer() {
       mt-5
       text-[14px]
     "
-  >
+          >
 
-    {/* HEAD OFFICE */}
-    <div className="md:text-left text-center flex flex-col items-center md:items-start">
-      <p className="text-yellow-300 font-bold mb-1 text-base tab-small-heading">
-        HEAD OFFICE
-      </p>
+            {/* HEAD OFFICE */}
+            <div className="md:text-left text-center flex flex-col items-center md:items-start">
+              <p className="text-yellow-300 font-bold mb-1 text-base tab-small-heading">
+                HEAD OFFICE
+              </p>
 
-      <p className="opacity-95 leading-relaxed tab-tight tab-small-text tab-w-85">
-        7/621, Nesamani Nagar Ext Road, <br />
-        Perumbakam, Sholinganallur, <br />
-        Chennai 600100, Tamil Nadu
-      </p>
-    </div>
+              <p className="opacity-95 leading-relaxed tab-tight tab-small-text tab-w-85">
+                7/621, Nesamani Nagar Ext Road, <br />
+                Perumbakam, Sholinganallur, <br />
+                Chennai 600100, Tamil Nadu
+              </p>
+            </div>
 
-    {/* READY TO QUERY */}
-    <div className="text-center md:text-left flex flex-col items-center md:items-start">
-      <p className="text-yellow-300 font-bold mb-1 text-base tab-small-heading">
-        READY TO QUERY
-      </p>
+            {/* READY TO QUERY */}
+            <div className="text-center md:text-left flex flex-col items-center md:items-start">
+              <p className="text-yellow-300 font-bold mb-1 text-base tab-small-heading">
+                READY TO QUERY
+              </p>
 
-      {/* MOBILE VIEW */}
-      <div className="md:hidden">
-        <div className="flex items-start gap-2">
-          <img src={IconPhone} className="w-6 h-6 mt-1" />
-          <p className="text-sm opacity-95">
-            +91 98417 22675 / +91 90032 41571
-          </p>
-        </div>
-        <div className="flex items-start gap-2 -mt-1">
-          <img src={IconPhone} className="w-6 h-6 opacity-0" />
-          <p className="text-sm opacity-95">+91 89250 72675</p>
-        </div>
-      </div>
+              {/* MOBILE VIEW */}
+              <div className="md:hidden">
+                <div className="flex items-start gap-2">
+                  <img src={IconPhone} className="w-6 h-6 mt-1" />
+                  <p className="text-sm opacity-95">
+                    +91 98417 22675 / +91 90802 80818
+                  </p>
+                </div>
+                <div className="flex items-start gap-2 -mt-1">
+                  <img src={IconPhone} className="w-6 h-6 opacity-0" />
+                  <p className="text-sm opacity-95">+91 89250 72675</p>
+                </div>
+              </div>
 
-      {/* TABLET + LAPTOP */}
-      <div className="hidden md:flex items-center gap-2 mb-1">
-        <img src={IconPhone} className="w-6 cursor-pointer" />
-        <p className="opacity-95 whitespace-nowrap tab-small-text">
-          +91 98417 22675 / +91 90032 41571 / +91 89250 72675
-        </p>
-      </div>
+              {/* TABLET + LAPTOP */}
+              <div className="hidden md:flex items-center gap-2 mb-1">
+                <img src={IconPhone} className="w-6 cursor-pointer" />
+                <p className="opacity-95 whitespace-nowrap tab-small-text">
+                  +91 98417 22675 / +91 90802 80818 / +91 89250 72675
+                </p>
+              </div>
 
-      <div className="flex items-center gap-2 mt-1">
-        <img src={IconMail} className="w-6 h-6" />
-        <a
-          href="mailto:traveldesk@gracecabs.com"
-          className="hover:text-yellow-300 transition tab-small-text"
-        >
-          traveldesk@gracecabs.com
-        </a>
-      </div>
-    </div>
+              <div className="flex items-center gap-2 mt-1">
+                <img src={IconMail} className="w-6 h-6" />
+                <a
+                  href="mailto:support@fleetflow.com"
+                  className="hover:text-yellow-300 transition tab-small-text"
+                >
+                  support@fleetflow.com
+                </a>
+              </div>
+            </div>
 
-    {/* CAB BOOKING APP */}
-    <div className="flex flex-col text-center md:text-left items-center md:items-start gap-1 w-full lg:pl-40">
-      <p className="text-yellow-300 font-bold mb-1 text-base tab-small-heading">
-        CAB BOOKING APP
-      </p>
+            {/* CAB BOOKING APP */}
+            <div className="flex flex-col text-center md:text-left items-center md:items-start gap-1 w-full lg:pl-40">
+              <p className="text-yellow-300 font-bold mb-1 text-base tab-small-heading">
+                CAB BOOKING APP
+              </p>
 
-      <img
-        src={PlayStoreIcon}
-        className="
+              <img
+                src={PlayStoreIcon}
+                className="
           w-32 h-20 md:w-20 md:h-20 lg:w-36 lg:h-24
           object-contain cursor-pointer hover:scale-110 transition 
           -mt-2
           tab-small-text
         "
-      />
-    </div>
+              />
+            </div>
 
-  </div>
-</>
+          </div>
+        </>
 
 
         {/* BRANCHES + LINKS */}
@@ -268,10 +268,10 @@ export default function Footer() {
 
         <div className="border-t border-white/30 mx-4 sm:mx-6 lg:mx-12 mt-8 mb-4"></div>
 
-{/* COPY RIGHT SECTION */}
-       <div className="text-center text-[12px] sm:text-[14px] opacity-80">
-  © {new Date().getFullYear()} Grace Cabs Private Limited. All Rights Reserved.
-</div>
+        {/* COPY RIGHT SECTION */}
+        <div className="text-center text-[12px] sm:text-[14px] opacity-80">
+          © {new Date().getFullYear()} FleetFlow. All Rights Reserved.
+        </div>
 
       </div>
     </div>

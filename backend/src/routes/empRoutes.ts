@@ -7,16 +7,16 @@ import { createVendor,createBooking,createCompany,confirmPendingOrderCount,payme
     createBookingForWebOnCall} from '../services/empServices';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { uploadCompanyLogo } from "../middleware/uploadConfig";
-import { requireCompanyQuota } from '../middleware/entitlementMiddleware';
+import { requireCompanyQuota, requireActiveSubscriptionForBookings, requirePaidForModification } from '../middleware/entitlementMiddleware';
 
 const router = express.Router();
 
 
-router.post('/createVendor',authMiddleware, createVendor);
+router.post('/createVendor',authMiddleware, requirePaidForModification, createVendor);
 
-router.post('/createBooking',authMiddleware, createBooking);
-router.post('/createBookingForWeb',authMiddleware,createBookingForWeb);
-router.post('/createBookingForWebOnCall',authMiddleware, createBookingForWebOnCall);
+router.post('/createBooking', authMiddleware, requireActiveSubscriptionForBookings, createBooking);
+router.post('/createBookingForWeb', authMiddleware, requireActiveSubscriptionForBookings, createBookingForWeb);
+router.post('/createBookingForWebOnCall', authMiddleware, requireActiveSubscriptionForBookings, createBookingForWebOnCall);
 router.post('/createCompany', authMiddleware, requireCompanyQuota, uploadCompanyLogo.single("companyLogo"), createCompany);
 
 // router.get('/getAllCompany',authMiddleware, getAllCompany);
@@ -44,11 +44,11 @@ router.get('/paymentPendingOrderCount',authMiddleware, paymentPendingOrderCount)
 router.get('/paymentCompletedOrderCount',authMiddleware, paymentCompletedOrderCount);
 router.get('/getcompletedlist',authMiddleware, getCompletedList);  // get completed list
 
-router.put('/confirmBookingByManager',authMiddleware, confirmBookingByManager);
+router.put('/confirmBookingByManager',authMiddleware, requireActiveSubscriptionForBookings, confirmBookingByManager);
 
 router.get('/cnfrmBookingByManagerEmail', cnfrmBookingByManagerEmail);
 router.get('/rejectBookingByManagerEmail', rejectBookingByManager);
 
-router.put('/editTax/:taxId', authMiddleware, editTax);  
-router.delete('/deleteTax/:taxId', authMiddleware, deleteTax);
+router.put('/editTax/:taxId', authMiddleware, requirePaidForModification, editTax);  
+router.delete('/deleteTax/:taxId', authMiddleware, requirePaidForModification, deleteTax);
 export default router;

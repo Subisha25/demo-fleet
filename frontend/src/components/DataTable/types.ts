@@ -2,6 +2,7 @@ export interface Column<T> {
   header: string;
   accessor: keyof T;
   sortable?: boolean;
+  render?: (row: T) => React.ReactNode;
 }
 
 export type Customer = {

@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { v4 as uuidv4 } from 'uuid';
+import { Op } from 'sequelize';
 import { NotificationLog } from '../models/notificationLog';
 import { Employee } from '../models/employee';
 import { ROOT_TENANT_ID } from '../context/tenantContext';
@@ -16,6 +17,8 @@ export interface SendNotificationOptions {
   channel: NotificationChannel;
   recipient: string;
   templateCode: string;
+  tenantId?: string;
+  idempotencyKey?: string;
   subject?: string;
   body?: string;
   referenceEntity?: string;
@@ -31,6 +34,48 @@ export interface NotificationResult {
   providerStatus: 'QUEUED' | 'SENT' | 'FAILED' | 'UNCONFIGURED' | 'MOCK';
   providerMessageId?: string | null;
   error?: string;
+}
+
+/**
+ * Detects whether a recipient address is a simulated/test address or dummy domain.
+ * Prevents triggering remote delivery attempts on Gmail SMTP that cause external delivery-incomplete retries.
+ */
+export function isTestOrSyntheticRecipient(recipient: string): boolean {
+  if (!recipient) return true;
+  const lower = recipient.toLowerCase().trim();
+  const testDomains = [
+    'example.com',
+    'example.org',
+    'example.net',
+    'test.com',
+    'test.in',
+    'skylinecabs.in',
+    'swiftlogistics.com',
+    'alphatech.com',
+    'alpha.com',
+    'beta.com',
+    'alphafleet.com',
+    'betafleet.com',
+    'localhost',
+    'local',
+    'invalid',
+    'gamil.com',
+  ];
+  if (testDomains.some((d) => lower.endsWith(`@${d}`) || lower.includes(`@${d}`))) {
+    return true;
+  }
+  if (
+    lower.startsWith('test-') ||
+    lower.startsWith('applicant_') ||
+    lower.startsWith('driver_') ||
+    lower.startsWith('suresh-') ||
+    lower.startsWith('vikram-') ||
+    lower.startsWith('ramesh.rg') ||
+    lower.startsWith('apex.admin.')
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -69,11 +114,7 @@ export async function getSuperAdminEmail(): Promise<string> {
     console.warn('[NotificationService] Could not resolve superadmin from DB:', err);
   }
 
-  if (envEmail && envEmail.includes('@')) {
-    return envEmail;
-  }
-
-  return 'subisha2002.m@gmail.com';
+  return 'admin@fleetflow.app';
 }
 
 /**
@@ -101,7 +142,7 @@ export async function getSuperAdminPhone(): Promise<string> {
     console.warn('[NotificationService] Could not resolve superadmin phone from DB:', err);
   }
 
-  return '9003241571';
+  return '9999999999';
 }
 
 /**
@@ -157,8 +198,8 @@ function renderBrandEmailHtml(subject: string, bodyText: string, actionUrl?: str
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
             <td>
-              <h1 style="margin: 0; color: #FFFFFF; font-size: 20px; font-weight: 800; letter-spacing: 0.5px;">GRACE CABS</h1>
-              <p style="margin: 4px 0 0 0; color: #FBECE4; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Fleet Operations & Mobility SaaS</p>
+              <h1 style="margin: 0; color: #FFFFFF; font-size: 20px; font-weight: 800; letter-spacing: 0.5px;">FLEETFLOW</h1>
+              <p style="margin: 4px 0 0 0; color: #FBECE4; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Fleet Operations & Mobility SaaS Platform</p>
             </td>
           </tr>
         </table>
@@ -174,10 +215,10 @@ function renderBrandEmailHtml(subject: string, bodyText: string, actionUrl?: str
       <!-- Footer -->
       <div style="background-color: #F5F2EB; padding: 20px 30px; border-top: 1px solid #E0DAD1; text-align: center;">
         <p style="margin: 0 0 6px 0; font-size: 12px; color: #7A7570;">
-          This is an automated operational notification from Grace Cabs Mobility Platform.
+          This is an automated operational notification from FleetFlow Mobility Platform.
         </p>
         <p style="margin: 0; font-size: 11px; color: #9B958E;">
-          Need assistance? Contact support at <a href="mailto:support@gracecabs.in" style="color: #C04E24; text-decoration: none;">support@gracecabs.in</a>
+          Need assistance? Contact support at <a href="mailto:support@fleetflow.com" style="color: #C04E24; text-decoration: none;">support@fleetflow.com</a>
         </p>
       </div>
     </div>
@@ -197,6 +238,8 @@ export async function sendNotification(options: SendNotificationOptions): Promis
     channel,
     recipient,
     templateCode,
+    tenantId,
+    idempotencyKey,
     subject = `Notification: ${templateCode}`,
     body = '',
     referenceEntity,
@@ -210,71 +253,154 @@ export async function sendNotification(options: SendNotificationOptions): Promis
   let providerMessageId: string | null = null;
   let errorDetails: string | null = null;
 
-  try {
-    if (channel === 'EMAIL') {
-      const smtpServer = (config.sendmail?.smtp_server || process.env.SMTP_SERVER || process.env.SMTP_HOST || '').trim();
-      const smtpUser = (config.sendmail?.smtp_email || process.env.SMTP_EMAIL_ADDRESS || process.env.SMTP_USER || '').trim();
-      const smtpPass = (config.sendmail?.smtp_password || process.env.SMTP_EMAIL_PASSWORD || process.env.SMTP_PASS || '').trim();
-      const smtpPort = Number(config.sendmail?.smtp_port || process.env.SMTP_EMAIL_PORT || process.env.SMTP_PORT || 587);
+  // Strict isolation hard stop: Prohibit transmission to obsolete Grace Cabs customer
+  if (channel === 'EMAIL' && recipient.toLowerCase().includes('subisha2002.m')) {
+    const blockedMsg = 'Blocked: Delivery to obsolete Grace Cabs customer (subisha2002.m) is prohibited.';
+    console.warn(`[NotificationService: ISOLATION GUARD] ${blockedMsg}`);
+    await NotificationLog.create({
+      logId,
+      channel,
+      recipient,
+      tenantId: tenantId || null,
+      templateCode,
+      referenceEntity: referenceEntity || null,
+      referenceId: referenceId || null,
+      idempotencyKey: idempotencyKey || null,
+      providerStatus: 'FAILED',
+      providerMessageId: null,
+      errorDetails: blockedMsg,
+      metadata: sanitizeMetadata(metadata),
+    });
+    return { success: false, logId, providerStatus: 'FAILED', error: blockedMsg };
+  }
 
-      if (smtpServer && smtpUser && smtpPass) {
-        const transporter = nodemailer.createTransport({
-          host: smtpServer,
-          port: smtpPort,
-          secure: smtpPort === 465,
-          auth: {
-            user: smtpUser,
-            pass: smtpPass,
-          },
-          tls: { rejectUnauthorized: false },
-          connectionTimeout: 15000,
-        });
+  if (channel === 'SMS' && recipient.includes('90802')) {
+    const blockedMsg = 'Blocked: Delivery to obsolete Grace Cabs customer phone (90802) is prohibited.';
+    console.warn(`[NotificationService: ISOLATION GUARD] ${blockedMsg}`);
+    await NotificationLog.create({
+      logId,
+      channel,
+      recipient,
+      tenantId: tenantId || null,
+      templateCode,
+      referenceEntity: referenceEntity || null,
+      referenceId: referenceId || null,
+      idempotencyKey: idempotencyKey || null,
+      providerStatus: 'FAILED',
+      providerMessageId: null,
+      errorDetails: blockedMsg,
+      metadata: sanitizeMetadata(metadata),
+    });
+    return { success: false, logId, providerStatus: 'FAILED', error: blockedMsg };
+  }
 
-        const actionUrl = metadata?.activationUrl || metadata?.loginUrl || metadata?.renewalUrl;
-        const actionText = metadata?.actionText;
+  // Idempotency: Prevent duplicate dispatch of the same notification for the same reference within 15 minutes
+  if ((referenceId || idempotencyKey) && templateCode && channel) {
+    const whereClause: any = {
+      channel,
+      recipient,
+      templateCode,
+      providerStatus: { [Op.in]: ['SENT', 'MOCK'] },
+      createdAt: {
+        [Op.gt]: new Date(Date.now() - 15 * 60 * 1000), // 15 min window
+      },
+    };
+    if (idempotencyKey) {
+      whereClause.idempotencyKey = idempotencyKey;
+    } else {
+      whereClause.referenceId = referenceId;
+    }
 
-        const info = await transporter.sendMail({
-          from: `"Grace Cabs Mobility" <${smtpUser}>`,
-          to: recipient,
-          subject,
-          text: body,
-          html: renderBrandEmailHtml(subject, body, actionUrl, actionText),
-        });
+    const existingRecent = await NotificationLog.findOne({ where: whereClause });
+    if (existingRecent) {
+      console.log(`[NotificationService: DEDUPLICATED] Notification ${templateCode} to ${recipient} (Ref: ${referenceId || idempotencyKey}) already sent recently. Reusing logId.`);
+      return {
+        success: true,
+        logId: existingRecent.logId,
+        providerStatus: existingRecent.providerStatus as any,
+        providerMessageId: existingRecent.providerMessageId,
+      };
+    }
+  }
 
-        providerStatus = 'SENT';
-        providerMessageId = info.messageId || `msg_${Date.now()}`;
-      } else {
-        providerStatus = 'UNCONFIGURED';
-        errorDetails = 'SMTP credentials not configured in backend/.env (SMTP_SERVER, SMTP_EMAIL_ADDRESS, SMTP_EMAIL_PASSWORD)';
-        console.warn(`[NotificationService:EMAIL Unconfigured] Recipient: ${recipient} | Reason: ${errorDetails}`);
-      }
-    } else if (channel === 'SMS') {
-      const phoneCheck = normalizePhoneNumberForSms(recipient);
-      if (!phoneCheck.valid) {
-        providerStatus = 'FAILED';
-        errorDetails = phoneCheck.error || 'Invalid phone number format';
-      } else {
-        if (smsTemplateName && smsVars && smsVars.length > 0) {
-          const smsRes = await send2FactorTemplateSms({
-            to: phoneCheck.normalizedPhone,
-            templateName: smsTemplateName,
-            vars: smsVars,
+  // Determine whether to mock delivery (safe test / synthetic domain protection)
+  const isMockMode =
+    process.env.NOTIFICATION_MOCK_MODE === 'true' ||
+    process.env.NODE_ENV === 'test' ||
+    (channel === 'EMAIL' && isTestOrSyntheticRecipient(recipient)) ||
+    (channel === 'SMS' && (recipient.startsWith('+91987654321') || recipient === '9876543210' || recipient.startsWith('99999')));
+
+  if (isMockMode) {
+    providerStatus = 'MOCK';
+    providerMessageId = `mock_${channel.toLowerCase()}_${Date.now()}`;
+    console.log(`[NotificationService: MOCK MODE] Channel: ${channel} | Recipient: ${recipient} | Template: ${templateCode} | Status: MOCK (No external delivery)`);
+  } else {
+    try {
+      if (channel === 'EMAIL') {
+        const smtpServer = (config.sendmail?.smtp_server || process.env.SMTP_SERVER || process.env.SMTP_HOST || '').trim();
+        const smtpUser = (config.sendmail?.smtp_email || process.env.SMTP_EMAIL_ADDRESS || process.env.SMTP_USER || '').trim();
+        const smtpPass = (config.sendmail?.smtp_password || process.env.SMTP_EMAIL_PASSWORD || process.env.SMTP_PASS || '').trim();
+        const smtpPort = Number(config.sendmail?.smtp_port || process.env.SMTP_EMAIL_PORT || process.env.SMTP_PORT || 587);
+
+        if (smtpServer && smtpUser && smtpPass) {
+          const transporter = nodemailer.createTransport({
+            host: smtpServer,
+            port: smtpPort,
+            secure: smtpPort === 465,
+            auth: {
+              user: smtpUser,
+              pass: smtpPass,
+            },
+            tls: { rejectUnauthorized: false },
+            connectionTimeout: 15000,
           });
-          providerStatus = smsRes.providerStatus;
-          providerMessageId = smsRes.providerMessageId || null;
-          errorDetails = smsRes.error || null;
+
+          const actionUrl = metadata?.activationUrl || metadata?.loginUrl || metadata?.renewalUrl;
+          const actionText = metadata?.actionText;
+
+          const info = await transporter.sendMail({
+            from: `"FleetFlow Platform" <${smtpUser}>`,
+            to: recipient,
+            subject,
+            text: body,
+            html: renderBrandEmailHtml(subject, body, actionUrl, actionText),
+          });
+
+          providerStatus = 'SENT';
+          providerMessageId = info.messageId || `msg_${Date.now()}`;
         } else {
-          const smsRes = await sendDirectSms(phoneCheck.normalizedPhone, body || `Grace Cabs Alert: ${templateCode}`);
-          providerStatus = smsRes.providerStatus;
-          providerMessageId = smsRes.providerMessageId || null;
-          errorDetails = smsRes.error || null;
+          providerStatus = 'UNCONFIGURED';
+          errorDetails = 'SMTP credentials not configured in backend/.env (SMTP_SERVER, SMTP_EMAIL_ADDRESS, SMTP_EMAIL_PASSWORD)';
+          console.warn(`[NotificationService:EMAIL Unconfigured] Recipient: ${recipient} | Reason: ${errorDetails}`);
+        }
+      } else if (channel === 'SMS') {
+        const phoneCheck = normalizePhoneNumberForSms(recipient);
+        if (!phoneCheck.valid) {
+          providerStatus = 'FAILED';
+          errorDetails = phoneCheck.error || 'Invalid phone number format';
+        } else {
+          if (smsTemplateName && smsVars && smsVars.length > 0) {
+            const smsRes = await send2FactorTemplateSms({
+              to: phoneCheck.normalizedPhone,
+              templateName: smsTemplateName,
+              vars: smsVars,
+            });
+            providerStatus = smsRes.providerStatus;
+            providerMessageId = smsRes.providerMessageId || null;
+            errorDetails = smsRes.error || null;
+          } else {
+            const smsRes = await sendDirectSms(phoneCheck.normalizedPhone, body || `FleetFlow Alert: ${templateCode}`);
+            providerStatus = smsRes.providerStatus;
+            providerMessageId = smsRes.providerMessageId || null;
+            errorDetails = smsRes.error || null;
+          }
         }
       }
+    } catch (err: any) {
+      providerStatus = 'FAILED';
+      errorDetails = err?.message || 'Notification transmission error';
+      console.error(`[NotificationService Provider Delivery Failure] ${templateCode} to ${recipient}:`, errorDetails);
     }
-  } catch (err: any) {
-    providerStatus = 'FAILED';
-    errorDetails = err?.message || 'Notification transmission error';
-    console.error(`[NotificationService Provider Delivery Failure] ${templateCode} to ${recipient}:`, errorDetails);
   }
 
   // Persist to database audit log
@@ -283,9 +409,11 @@ export async function sendNotification(options: SendNotificationOptions): Promis
       logId,
       channel,
       recipient,
+      tenantId: tenantId || null,
       templateCode,
       referenceEntity: referenceEntity || null,
       referenceId: referenceId || null,
+      idempotencyKey: idempotencyKey || null,
       providerStatus,
       providerMessageId,
       errorDetails,
@@ -298,7 +426,7 @@ export async function sendNotification(options: SendNotificationOptions): Promis
   }
 
   return {
-    success: providerStatus === 'SENT',
+    success: providerStatus === 'SENT' || providerStatus === 'MOCK',
     logId,
     providerStatus,
     providerMessageId,

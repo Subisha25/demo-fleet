@@ -13,6 +13,16 @@ import {
   getRegistrationNotifications,
   markRegistrationNotificationRead,
   markAllRegistrationNotificationsRead,
+  listSaaSPlans,
+  createSaaSPlan,
+  updateSaaSPlan,
+  toggleSaaSPlanActive,
+  getTenantBillingHistory,
+  getFleetInspectionProfile,
+  getFleetInspectionData,
+  getNotificationAuditLogs,
+  getPublicFleetBySlug,
+  fleetLoginBySlug,
 } from '../services/tenantService';
 import { uploadFleetLogo } from '../middleware/uploadConfig';
 import { getCompanyPolicy, upsertCompanyPolicy } from '../services/policyService';
@@ -27,11 +37,14 @@ import {
   completeAccountActivation,
   diagnoseEmailEndpoint,
   sendTestEmailEndpoint,
+  downloadPlanSummaryPDF,
 } from '../services/registrationService';
 import {
   createSubscriptionCheckout,
   verifySubscriptionPayment,
   getTenantSubscriptionInvoices,
+  getSubscriptionRevenueSummary,
+  getAllSubscriptionInvoices,
 } from '../services/subscriptionBillingService';
 import {
   runLifecycleEvaluation,
@@ -54,6 +67,12 @@ router.post('/activation/verify', verifyActivationToken);
 router.get('/verify-activation-token', verifyActivationToken);
 router.post('/activation/complete', completeAccountActivation);
 router.post('/activate-account', completeAccountActivation);
+router.get('/plan-summary/download/:fileName', downloadPlanSummaryPDF);
+
+// Dedicated Fleet-Branded Unique URL Routes
+router.get('/public/slug/:slug', getPublicFleetBySlug);
+router.get('/public/fleet-by-slug/:slug', getPublicFleetBySlug);
+router.post('/public/login/:slug', fleetLoginBySlug);
 
 // =============================================================================
 // SUPERADMIN REGISTRATION REVIEW & ONBOARDING QUEUE
@@ -79,12 +98,21 @@ router.post('/registrations/:requestId/resend-token', authMiddleware, requireSup
 router.post('/subscription/checkout', authMiddleware, createSubscriptionCheckout);
 router.post('/subscription/verify-payment', authMiddleware, verifySubscriptionPayment);
 router.get('/subscription/invoices', authMiddleware, getTenantSubscriptionInvoices);
+router.get('/subscription/history', authMiddleware, getTenantSubscriptionInvoices);
 
 // Billing desk aliases for /api/admin/billing and /api/tenants/billing
 router.post('/billing/checkout', authMiddleware, createSubscriptionCheckout);
 router.post('/billing/verify-payment', authMiddleware, verifySubscriptionPayment);
 router.get('/billing/invoices', authMiddleware, getTenantSubscriptionInvoices);
+router.get('/billing/history', authMiddleware, getTenantSubscriptionInvoices);
 router.post('/billing/run-lifecycle-check', authMiddleware, runLifecycleEvaluation);
+
+// SuperAdmin Subscription Revenue & Comprehensive Multi-Tenant Billing Reports
+router.get('/admin/billing/revenue-summary', authMiddleware, requireSuperAdmin, getSubscriptionRevenueSummary);
+router.get('/admin/billing/all-invoices', authMiddleware, requireSuperAdmin, getAllSubscriptionInvoices);
+router.get('/admin/billing/reports', authMiddleware, requireSuperAdmin, getAllSubscriptionInvoices);
+router.get('/billing/revenue-summary', authMiddleware, requireSuperAdmin, getSubscriptionRevenueSummary);
+router.get('/billing/all-invoices', authMiddleware, requireSuperAdmin, getAllSubscriptionInvoices);
 
 // =============================================================================
 // SUBSCRIPTION LIFECYCLE SCHEDULER & HEALTH STATUS
@@ -113,6 +141,11 @@ router.post('/notifications/mark-all-read', authMiddleware, requireSuperAdmin, m
 // Notification Diagnostics (SuperAdmin / Dev)
 router.get('/admin/notifications/diagnose-smtp', authMiddleware, requireSuperAdmin, diagnoseEmailEndpoint);
 router.post('/admin/notifications/test-email', authMiddleware, requireSuperAdmin, sendTestEmailEndpoint);
+
+// Notification Monitoring & Audit Logs (SuperAdmin)
+router.get('/admin/notifications/audit-logs', authMiddleware, requireSuperAdmin, getNotificationAuditLogs);
+router.get('/admin/notification-logs', authMiddleware, requireSuperAdmin, getNotificationAuditLogs);
+router.get('/notifications/audit-logs', authMiddleware, requireSuperAdmin, getNotificationAuditLogs);
 
 
 // =============================================================================
@@ -151,6 +184,34 @@ router.put('/policy/:companyId', authMiddleware, handleUpsertPolicy);
 router.put('/policies/:companyId', authMiddleware, handleUpsertPolicy);
 router.post('/policy/:companyId', authMiddleware, handleUpsertPolicy);
 router.post('/policies/:companyId', authMiddleware, handleUpsertPolicy);
+
+// =============================================================================
+// SAAS PLAN MANAGEMENT (Platform SuperAdmin)
+// =============================================================================
+router.get('/admin/plans', authMiddleware, requireSuperAdmin, listSaaSPlans);
+router.post('/admin/plans', authMiddleware, requireSuperAdmin, createSaaSPlan);
+router.put('/admin/plans/:planId', authMiddleware, requireSuperAdmin, updateSaaSPlan);
+router.put('/admin/plans/:planId/toggle-active', authMiddleware, requireSuperAdmin, toggleSaaSPlanActive);
+router.get('/plans/manage', authMiddleware, requireSuperAdmin, listSaaSPlans);
+router.post('/plans/manage', authMiddleware, requireSuperAdmin, createSaaSPlan);
+router.put('/plans/manage/:planId', authMiddleware, requireSuperAdmin, updateSaaSPlan);
+router.put('/plans/manage/:planId/toggle-active', authMiddleware, requireSuperAdmin, toggleSaaSPlanActive);
+
+// =============================================================================
+// READ-ONLY FLEET INSPECTION (Platform SuperAdmin)
+// =============================================================================
+router.get('/:tenantId/inspection-profile', authMiddleware, requireSuperAdmin, getFleetInspectionProfile);
+router.get('/admin/inspect/:tenantId', authMiddleware, requireSuperAdmin, getFleetInspectionProfile);
+router.get('/:tenantId/overview', authMiddleware, requireSuperAdmin, getFleetInspectionProfile);
+router.get('/overview/:tenantId', authMiddleware, requireSuperAdmin, getFleetInspectionProfile);
+router.get('/:tenantId/inspection-data', authMiddleware, requireSuperAdmin, getFleetInspectionData);
+router.get('/overview/:tenantId/data', authMiddleware, requireSuperAdmin, getFleetInspectionData);
+
+// =============================================================================
+// TENANT SUBSCRIPTION & BILLING HISTORY
+// =============================================================================
+router.get('/:tenantId/billing-history', authMiddleware, getTenantBillingHistory);
+router.get('/:tenantId/subscription-history', authMiddleware, getTenantBillingHistory);
 
 // =============================================================================
 // PLATFORM TENANT MANAGEMENT (SuperAdmin)

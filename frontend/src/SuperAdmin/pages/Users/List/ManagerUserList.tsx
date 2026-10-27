@@ -197,7 +197,7 @@ export default function ManagerUserList() {
       {/* <div className="flex items-center gap-4 bg-white shadow-md rounded-xl px-6 py-4 mb-6">
         {company?.companyLogo ? (
           <img
-            src={`http://localhost:5000/uploads/companyLogo/${company.companyLogo}`}
+            src={`${process.env.REACT_APP_API_BASE_URL || ''}/uploads/companyLogo/${company.companyLogo}`}
             alt="Company Logo"
             className="w-14 h-14 object-contain rounded-md border"
             onError={(e) => (e.currentTarget.style.display = "none")}

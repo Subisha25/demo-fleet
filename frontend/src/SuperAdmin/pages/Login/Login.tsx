@@ -269,7 +269,7 @@ const handleForgetPassword = async () => {
 
           {/* Footer text */}
           <p className="text-center text-sm text-[#7A7570] mt-6">
-            Protected by Grace Cabs industry-standard encryption
+            Protected by FleetFlow industry-standard encryption
           </p>
         </div>
       </div>

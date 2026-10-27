@@ -17,12 +17,8 @@ import jwt from "jsonwebtoken";
 import { getFleetDocumentBranding } from '../services/fleetBrandingService';
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
-const BASE_URL = process.env.API_BASE_URL || "https://gracecabs.com";
+const BASE_URL = process.env.API_BASE_URL || "http://localhost:5000";
 const { ROLES } = USERS;
-const logoPath = path.join(__dirname, "..", "images", "logo.png");
-const logoBase64 = fs.readFileSync(logoPath, "base64");
-//const logoSrc = `data:image/jpeg;base64,${logoBase64}`;
-    const logoSrc = "https://gracecabs.com/images/logo.png";
 
 // Interface for line items in invoice
 interface InvoiceLineItem {
@@ -37,7 +33,7 @@ interface InvoiceLineItem {
 }
 
 // Interface for structured invoice data
-interface InvoiceData {
+export interface InvoiceData {
   invoiceNumber: string;
   managerName?: string;
  managerEmail?: string;
@@ -134,9 +130,11 @@ const numberToWords = (num: number): string => {
 };
 // Generate HTML with dynamic line item
 export const generateInvoiceHTML = (data: InvoiceData, branding?: any): string => {
-  const dynamicLogo = branding?.logoSrc || logoSrc;
-  const dynamicFleet = branding?.fleetName || "Grace Cabs";
-  const dynamicHeaderColor = branding?.headerColor || "rgb(39, 89, 129)";
+  const dynamicLogo = branding?.logoSrc || "";
+  const dynamicFleet = branding?.displayName || branding?.legalName || branding?.fleetName || "Fleet Mobility";
+  const dynamicHeaderColor = branding?.headerColor || "#1A365D";
+  const dynamicFont = branding?.fontFamily || "Arial, sans-serif";
+  const dynamicFooterColor = branding?.footerColor || "#f8fafc";
 
   const lineItemsHTML = data.lineItems.map(item => {
     let rowClass = '';
@@ -181,7 +179,7 @@ export const generateInvoiceHTML = (data: InvoiceData, branding?: any): string =
         }
 
         body {
-            font-family: Arial, sans-serif;
+            font-family: ${dynamicFont};
             background-color: #fff;
             padding: 12px;
             font-size: 13px;
@@ -464,7 +462,7 @@ export const generateInvoiceHTML = (data: InvoiceData, branding?: any): string =
         <!-- Header -->
        <div class="header">
     <div class="logo-section">
-    <img src="${dynamicLogo}" alt="${dynamicFleet}" class="logo-img" />
+      ${dynamicLogo ? `<img src="${dynamicLogo}" alt="${dynamicFleet}" class="logo-img" />` : `<div style="font-size:22px; font-weight:bold; color:${dynamicHeaderColor};">${dynamicFleet}</div>`}
     </div>
             <div class="invoice-info">
                 <div><strong>Invoice Number:</strong> ${data.invoiceNumber}</div>
@@ -610,39 +608,48 @@ ${data.managerEmail ? `
 
         <!-- Footer Information -->
         <div class="footer-info">
+            ${branding?.registeredAddress ? `
             <div class="footer-row">
                 <span class="footer-label">Regd.Office:</span>
-                <span>${branding?.registeredAddress || 'Grace Cabs  Pvt. Ltd., 7/621 NESAMANI NAGAR, PERUMBAKKAM, CHENNAI - 600100'}</span>
-            </div>
+                <span>${branding.registeredAddress}</span>
+            </div>` : ''}
+            ${branding?.website ? `
             <div class="footer-row">
                 <span class="footer-label">Website:</span>
-                <span>${branding?.portalTitle ? branding.portalTitle.toLowerCase().replace(/\s+/g, '') + '.com' : 'gracecabs.com'}</span>
-            </div>
+                <span>${branding.website}</span>
+            </div>` : ''}
+            ${branding?.fleetLoginUrl ? `
+            <div class="footer-row">
+                <span class="footer-label">Fleet Portal:</span>
+                <span>${branding.fleetLoginUrl}</span>
+            </div>` : ''}
+            ${branding?.gstNumber ? `
             <div class="footer-row">
                 <span class="footer-label">GSTIN:</span>
-                <span>${branding?.gstNumber || '33AAMCG2518C1Z0'}</span>
-            </div>
+                <span>${branding.gstNumber}</span>
+            </div>` : ''}
+            ${branding?.panNumber ? `
             <div class="footer-row">
                 <span class="footer-label">PAN No.:</span>
-                <span>AAMCG2518C</span>
-            </div>
+                <span>${branding.panNumber}</span>
+            </div>` : ''}
             <div class="footer-row">
                 <span class="footer-label">SAC:</span>
-                <span>996609</span>
+                <span>${branding?.sacCode || '996609'}</span>
             </div>
+            ${branding?.billingFooterText ? `
+            <div class="footer-row">
+                <span>${branding.billingFooterText}</span>
+            </div>` : ''}
             <div class="footer-row">
                 <p> * It is a system generated invoice which does not need a signature</p>
-                </div>
-                 <div class="footer-row">
-               
+            </div>
+            <div class="footer-row">
                 <p> * GST 5 % - Without ITC </p>
-               
-                </div>
-                <div class="footer-row">
-               
-             
+            </div>
+            <div class="footer-row">
                 <p>* GST 12% - With ITC</p>
-                </div>
+            </div>
         </div>
     </div>
 </body>

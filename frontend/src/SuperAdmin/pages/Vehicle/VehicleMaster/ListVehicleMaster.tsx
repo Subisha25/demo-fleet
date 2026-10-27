@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import PageLayout from "../../../../components/PageLayout";
 import { DataTable, Column } from "../../../../components/DataTable";
 import SearchBar from "../../../../components/SearchBar";
@@ -59,6 +60,7 @@ type Option = {
 const ITEMS_PER_PAGE = 10;
 
 const ListVehicleMaster: React.FC = () => {
+  const navigate = useNavigate();
   const [vehicleMasters, setVehicleMasters] = useState<VehicleMaster[]>([]);
   const [search, setSearch] = useState("");
   const [showTrashed, setShowTrashed] = useState(false);
@@ -312,8 +314,18 @@ const handleInputBox = (a: any, b?: any) => {
     <PageLayout>
       <AlertContainer />
       <div className="py-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-800">List Vehicle Master</h1>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800">Vehicle Master List</h1>
+            <p className="text-sm text-gray-500 mt-1">Manage and inspect registered vehicles in your fleet</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/vehicle/add')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-all"
+          >
+            <span>+ Add Vehicle</span>
+          </button>
         </div>
 
         {/* Search & Trash Toggle */}

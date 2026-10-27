@@ -16,6 +16,7 @@ import { InvoiceSequence } from '../models/invoice_sequence';
 import { Sequelize } from 'sequelize';
 import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
+import { getFleetDocumentBranding } from './fleetBrandingService';
 // export const createOncallInvoice = async (
 //   req: Request,
 //   res: Response
@@ -1087,10 +1088,11 @@ export const deleteOnCallInvoice = async (
 export const generateOncallInvoicePDF = async (
   invoice: any
 ) => {
-
+  const tenantId = invoice?.invoice?.tenantId || invoice?.tenantId;
+  const branding = await getFleetDocumentBranding(tenantId);
 
   const htmlContent =
-    generateOncallInvoiceHTML(invoice);
+    generateOncallInvoiceHTML(invoice, branding);
 
   // FOLDER
   const uploadsDir = path.join(
@@ -1171,13 +1173,18 @@ export const generateOncallInvoicePDF = async (
   };
 };
 
-export const generateOncallInvoiceHTML = (data: any) => {
-  const invoice = data.invoice;
-  const invoiceItems = data.invoiceItems;
+export const generateOncallInvoiceHTML = (data: any, branding?: any) => {
+  const invoice = data.invoice || data;
+  const invoiceItems = data.invoiceItems || data.items || [];
 
-  const logoPath = path.join(__dirname, '../images/logo.png');
-  const logoBase64 = fs.readFileSync(logoPath, { encoding: 'base64' });
-  const logoSrc = `data:image/png;base64,${logoBase64}`;
+  const fleetLogo = branding?.logoSrc || "";
+  const fleetLegalName = branding?.legalName || branding?.displayName || branding?.fleetName || "Fleet Mobility";
+  const fleetAddress = branding?.registeredAddress || "";
+  const fleetGstin = branding?.gstNumber || "";
+  const fleetPan = branding?.panNumber || "";
+  const fleetSac = branding?.sacCode || "996609";
+  const fleetWebsite = branding?.website || "";
+  const fleetFooterText = branding?.billingFooterText || "";
 
   let subTotal: number;
   let parsedTotalTax: Array<{ taxName: string; taxPercent?: number; taxAmount: number }>;
@@ -1473,7 +1480,7 @@ ${addressParts.slice(4).join(",")}
  
 <!-- HEADER -->
 <div class="page-header">
-  <img src="${logoSrc}" class="logo" />
+  ${fleetLogo ? `<img src="${fleetLogo}" class="logo" />` : `<div><b style="font-size:16px;color:#1a4f7a;">${fleetLegalName}</b></div>`}
   <div class="header-right">
     <div class="inv-no">Invoice No: ${invoice.onCallInvoiceCode}</div>
     <div>Invoice Date: ${moment(invoice.createdAt).format('DD-MMM-YYYY')}</div>
@@ -1638,17 +1645,17 @@ ${addressParts.slice(4).join(",")}
 <!-- FOOTER -->
 <div class="footer">
   <div>
-    <div><b>Grace Cabs Pvt. Ltd.</b></div>
-    <div>7/621 Nesamani Nagar, Perumbakkam, Chennai - 600100</div>
-    <div>Website: gracecabs.com</div>
+    <div><b>${fleetLegalName}</b></div>
+    ${fleetAddress ? `<div>${fleetAddress}</div>` : ''}
+    ${fleetWebsite ? `<div>Website: ${fleetWebsite}</div>` : ''}
   </div>
   <div>
-    <div><b>GSTIN:</b> 33AAMCG2518C1Z0</div>
-    <div><b>PAN No:</b> AAMCG2518C</div>
-    <div><b>SAC:</b> 996609</div>
+    ${fleetGstin ? `<div><b>GSTIN:</b> ${fleetGstin}</div>` : ''}
+    ${fleetPan ? `<div><b>PAN No:</b> ${fleetPan}</div>` : ''}
+    <div><b>SAC:</b> ${fleetSac}</div>
   </div>
   <div class="footer-note">
-    <div>* System generated invoice</div>
+    ${fleetFooterText ? `<div>${fleetFooterText}</div>` : '<div>* System generated invoice</div>'}
     <div>* GST 5% - Without ITC</div>
   </div>
 </div>

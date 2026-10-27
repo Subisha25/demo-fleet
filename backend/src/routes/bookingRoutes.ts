@@ -6,6 +6,7 @@ import { getAllOrders, editBooking, cancelBooking, declineBooking, getOrderById,
   createPartner,editCloseBooking } from '../services/bookingServices';
 
 import { authMiddleware } from '../middleware/authMiddleware';
+import { requirePaidForModification } from '../middleware/entitlementMiddleware';
 import {
   getConfirmedOrders,
   getPendingOrders,
@@ -29,10 +30,10 @@ router.get('/status/completed', authMiddleware, getCompletedOrders);
 router.get('/status/paymentcompleted', authMiddleware, getPaymentCompletedOrders);
 router.get('/status/cancelled', authMiddleware, getCancelledBooking);
 
-router.put('/editBooking/:bookingId', authMiddleware, editBooking);
-router.put('/editCloseBooking/:bookingId', authMiddleware, editCloseBooking);
-router.put("/cancelBooking", authMiddleware, cancelBooking);
-router.put("/declineBooking", authMiddleware, declineBooking);
+router.put('/editBooking/:bookingId', authMiddleware, requirePaidForModification, editBooking);
+router.put('/editCloseBooking/:bookingId', authMiddleware, requirePaidForModification, editCloseBooking);
+router.put("/cancelBooking", authMiddleware, requirePaidForModification, cancelBooking);
+router.put("/declineBooking", authMiddleware, requirePaidForModification, declineBooking);
 router.get('/status/cancelled', authMiddleware, getCancelledBooking);
 
 router.get("/details/:bookingCode", authMiddleware, getBookingDetails);

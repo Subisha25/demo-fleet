@@ -16,6 +16,13 @@ export interface TenantSubscriptionInfo {
   companyQuota: number;
   monthlyTripQuota: number;
   allowOverage: boolean;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  billingCycle?: string;
+  agreedPrice?: number;
+  currency?: string;
+  lastPaymentDate?: string;
+  lastPaymentAmount?: number;
 }
 
 export interface TenantInfo {
@@ -45,16 +52,16 @@ interface TenantContextType {
 
 const DEFAULT_ROOT_TENANT: TenantInfo = {
   tenantId: 'e7b8a1c0-0000-0000-0000-000000000001',
-  name: 'Grace Cabs Fleet Operations',
-  code: 'GC',
-  subdomain: 'gracecabs',
+  name: 'FleetFlow Fleet Operations',
+  code: 'FF',
+  subdomain: 'fleetflow',
   status: 'ACTIVE',
   planTier: 'ENTERPRISE',
   contactEmail: 'subisha2002.m@gmail.com',
   brandingTokens: {
-    primaryColor: '#C04E24',
-    secondaryColor: '#262320',
-    portalTitle: 'Grace Cabs Mobility SaaS',
+    primaryColor: '#0F766E',
+    secondaryColor: '#1C1A18',
+    portalTitle: 'FleetFlow Mobility SaaS',
   },
   subscription: {
     planTier: 'ENTERPRISE',

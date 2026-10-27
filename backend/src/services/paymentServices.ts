@@ -760,7 +760,8 @@ export const paymentReturnRelay = async (req: Request, res: Response) => {
       log('RETURN_RELAY_STATUS_CHECK_ERROR', { orderId, message: e?.message, data: e?.response?.data });
     }
 
-    const feUrl = new URL('https://gracecabs.com/payments/return');
+    const feBase = process.env.WEB_BASE_URL || 'https://fleetflow.com';
+    const feUrl = new URL('/payments/return', feBase);
     if (orderId) feUrl.searchParams.set('orderId', String(orderId));
     feUrl.searchParams.set('statusHint', canonicalStatus);
     if (reason) feUrl.searchParams.set('reason', String(reason));
@@ -768,8 +769,9 @@ export const paymentReturnRelay = async (req: Request, res: Response) => {
     log('RETURN_RELAY', { orderId, statusParam, canonicalStatus, redirect: feUrl.toString() });
     return res.redirect(302, feUrl.toString());
   } catch (err: any) {
+    const feBase = process.env.WEB_BASE_URL || 'https://fleetflow.com';
     log('RETURN_RELAY_ERROR', { message: err?.message });
-    return res.redirect(302, 'https://gracecabs.com/payments/return');
+    return res.redirect(302, `${feBase}/payments/return`);
   }
 };
 

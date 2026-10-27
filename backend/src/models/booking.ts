@@ -290,7 +290,7 @@ travelTrail!: any;
   roundTrip!: string;
 
   @Column({
-    type: DataType.STRING,
+    type: DataType.TEXT,
     allowNull: true,
   })
   notes!: string;

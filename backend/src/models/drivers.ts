@@ -48,10 +48,7 @@ export class Drivers extends Model {
   @Column(DataType.STRING)
   driverEmail!: string;
 
-  @Column({
-    type: DataType.STRING,
-    unique: true,
-  })
+  @Column(DataType.STRING)
   phno!: string;
 
   @Column(DataType.STRING)

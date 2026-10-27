@@ -51,10 +51,22 @@ export class NotificationLog extends Model {
   referenceEntity!: string | null;
 
   @Column({
+    type: DataType.CHAR(36),
+    allowNull: true,
+  })
+  tenantId!: string | null;
+
+  @Column({
     type: DataType.STRING(100),
     allowNull: true,
   })
   referenceId!: string | null;
+
+  @Column({
+    type: DataType.STRING(255),
+    allowNull: true,
+  })
+  idempotencyKey!: string | null;
 
   @Column({
     type: DataType.STRING(50),

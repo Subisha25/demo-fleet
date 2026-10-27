@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { User } from '../models/user';
+import { Employee } from '../models/employee';
+import { Tenant } from '../models/tenant';
 import { Company } from '../models/company';
 import { Booking } from '../models/booking';
 import { Op } from 'sequelize';                    
@@ -897,6 +899,153 @@ export const getCurrentUser = async (req: Request, res: Response) => {
       message: 'Error retrieving current user',
       error: error.message
     });
+  }
+};
+
+/**
+ * Universal profile endpoint for SuperAdmin & Fleet Admin.
+ */
+export const getUserProfile = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId || (req as any).user?.id || (req as any).user?.userId;
+    const email = (req as any).email || (req as any).user?.email;
+
+    let userRecord: any = null;
+    if (userId) {
+      userRecord = await User.findByPk(userId, { attributes: { exclude: ['password'] } });
+    }
+    if (!userRecord && email) {
+      userRecord = await User.findOne({ where: { email }, attributes: { exclude: ['password'] } });
+    }
+    if (!userRecord && email) {
+      const emp = await Employee.findOne({ where: { email }, attributes: { exclude: ['password'] } });
+      if (emp) {
+        userRecord = {
+          userId: emp.employeeId,
+          username: emp.username,
+          email: emp.email,
+          mobile: emp.phno,
+          role: emp.role,
+          tenantId: emp.tenantId,
+        };
+      }
+    }
+
+    if (!userRecord && ((req as any).role || (req as any).email || (req as any).tenantId)) {
+      userRecord = {
+        userId: userId || 'admin-user',
+        username: (req as any).email?.split('@')[0] || 'Fleet Admin',
+        email: email || 'admin@fleetflow.com',
+        role: (req as any).role || 'admin',
+        tenantId: (req as any).tenantId || ROOT_TENANT_ID,
+      };
+    }
+
+    if (!userRecord) {
+      return res.status(404).json({ success: false, message: 'User profile not found.' });
+    }
+
+    const jsonUser = userRecord.toJSON ? userRecord.toJSON() : userRecord;
+    const ctx = getTenantContext();
+    const tenantId = (req as any).tenantId || ctx?.tenantId || jsonUser.tenantId || ROOT_TENANT_ID;
+
+    let tenantProfile: any = null;
+    if (tenantId && tenantId !== ROOT_TENANT_ID) {
+      const tenant = await Tenant.findByPk(tenantId);
+      if (tenant) {
+        tenantProfile = tenant;
+      }
+    }
+
+    const profileData = {
+      userId: jsonUser.userId || jsonUser.id,
+      name: jsonUser.username || jsonUser.name || 'User',
+      email: jsonUser.email,
+      phone: jsonUser.mobile || jsonUser.phno || '',
+      role: jsonUser.role || (req as any).role || 'User',
+      tenantId,
+    };
+
+    return res.status(200).json({
+      success: true,
+      profile: profileData,
+      fleetProfile: tenantProfile,
+      data: {
+        profile: profileData,
+        fleet: tenantProfile,
+        fleetProfile: tenantProfile,
+      },
+    });
+  } catch (err: any) {
+    console.error('Error fetching user profile:', err);
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+/**
+ * Universal profile update for personal details & fleet business profile.
+ */
+export const updateUserProfile = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId || (req as any).user?.id || (req as any).user?.userId;
+    const email = (req as any).email || (req as any).user?.email;
+    const { name, phone, fleetProfile } = req.body;
+
+    let updated = false;
+    if (userId) {
+      const user = await User.findByPk(userId);
+      if (user) {
+        if (name) user.username = name;
+        if (phone) user.mobile = phone;
+        await user.save();
+        updated = true;
+      }
+    }
+
+    if (email) {
+      const emp = await Employee.findOne({ where: { email } });
+      if (emp) {
+        if (name) emp.username = name;
+        if (phone) emp.phno = phone;
+        await emp.save();
+        updated = true;
+      }
+    }
+
+    // Tenant Business Profile update strictly scoped to authenticated tenant
+    if (fleetProfile && typeof fleetProfile === 'object') {
+      const ctx = getTenantContext();
+      const tenantId = (req as any).tenantId || ctx?.tenantId;
+      if (tenantId && tenantId !== ROOT_TENANT_ID) {
+        const tenant = await Tenant.findByPk(tenantId);
+        if (tenant) {
+          if (fleetProfile.legalName !== undefined) tenant.legalName = fleetProfile.legalName;
+          if (fleetProfile.displayName !== undefined) tenant.displayName = fleetProfile.displayName;
+          if (fleetProfile.gstin !== undefined) tenant.gstin = fleetProfile.gstin;
+          if (fleetProfile.panNumber !== undefined) tenant.panNumber = fleetProfile.panNumber;
+          if (fleetProfile.sacCode !== undefined) tenant.sacCode = fleetProfile.sacCode;
+          if (fleetProfile.contactEmail !== undefined) tenant.contactEmail = fleetProfile.contactEmail;
+          if (fleetProfile.contactPhone !== undefined) tenant.contactPhone = fleetProfile.contactPhone;
+          if (fleetProfile.businessEmail !== undefined) tenant.businessEmail = fleetProfile.businessEmail;
+          if (fleetProfile.businessPhone !== undefined) tenant.businessPhone = fleetProfile.businessPhone;
+          if (fleetProfile.registeredAddress !== undefined) tenant.registeredAddress = fleetProfile.registeredAddress;
+          if (fleetProfile.website !== undefined) tenant.website = fleetProfile.website;
+          if (fleetProfile.city !== undefined) tenant.city = fleetProfile.city;
+          if (fleetProfile.state !== undefined) tenant.state = fleetProfile.state;
+          if (fleetProfile.pinCode !== undefined) tenant.pinCode = fleetProfile.pinCode;
+          await tenant.save();
+          updated = true;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully.',
+    });
+  } catch (err: any) {
+    console.error('Error updating user profile:', err);
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };
 

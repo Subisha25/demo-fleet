@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Configuration } from '../models/configuration';
+import { getTenantContext } from '../context/tenantContext';
 
 // Create or update configuration
 export const createConfiguration = async (req: Request, res: Response): Promise<void> => {
@@ -45,9 +46,21 @@ export const createConfiguration = async (req: Request, res: Response): Promise<
 
         const existingConfig = await Configuration.findOne();
 
-        // If updating and password is placeholder/masked or blank, retain existing password
+        const ctx = getTenantContext();
+        const isPlatformAdmin = ctx?.isPlatformSuperAdmin && !(req as any).headers?.['x-tenant-id'];
+
+        let finalSmtpServer = smtpServer;
+        let finalSmtpEmailAddress = smtpEmailAddress;
+        let finalSmtpEmailPort = smtpEmailPort;
         let finalPassword = smtpEmailPassword;
-        if (existingConfig && (!smtpEmailPassword || smtpEmailPassword === '••••••••')) {
+
+        // If not platform admin, preserve existing SMTP settings to prevent tampering or credential exposure
+        if (!isPlatformAdmin && existingConfig) {
+            finalSmtpServer = existingConfig.smtpServer;
+            finalSmtpEmailAddress = existingConfig.smtpEmailAddress;
+            finalSmtpEmailPort = existingConfig.smtpEmailPort;
+            finalPassword = existingConfig.smtpEmailPassword;
+        } else if (existingConfig && (!smtpEmailPassword || smtpEmailPassword === '••••••••')) {
             finalPassword = existingConfig.smtpEmailPassword;
         }
 
@@ -58,10 +71,10 @@ export const createConfiguration = async (req: Request, res: Response): Promise<
                 invoiceNoStartingFrom,
                 cancelBookingHours,
                 invoiceNoPrefix,
-                smtpServer,
-                smtpEmailAddress,
+                smtpServer: finalSmtpServer,
+                smtpEmailAddress: finalSmtpEmailAddress,
                 smtpEmailPassword: finalPassword,
-                smtpEmailPort,
+                smtpEmailPort: finalSmtpEmailPort,
                 outstationHasTax
             });
 

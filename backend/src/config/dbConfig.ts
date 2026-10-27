@@ -42,6 +42,9 @@ import { TenantRegistrationRequest } from '../models/tenantRegistrationRequest';
 import { TenantActivationToken } from '../models/tenantActivationToken';
 import { SubscriptionInvoice } from '../models/subscriptionInvoice';
 import { NotificationLog } from '../models/notificationLog';
+import { SaaSPlan } from '../models/saasPlan';
+import { SmsTemplate } from '../models/smsTemplate';
+import { TenantInitialAllowance } from '../models/tenantInitialAllowance';
 
 const sequelize = new Sequelize({
   dialect: config.database.dialect as Dialect,
@@ -54,7 +57,7 @@ const sequelize = new Sequelize({
     PackageData,Configuration,ClosePending,EmailConfiguration,BookingSequence,PaymentSequence, InvoiceSequence,
      MonthlyInvoice, MonthlyInvoiceItems, MonthlyBookingSequence,MapCount,OnCallInvoice,OnCallInvoiceItems,
      Tenant, TenantSubscription, TenantUsageMeter, CompanyPolicy,
-     TenantRegistrationRequest, TenantActivationToken, SubscriptionInvoice, NotificationLog],
+     TenantRegistrationRequest, TenantActivationToken, TenantInitialAllowance, SubscriptionInvoice, NotificationLog, SaaSPlan, SmsTemplate],
   logging: false,
 });
 

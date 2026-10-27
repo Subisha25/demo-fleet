@@ -228,8 +228,8 @@ onInvoice={!showTrashed ? async (row: any) => {
 
     const companyName = res?.data?.data?.companyName?.toLowerCase();
 
-    // ✅ CONDITION
-    if (companyName?.includes("grace cabs")) {
+    // ✅ CONDITION (supports FleetFlow platform brand and legacy checks)
+    if (companyName?.includes("grace cabs") || companyName?.includes("fleetflow") || companyName?.includes("vahanaflow")) {
       navigate(`/users/createinvoice/${r.userId}?companyId=${r.companyId}`);
     } else {
       navigate(`/users/userinvoice/${r.userId}?companyId=${r.companyId}`);

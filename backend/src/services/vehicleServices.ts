@@ -305,11 +305,17 @@ export const updateVehicle = async (req: any, res: Response) => {
     }
 
         if (updateData.vehicleName && updateData.vehicleName !== vehicle.vehicleName) {
+            const ctx = getTenantContext();
+            const tenantId = vehicle.tenantId || ctx?.tenantId || ROOT_TENANT_ID;
             const existing = await Vehicle.findOne({
-                where: { vehicleName: updateData.vehicleName }
+                where: {
+                    vehicleName: updateData.vehicleName,
+                    tenantId,
+                    vehicleId: { [Op.ne]: vehicleId }
+                }
             });
             if (existing) {
-                return res.status(400).json({ message: 'Vehicle name already exists' });
+                return res.status(400).json({ message: 'Vehicle model name already exists in this fleet' });
             }
         }
 

@@ -106,36 +106,59 @@ export const  updateDriver = async (req: any, res: Response) => {
     }
     assertTenantOwnership(driver);
 
-    // Check if email is being updated and if it already exists
+    const ctx = getTenantContext();
+    const tenantId = driver.tenantId || ctx?.tenantId || ROOT_TENANT_ID;
+
+    // Check if email is being updated and if it already exists in this fleet
     if (updateData.driverEmail && updateData.driverEmail !== driver.driverEmail) {
-      const existingDriver = await Drivers.findOne({
-        where: { driverEmail: updateData.driverEmail }
+      const existingDriver = await Drivers.unscoped().findOne({
+        where: {
+          driverEmail: updateData.driverEmail,
+          tenantId,
+          isDeleted: false,
+          driverId: { [Op.ne]: driverId }
+        }
       });
       if (existingDriver) {
-        return res.status(400).json({ message: 'Email already exists for another driver' });
+        return res.status(400).json({ message: 'Email already exists for another driver in this fleet', field: 'driverEmail' });
       }
     }
 
-    // ✅ Check if phone number is being updated and already exists
+    // Check if phone number is being updated and already exists in this fleet
     if (updateData.phno && updateData.phno !== driver.phno) {
-      const existingDriverWithPhone = await Drivers.findOne({
-        where: { phno: updateData.phno }
+      const existingDriverWithPhone = await Drivers.unscoped().findOne({
+        where: {
+          phno: updateData.phno,
+          tenantId,
+          isDeleted: false,
+          driverId: { [Op.ne]: driverId }
+        }
       });
       if (existingDriverWithPhone) {
-        return res.status(400).json({ message: 'Mobile number already exists' });
+        return res.status(400).json({ message: 'Mobile number already exists in this fleet', field: 'phno' });
       }
     }
 
-await driver.update({
-  ...updateData,
-  trackingsource: updateData.trackingSource, // ✅ map correct DB column
-});
+    if (updateData.vehicleTypeId) {
+      const vt = await VehicleType.findByPk(updateData.vehicleTypeId);
+      if (!vt) {
+        return res.status(404).json({ message: 'Vehicle type not found', field: 'vehicleTypeId' });
+      }
+      if (vt.tenantId && vt.tenantId !== tenantId && vt.tenantId !== ROOT_TENANT_ID) {
+        return res.status(403).json({ message: 'Selected vehicle type does not belong to your fleet', field: 'vehicleTypeId' });
+      }
+    }
+
+    await driver.update({
+      ...updateData,
+      trackingsource: updateData.trackingSource ?? driver.trackingsource,
+    });
     res.status(200).json({ message: 'Driver updated successfully', driver });
   } catch (err: any) {
     if (isTenantError(err)) {
       return res.status(403).json({ message: err.message });
     }
-    res.status(500).json({ error: err });
+    res.status(500).json({ error: err.message || err });
   }
 };
 

@@ -471,7 +471,7 @@ export default function ListCompletedOrders() {
       </main>
 
       <footer className="mt-auto text-xs text-gray-500 pt-2 text-center">
-        © {new Date().getFullYear()} Grace Cabs Private Limited. Powered by Celexsa
+        © {new Date().getFullYear()} FleetFlow Mobility Platform. Powered by Celexsa
       </footer>
 
     </PageLayout>

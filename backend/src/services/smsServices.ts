@@ -132,6 +132,17 @@ export async function send2FactorTemplateSms(options: {
   const apiKey = (process.env.TWO_FACTOR_API_KEY || process.env.TWOFACTOR_API_KEY || '').trim();
   const senderId = (process.env.TWO_FACTOR_SENDER_ID || process.env.TWOFACTOR_SENDER_ID || 'GRCCAB').trim();
 
+  // Strict isolation guard: Never dispatch to obsolete customer phone 90802...
+  if (options.to && (options.to.includes('90802') || options.to.replace(/\D/g, '').includes('9080280818'))) {
+    const msg = 'Blocked: Transmission to obsolete customer phone number (90802...) is prohibited.';
+    console.warn(`[SMS Service: ISOLATION GUARD] ${msg}`);
+    return {
+      success: false,
+      providerStatus: 'FAILED',
+      error: msg,
+    };
+  }
+
   const phoneCheck = normalizePhoneNumberForSms(options.to);
   if (!phoneCheck.valid) {
     return {
@@ -198,6 +209,17 @@ export async function sendDirectSms(
   providerMessageId?: string;
   error?: string;
 }> {
+  // Strict isolation guard: Never dispatch to obsolete customer phone 90802...
+  if (to && (to.includes('90802') || to.replace(/\D/g, '').includes('9080280818'))) {
+    const msg = 'Blocked: Transmission to obsolete customer phone number (90802...) is prohibited.';
+    console.warn(`[SMS Service: ISOLATION GUARD] ${msg}`);
+    return {
+      success: false,
+      providerStatus: 'FAILED',
+      error: msg,
+    };
+  }
+
   const phoneCheck = normalizePhoneNumberForSms(to);
   if (!phoneCheck.valid) {
     return {
@@ -352,7 +374,7 @@ export async function dispatchAuditedSms(options: {
       vars,
     });
   } else {
-    sendResult = await sendDirectSms(recipient, message || `Grace Cabs Alert: ${templateCode}`);
+    sendResult = await sendDirectSms(recipient, message || `FleetFlow Alert: ${templateCode}`);
   }
 
   // Persist to notification_logs
@@ -390,7 +412,7 @@ export async function sendDriverAllocationTwoWaySms(payload: DriverAllocationSms
   const { booking, driver, customerName, customerPhone, vehicleName, vehicleNumber } = payload;
   const bookingId = booking?.bookingId || booking?.id;
   const bookingCode = booking?.bookingCode || '';
-  const driverName = driver?.driverName || 'Grace Cabs Driver';
+  const driverName = driver?.driverName || 'Assigned Driver';
   const driverPhone = driver?.phno || driver?.phone || driver?.mobile || '';
   const pickupPoint = booking?.pickupPoint || booking?.pickupArea || '';
   const dropPoint = booking?.dropPoint || booking?.dropLocation || '';
@@ -415,6 +437,14 @@ export async function sendDriverAllocationTwoWaySms(payload: DriverAllocationSms
     driverSms: { sent: false, providerStatus: 'UNCONFIGURED' },
   };
 
+  let fleetDisplayName = 'FleetFlow Fleet';
+  try {
+    const branding = await getFleetDocumentBranding(booking?.tenantId);
+    if (branding?.fleetName) fleetDisplayName = branding.fleetName;
+  } catch (e) {
+    // Fallback to default fleet
+  }
+
   // 1. CUSTOMER SMS
   try {
     const existingCust = await NotificationLog.findOne({
@@ -437,46 +467,38 @@ export async function sendDriverAllocationTwoWaySms(payload: DriverAllocationSms
     } else {
       const isGuest = !!booking?.behalfOfPhone;
       const templateName = isGuest ? 'BookingConfirmGuest' : 'Booking Confimation Message';
-      const companySupportPhone = process.env.SUPPORT_PHONE || '9003241571';
-
-      let fleetDisplayName = 'Grace Cabs';
-      try {
-        const branding = await getFleetDocumentBranding(booking?.tenantId);
-        if (branding?.fleetName) fleetDisplayName = branding.fleetName;
-      } catch (e) {
-        // Fallback to Grace Cabs
-      }
+      const companySupportPhone = process.env.SUPPORT_PHONE || '9080280818';
 
       const vars = isGuest
         ? [
-            booking.behalfOfName || customerName,
-            driverName,
-            driverPhone,
-            vehicleName,
-            vehicleNumber,
-            formattedBookingDate,
-            fleetDisplayName,
-            companySupportPhone,
-          ]
+          booking.behalfOfName || customerName,
+          driverName,
+          driverPhone,
+          vehicleName,
+          vehicleNumber,
+          formattedBookingDate,
+          fleetDisplayName,
+          companySupportPhone,
+        ]
         : [
-            customerName,
-            bookingCode,
-            `?l=${directionsCode}`,
-            formattedBookingDate,
-            driverName,
-            driverPhone,
-            vehicleName,
-            vehicleNumber,
-            fleetDisplayName,
-            companySupportPhone,
-          ];
+          customerName,
+          bookingCode,
+          `?l=${directionsCode}`,
+          formattedBookingDate,
+          driverName,
+          driverPhone,
+          vehicleName,
+          vehicleNumber,
+          fleetDisplayName,
+          companySupportPhone,
+        ];
 
       const custRes = await dispatchAuditedSms({
         recipient: customerPhone,
         templateCode: 'DRIVER_ASSIGNED_TO_CUSTOMER',
         templateName,
         vars,
-        message: `Grace Cabs: Your driver ${driverName} (${driverPhone}) has been assigned for booking ${bookingCode}. Vehicle: ${vehicleName} (${vehicleNumber}).`,
+        message: `${fleetDisplayName}: Your driver ${driverName} (${driverPhone}) has been assigned for booking ${bookingCode}. Vehicle: ${vehicleName} (${vehicleNumber}).`,
         referenceEntity: 'BOOKING',
         referenceId: String(bookingId),
       });
@@ -528,7 +550,7 @@ export async function sendDriverAllocationTwoWaySms(payload: DriverAllocationSms
         templateCode: 'BOOKING_ASSIGNED_TO_DRIVER',
         templateName: 'Driver Assigning',
         vars,
-        message: `Grace Cabs: Trip assigned to you. Passenger: ${booking?.behalfOfName || customerName} (${booking?.behalfOfPhone || customerPhone}). Pickup: ${pickupPoint}. Drop: ${dropPoint}.`,
+        message: `${fleetDisplayName}: Trip assigned to you. Passenger: ${booking?.behalfOfName || customerName} (${booking?.behalfOfPhone || customerPhone}). Pickup: ${pickupPoint}. Drop: ${dropPoint}.`,
         referenceEntity: 'BOOKING',
         referenceId: String(bookingId),
       });

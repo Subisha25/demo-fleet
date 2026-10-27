@@ -23,6 +23,7 @@ import puppeteer from "puppeteer";
 import path from 'path';
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
+import config from '../config/config';
 import timezone from "dayjs/plugin/timezone";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import { Partner } from '../models/Partner';
@@ -61,126 +62,126 @@ const fmtD = (d?: string | Date | null) => {
 const n = (v: any) => (isNaN(Number(v)) ? 0 : Number(v));
 
 function mapToUserInvoiceData(booking: any, targetInvoiceId?: string) {
-  console.log("mapuser ",booking,targetInvoiceId);
+  console.log("mapuser ", booking, targetInvoiceId);
   const invs = booking?.payment?.invoices || [];
   const invoice = targetInvoiceId
     ? invs.find((i: any) => i.invoiceId === targetInvoiceId)
     : invs[0];
 
- const cp = invoice?.closePending || {};
+  const cp = invoice?.closePending || {};
 
-// ✅ Read from closependings.selectedPackageData first (your DB column)
-const pkgRaw =
-  cp?.selectedPackageData ??
-  cp?.packageData?.selectedPackageData ??
-  cp?.packageData?.packages;
+  // ✅ Read from closependings.selectedPackageData first (your DB column)
+  const pkgRaw =
+    cp?.selectedPackageData ??
+    cp?.packageData?.selectedPackageData ??
+    cp?.packageData?.packages;
 
-const pkg = (() => {
-  try {
-    const parsed = typeof pkgRaw === "string" ? JSON.parse(pkgRaw) : pkgRaw;
-    // sometimes it may be an array
-    return Array.isArray(parsed) ? parsed[0] : parsed;
-  } catch {
-    return null;
+  const pkg = (() => {
+    try {
+      const parsed = typeof pkgRaw === "string" ? JSON.parse(pkgRaw) : pkgRaw;
+      // sometimes it may be an array
+      return Array.isArray(parsed) ? parsed[0] : parsed;
+    } catch {
+      return null;
+    }
+  })();
+
+  const lineItems: Array<{ label: string; value: number }> = [];
+
+  /* 1️⃣ Package Amount */
+  if (pkg && pkg.amount !== undefined && pkg.amount !== null) {
+    lineItems.push({
+      label: "Package Amount",
+      value: n(pkg.amount),
+    });
   }
-})();
 
-const lineItems: Array<{ label: string; value: number }> = [];
+  /* 2️⃣ Additional KMs */
+  if (cp?.additionalKmsAmount !== undefined) {
+    lineItems.push({
+      label: cp?.additionalKms
+        ? `Additional Km(s) (${n(cp.additionalKms)} × ₹${n(cp.additionalKmRate || 55)})`
+        : "Additional Km(s)",
+      value: n(cp.additionalKmsAmount),
+    });
+  }
 
-/* 1️⃣ Package Amount */
-if (pkg && pkg.amount !== undefined && pkg.amount !== null) {
+  /* 3️⃣ Additional Hours */
+  if (cp?.additionalHoursAmount !== undefined) {
+    lineItems.push({
+      label: cp?.additionalHours
+        ? `Additional Hours (${n(cp.additionalHours)} × ₹${n(cp.additionalHourRate || 50)})`
+        : "Additional Hours",
+      value: n(cp.additionalHoursAmount),
+    });
+  }
+
+  /* 4️⃣ Sub Total */
+  if (cp?.totalAmount !== undefined) {
+    lineItems.push({
+      label: "Total Amount",
+      value: n(cp.totalAmount),
+    });
+  }
+
+  /* 5️⃣ CGST */
+  if (cp?.totalTaxAmount !== undefined) {
+    lineItems.push({
+      label: "Total Tax Amount",
+      value: n(cp.totalTaxAmount),
+    });
+  }
+
+  /* 6️⃣ Extra Charges */
+  if (cp?.extraCharges) {
+    lineItems.push({
+      label: cp?.chargesTitle || "Extra Charges",
+      value: n(cp.extraCharges),
+    });
+  }
+
+  /* 7️⃣ Discount */
+  if (cp?.discountAmount) {
+    lineItems.push({
+      label: "Discount Amount",
+      value: -n(cp.discountAmount),
+    });
+  }
+
+  /* 8️⃣ Advance */
+  if (cp?.advanceAmount) {
+    lineItems.push({
+      label: "Advance",
+      value: -n(cp.advanceAmount),
+    });
+  }
+
+  /* 9️⃣ Total Due */
   lineItems.push({
-    label: "Package Amount",
-    value: n(pkg.amount),
+    label: "Total Due",
+    value: n(cp?.totalDue ?? invoice?.invoiceAmount),
   });
-}
-
-/* 2️⃣ Additional KMs */
-if (cp?.additionalKmsAmount !== undefined) {
-  lineItems.push({
-    label: cp?.additionalKms
-      ? `Additional Km(s) (${n(cp.additionalKms)} × ₹${n(cp.additionalKmRate || 55)})`
-      : "Additional Km(s)",
-    value: n(cp.additionalKmsAmount),
-  });
-}
-
-/* 3️⃣ Additional Hours */
-if (cp?.additionalHoursAmount !== undefined) {
-  lineItems.push({
-    label: cp?.additionalHours
-      ? `Additional Hours (${n(cp.additionalHours)} × ₹${n(cp.additionalHourRate || 50)})`
-      : "Additional Hours",
-    value: n(cp.additionalHoursAmount),
-  });
-}
-
-/* 4️⃣ Sub Total */
-if (cp?.totalAmount !== undefined) {
-  lineItems.push({
-    label: "Total Amount",
-    value: n(cp.totalAmount),
-  });
-}
-
-/* 5️⃣ CGST */
-if (cp?.totalTaxAmount !== undefined) {
-  lineItems.push({
-    label: "Total Tax Amount",
-    value: n(cp.totalTaxAmount),
-  });
-}
-
-/* 6️⃣ Extra Charges */
-if (cp?.extraCharges) {
-  lineItems.push({
-    label: cp?.chargesTitle || "Extra Charges",
-    value: n(cp.extraCharges),
-  });
-}
-
-/* 7️⃣ Discount */
-if (cp?.discountAmount) {
-  lineItems.push({
-    label: "Discount Amount",
-    value: -n(cp.discountAmount),
-  });
-}
-
-/* 8️⃣ Advance */
-if (cp?.advanceAmount) {
-  lineItems.push({
-    label: "Advance",
-    value: -n(cp.advanceAmount),
-  });
-}
-
-/* 9️⃣ Total Due */
-lineItems.push({
-  label: "Total Due",
-  value: n(cp?.totalDue ?? invoice?.invoiceAmount),
-});
 
   const data = {
     invoiceNumber: invoice?.invoiceNumber || booking?.bookingCode || booking?.bookingId,
-   // invoiceDate: fmtDT(invoice?.createdAt || invoice?.startDate),
+    // invoiceDate: fmtDT(invoice?.createdAt || invoice?.startDate),
     //dueDate: fmtD(invoice?.endDate ||  dayjs(invoice?.createdAt || new Date()).add(7, "day").toDate()),
     invoiceDate: fmtDT(
-  // prefer invoice.startDate (if present), else fallback to invoice.createdAt or booking.createdAt
-  invoice?.startDate
-    ? // make sure we pass a Date to fmtDT
-      (typeof invoice.startDate === "string" ? dayjs(invoice.startDate).toDate() : invoice.startDate)
-    : invoice?.createdAt || booking?.createdAt
-),
+      // prefer invoice.startDate (if present), else fallback to invoice.createdAt or booking.createdAt
+      invoice?.startDate
+        ? // make sure we pass a Date to fmtDT
+        (typeof invoice.startDate === "string" ? dayjs(invoice.startDate).toDate() : invoice.startDate)
+        : invoice?.createdAt || booking?.createdAt
+    ),
 
-dueDate: fmtDT(
-  // prefer invoice.endDate (if present), else fallback to createdAt + 7 days
-  invoice?.endDate
-    ? (typeof invoice.endDate === "string" ? dayjs(invoice.endDate).toDate() : invoice.endDate)
-    : dayjs(invoice?.createdAt || booking?.createdAt || new Date()).add(10, "day").toDate()
-),
-   // startDate: fmtDT(invoice?.startDate),
-   // endDate: fmtDT(invoice?.endDate),
+    dueDate: fmtDT(
+      // prefer invoice.endDate (if present), else fallback to createdAt + 7 days
+      invoice?.endDate
+        ? (typeof invoice.endDate === "string" ? dayjs(invoice.endDate).toDate() : invoice.endDate)
+        : dayjs(invoice?.createdAt || booking?.createdAt || new Date()).add(10, "day").toDate()
+    ),
+    // startDate: fmtDT(invoice?.startDate),
+    // endDate: fmtDT(invoice?.endDate),
 
     customerName: booking?.user?.username || "Customer",
     customerAddress:
@@ -197,7 +198,7 @@ dueDate: fmtDT(
       booking?.vehicleType?.vehicleTypeName ||
       booking?.vehicle?.vehicleMaster?.vehicleModelName || "-",
     pickupDate: fmtDT(booking?.bookingDate || cp?.pickupDate),
-        vehicleNumber: booking.vehicle?.vehicleNumber || booking.vehicle?.vehicleMaster?.vehicleNumber,
+    vehicleNumber: booking.vehicle?.vehicleNumber || booking.vehicle?.vehicleMaster?.vehicleNumber,
 
     email: booking?.user?.email || "-",
     mobile: booking?.user?.mobile || "-",
@@ -216,7 +217,7 @@ dueDate: fmtDT(
     usageKms: n(cp?.garageKms),
     usageHours: n(cp?.usageHours),
   };
-  console.log("inv star ",invoice.startDate," ",invoice.endDate," booking.cre ",booking.createdAt);
+  console.log("inv star ", invoice.startDate, " ", invoice.endDate, " booking.cre ", booking.createdAt);
   return data;
 }
 
@@ -227,7 +228,7 @@ export { mapToUserInvoiceData };
 
 export const createPartner = async (req: Request, res: Response) => {
   try {
-     // Check if email already exists
+    // Check if email already exists
     const existingEmail = await Partner.findOne({ where: { email: req.body.email } });
     if (existingEmail) {
       return res.status(400).json({
@@ -253,12 +254,12 @@ export const createPartner = async (req: Request, res: Response) => {
       PassengerCapacity: partner.passengerCapacity.toString(),
 
       // From & To emails
-      to: "gracecabs1975@gmail.com,traveldesk@gracecabs.com",
+      to: config.sendmail?.superadmin_email || "admin@fleetflow.app",
       UserEmail: partner.email,
 
       // If template uses FromName & FromAddress
-      FromName: "Grace Cabs",
-      FromAddress: "traveldesk@gracecabs.com",
+      FromName: "FleetFlow",
+      FromAddress: config.sendmail?.smtp_email || "no-reply@fleetflow.app",
     };
 
     // Send Email using template
@@ -311,11 +312,11 @@ export const createPartner = async (req: Request, res: Response) => {
 
 
 // Get All Drivers
-export const getAllOrders = async (req:any, res: Response) => {
+export const getAllOrders = async (req: any, res: Response) => {
   try {
     const role = req.role;
     const userid = req.userId;
-    console.log(role,userid);
+    console.log(role, userid);
     // if (role === ROLES.DRIVER) {
     //   return res.status(403).json({
     //     success: false,
@@ -335,42 +336,47 @@ export const getAllOrders = async (req:any, res: Response) => {
         ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
         : { tenantId: currentTenantId };
 
-    if(role === ROLES.USER) {
+    if (role === ROLES.USER) {
       const orders = await Booking.findAll({
-             include: [
-                     { model: VehicleType,    required: false,    
-                       include: [
-                      {
-                        model: Vehicle,
-                        as: "vehicle",
-                        required: false,
-                      },] },
-                     { model:  Vehicle,    required: false},
-                     { model:  User,   as: 'user', required: false,
-                       attributes: ['userId', 'username', 'email', 'mobile'],
-                                                  include: [
-                              {
-                                model: Company,
-                          //      as: 'company',     // must match User → Company alias
-                                required: false,
-                                attributes: ['companyId', 'companyName']
-                              }
-                            ]},
-                 ],    
-                   where: { userId: userid, ...tenantCondition },
-                  order: [['createdAt', 'DESC']]
-    });
-    return res.status(200).json({
-      success: true,
-      message: 'Orders retrieved successfully.',
-      data: orders,
-    });
-    } 
+        include: [
+          {
+            model: VehicleType, required: false,
+            include: [
+              {
+                model: Vehicle,
+                as: "vehicle",
+                required: false,
+              },]
+          },
+          { model: Vehicle, required: false },
+          {
+            model: User, as: 'user', required: false,
+            attributes: ['userId', 'username', 'email', 'mobile'],
+            include: [
+              {
+                model: Company,
+                //      as: 'company',     // must match User → Company alias
+                required: false,
+                attributes: ['companyId', 'companyName']
+              }
+            ]
+          },
+        ],
+        where: { userId: userid, ...tenantCondition },
+        order: [['createdAt', 'DESC']]
+      });
+      return res.status(200).json({
+        success: true,
+        message: 'Orders retrieved successfully.',
+        data: orders,
+      });
+    }
     else {
       const whereCondition: any = { ...tenantCondition };
       const orders = await Booking.findAll({
         include: [
-          { model: VehicleType, required: false,
+          {
+            model: VehicleType, required: false,
             include: [
               {
                 model: Vehicle,
@@ -380,7 +386,8 @@ export const getAllOrders = async (req:any, res: Response) => {
             ]
           },
           { model: Vehicle, required: false },
-          { model: User, as: 'user', required: false,
+          {
+            model: User, as: 'user', required: false,
             attributes: ['userId', 'username', 'email', 'mobile'],
             include: [
               {
@@ -400,7 +407,7 @@ export const getAllOrders = async (req:any, res: Response) => {
         data: orders,
       });
     }
-   
+
   } catch (error) {
     console.error('[GET_ALL_ORDERS_ERROR]', error);
 
@@ -463,36 +470,36 @@ export const editBooking = async (req: any, res: Response) => {
     // Update the booking fields
     await booking.update(updateFields);
 
-     //push notification
-        try {
-          const user = await User.findOne({
-            where: { userId: booking.userId },
-          });
-          const driverToken = await Drivers.findOne({
-            where: { driverId: booking.driverId },
-          });
-        
-          const fcm_token = driverToken?.fcm_token;
-          const user_fcm_token = user?.fcm_token;
-          console.log("driver confirm booking1 ",fcm_token);
-          if (!fcm_token) {
-            console.log("No FCM token found for driver:", booking.driverId);
-           // return;
-          }
-          else {
-              await sendNotification(fcm_token, `Hi ${driverToken?.driverName}, Booking changed, pls check..`, `Booking changed for ${driverToken?.driverName}`);
-          }
-          if(!user_fcm_token) {
-            console.log("No FCM token found for driver:", booking.userId);
-           // return;
-          } else {  
-            await sendNotification(user_fcm_token, `Hi ${user?.username}, Booking changed, pls check..`, `Booking changed for ${user?.username}`);
-          }
-        
-        
-        } catch (error: any) {
-          console.error("Notification send error:", error);
-        }
+    //push notification
+    try {
+      const user = await User.findOne({
+        where: { userId: booking.userId },
+      });
+      const driverToken = await Drivers.findOne({
+        where: { driverId: booking.driverId },
+      });
+
+      const fcm_token = driverToken?.fcm_token;
+      const user_fcm_token = user?.fcm_token;
+      console.log("driver confirm booking1 ", fcm_token);
+      if (!fcm_token) {
+        console.log("No FCM token found for driver:", booking.driverId);
+        // return;
+      }
+      else {
+        await sendNotification(fcm_token, `Hi ${driverToken?.driverName}, Booking changed, pls check..`, `Booking changed for ${driverToken?.driverName}`);
+      }
+      if (!user_fcm_token) {
+        console.log("No FCM token found for driver:", booking.userId);
+        // return;
+      } else {
+        await sendNotification(user_fcm_token, `Hi ${user?.username}, Booking changed, pls check..`, `Booking changed for ${user?.username}`);
+      }
+
+
+    } catch (error: any) {
+      console.error("Notification send error:", error);
+    }
 
     return res.status(200).json({
       success: true,
@@ -546,33 +553,33 @@ export const editCloseBooking = async (req: any, res: Response) => {
     // Update the booking fields
     await booking.update(updateFields);
 
-     //push notification
-        try {
-          const user = await User.findOne({
-            where: { userId: booking.userId },
-          });
-          const driverToken = await Drivers.findOne({
-            where: { driverId: booking.driverId },
-          });
-        
-          const fcm_token = driverToken?.fcm_token;
-          const user_fcm_token = user?.fcm_token;
-          console.log("driver confirm booking2 ",fcm_token);
-          if (!fcm_token) {
-            console.log("No FCM token found for driver:", booking.driverId);
-           // return;
-          }
-          if(!user_fcm_token) {
-            console.log("No FCM token found for driver:", booking.userId);
-           // return;
-          }
-        
-          await sendNotification(fcm_token, `Hi ${driverToken?.driverName}, Booking changed, pls check..`, `Booking changed for ${driverToken?.driverName}`);
-          await sendNotification(user_fcm_token, `Hi ${user?.username}, Booking changed, pls check..`, `Booking changed for ${user?.username}`);
-          
-        } catch (error: any) {
-          console.error("Notification send error:", error);
-        }
+    //push notification
+    try {
+      const user = await User.findOne({
+        where: { userId: booking.userId },
+      });
+      const driverToken = await Drivers.findOne({
+        where: { driverId: booking.driverId },
+      });
+
+      const fcm_token = driverToken?.fcm_token;
+      const user_fcm_token = user?.fcm_token;
+      console.log("driver confirm booking2 ", fcm_token);
+      if (!fcm_token) {
+        console.log("No FCM token found for driver:", booking.driverId);
+        // return;
+      }
+      if (!user_fcm_token) {
+        console.log("No FCM token found for driver:", booking.userId);
+        // return;
+      }
+
+      await sendNotification(fcm_token, `Hi ${driverToken?.driverName}, Booking changed, pls check..`, `Booking changed for ${driverToken?.driverName}`);
+      await sendNotification(user_fcm_token, `Hi ${user?.username}, Booking changed, pls check..`, `Booking changed for ${user?.username}`);
+
+    } catch (error: any) {
+      console.error("Notification send error:", error);
+    }
 
     return res.status(200).json({
       success: true,
@@ -676,50 +683,49 @@ export const cancelBooking = async (req: any, res: Response) => {
     // -----------------------------
     // 📧 Send Email to User only
     // -----------------------------
-  let needEmail = false;
+    let needEmail = false;
 
-if (booking.user?.companyId) {
-  const company = await Company.findByPk(
-    booking.user.companyId,
-    { attributes: ["needEmail"] }
-  );
-  needEmail = company?.needEmail === true;
-}
-
-console.log("cancel needEmail:", needEmail);
-     if(needEmail)
-    {
-    try {
-      const user = booking.user as any;
-      if (!user?.email) throw new Error("User email not found");
-
-      const bookingDateTime = new Date(booking.bookingDate);
-      const formattedBookingDate = formatDateTime(bookingDateTime);
-
-      const emailConfigs = await fetchAllEmailConfs();
-      const cancelClientConf = emailConfigs.find(
-        (c: any) => c.emailCode === "ORDER_CANCEL_EMAIL_TO_CLIENT"
+    if (booking.user?.companyId) {
+      const company = await Company.findByPk(
+        booking.user.companyId,
+        { attributes: ["needEmail"] }
       );
+      needEmail = company?.needEmail === true;
+    }
 
-      if (cancelClientConf) {
-        await sendEmailFromTemplate(cancelClientConf.emailCode, {
-          UserName: user.username || "",
-          UserEmail: user.email,
-          OrderNumber: booking.bookingCode,
-          CancelRemarks: remarks || "No remarks provided",
-          BookingDetails: `
+    console.log("cancel needEmail:", needEmail);
+    if (needEmail) {
+      try {
+        const user = booking.user as any;
+        if (!user?.email) throw new Error("User email not found");
+
+        const bookingDateTime = new Date(booking.bookingDate);
+        const formattedBookingDate = formatDateTime(bookingDateTime);
+
+        const emailConfigs = await fetchAllEmailConfs();
+        const cancelClientConf = emailConfigs.find(
+          (c: any) => c.emailCode === "ORDER_CANCEL_EMAIL_TO_CLIENT"
+        );
+
+        if (cancelClientConf) {
+          await sendEmailFromTemplate(cancelClientConf.emailCode, {
+            UserName: user.username || "",
+            UserEmail: user.email,
+            OrderNumber: booking.bookingCode,
+            CancelRemarks: remarks || "No remarks provided",
+            BookingDetails: `
             Pickup: ${booking.pickupArea}, ${booking.pickupCity}<br/>
             Drop: ${booking.dropPoint}<br/>
             Date: ${formattedBookingDate}<br/>
           `,
-        });
+          });
+        }
+      } catch (emailError) {
+        console.error("Cancel booking email error:", emailError);
       }
-    } catch (emailError) {
-      console.error("Cancel booking email error:", emailError);
     }
-  }
 
-     
+
     try {
       const user = booking.user as any;
       if (user?.mobile) {
@@ -781,8 +787,8 @@ export const getCancelledBooking = async (req: Request, res: Response) => {
     res.status(500).json({
       message: "Failed to fetch cancelled bookings",
       error: error.message,
-    });
-  }
+    });
+  }
 };
 
 export const declineBooking = async (req: any, res: Response) => {
@@ -1267,12 +1273,12 @@ export const getOrderByEmployeeId = async (req: Request, res: Response) => {
           model: VehicleType,
           as: "vehicleType",
           required: false,
-              include: [
-                  {
-                    model: Vehicle,
-                    as: "vehicle",
-                    required: false,
-                  }, ],
+          include: [
+            {
+              model: Vehicle,
+              as: "vehicle",
+              required: false,
+            },],
         },
         {
           model: Payment,
@@ -1434,9 +1440,9 @@ export const getBookingDetails = async (req: Request, res: Response) => {
     // ✅ Vehicle table rates REMOVE. Name மட்டும் போதும்.
     const vehicle = booking.vehicleId
       ? await Vehicle.findOne({
-          where: { vehicleId: booking.vehicleId },
-          attributes: ["vehicleId", "vehicleName", "vehicleTypeId"],
-        })
+        where: { vehicleId: booking.vehicleId },
+        attributes: ["vehicleId", "vehicleName", "vehicleTypeId"],
+      })
       : null;
 
     const vehicleType = await VehicleType.findOne({
@@ -2342,7 +2348,7 @@ const toYMD = (d: string | Date) => new Date(d).toISOString().slice(0, 10);
 //           // cp_additionalHoursAmount: cp?.additionalHoursAmount || 0,
 //           cp_extraCharges: cp?.extraCharges || 0,
 //           // cp_discountAmount: cp?.discountAmount || 0,
-       
+
 //           cp_totalAmount: cpTotal,
 //             ...taxAmounts, // 🔥 dynamic taxes here
 
@@ -2403,7 +2409,7 @@ const toYMD = (d: string | Date) => new Date(d).toISOString().slice(0, 10);
 //     confirmStatus: {
 //       [Op.notIn]: [0, 1, 6, 7],
 //     },
-        
+
 //       },
 
 //       include: [
@@ -2460,7 +2466,7 @@ const toYMD = (d: string | Date) => new Date(d).toISOString().slice(0, 10);
 //             ? garageCloseKm - garageOpenKm
 //             : 0;
 
-            
+
 
 //         /* ---------------- AMOUNTS ---------------- */
 //         const packageAmount = Number(cp?.packageAmount ?? 0);
@@ -2480,7 +2486,7 @@ const toYMD = (d: string | Date) => new Date(d).toISOString().slice(0, 10);
 //           paymentStatus = "Completed";
 //         }
 
-        
+
 //         const formatTime = (dateInput: any) => {
 //   if (!dateInput) return null;
 //   const d = new Date(dateInput);
@@ -2896,20 +2902,20 @@ const toYMD = (d: string | Date) => new Date(d).toISOString().slice(0, 10);
 //             console.log("ClosePending ID:", cp.id);
 //             console.log("selectedPackageData type:", typeof cp.selectedPackageData);
 //             console.log("selectedPackageData value:", cp.selectedPackageData);
-            
+
 //             // Try to parse selectedPackageData
 //             if (cp.selectedPackageData) {
 //               let parsedData;
-              
+
 //               if (typeof cp.selectedPackageData === 'string') {
 //                 parsedData = JSON.parse(cp.selectedPackageData);
 //               } else if (typeof cp.selectedPackageData === 'object') {
 //                 parsedData = cp.selectedPackageData;
 //               }
-              
+
 //               console.log("Parsed data:", parsedData);
 //               console.log("Label:", parsedData?.label);
-              
+
 //               packageLabel = parsedData?.label ?? "";
 //             }
 //           } catch (error) {
@@ -2974,7 +2980,7 @@ const toYMD = (d: string | Date) => new Date(d).toISOString().slice(0, 10);
 //           tripDetails: `${b.pickupArea ?? ""} - ${b.pickupCity ?? ""} to ${b.dropPoint ?? ""}`,
 
 //           packageLabel, // ✅ Package label from selectedPackageData
-          
+
 //           garageOpenKm,
 //           garageCloseKm,
 //           totalKm,
@@ -3062,7 +3068,7 @@ export const getOverallInvoiceReport = async (req: Request, res: Response) => {
     allVehicleTypes.forEach((vt: any) => {
       vehicleTypeMap.set(vt.vehicleTypeId, vt.vehicleType);
     });
-    
+
     const ctx = getTenantContext();
     const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
     const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
@@ -3076,115 +3082,115 @@ export const getOverallInvoiceReport = async (req: Request, res: Response) => {
     /* =========================================================
        ONCALL ROWS BUILDER
     ========================================================= */
-const buildOncallRows = async () => {
-  const oncallWhere: any = {
-    CreatedAt: { [Op.between]: [start, end] },
-    ...tenantCondition,
-  };
-  if (companyId !== "ALL") {
-    oncallWhere.companyId = companyId;
-  }
-
-  const invoices = await OnCallInvoice.findAll({
-    where: oncallWhere,
-    include: [
-      { model: Company, as: "company" },
-      { model: OnCallInvoiceItems, as: "invoiceItems" },
-    ],
-    order: [["createdAt", "ASC"]],
-  });
-
-  const rows: any[] = [];
-  let sno = 1;
-
-  invoices.forEach((invoice: any) => {
-    invoice.invoiceItems?.forEach((item: any) => {
-      let cgstAmount = 0;
-      let sgstAmount = 0;
-
-      try {
-        const taxes =
-          typeof item.taxes === "string" ? JSON.parse(item.taxes) : item.taxes;
-
-        if (Array.isArray(taxes)) {
-          taxes.forEach((t: any) => {
-            const taxName = (t.taxName || "").toUpperCase();
-            if (taxName.includes("CGST")) cgstAmount += Number(t.taxAmount || 0);
-            if (taxName.includes("SGST")) sgstAmount += Number(t.taxAmount || 0);
-          });
-        }
-      } catch (err) {}
-
-      // ✅ build a detailed package label — works for BOTH localcity AND outstation
-      let packageLabel = item.travelPackage || "";
-      try {
-        const meta =
-          typeof item.selectedPackageMeta === "string"
-            ? JSON.parse(item.selectedPackageMeta || "{}")
-            : item.selectedPackageMeta;
-
-        if (meta) {
-          if (item.packageType === "outstation") {
-            const perKm = meta.perKm ?? 0;
-            const batta = meta.driverBattaPerDay ?? 0;
-            const minKm = meta.minimumKmPerDay;
-            const days = item.packageDays || 1;
-
-            packageLabel =
-              `Outstation - ₹${perKm}/km, Batta ₹${batta}/day` +
-              (minKm ? `, Min ${minKm}km/day` : "") +
-              ` (${days} day${days > 1 ? "s" : ""})`;
-          } else if (meta.title) {
-            packageLabel = `${meta.title} (${meta.hours ?? 0}hrs/${meta.km ?? 0}km) - ₹${meta.amount ?? 0}`;
-          }
-        }
-      } catch (err) {
-        // keep fallback packageLabel as-is if parsing fails
+    const buildOncallRows = async () => {
+      const oncallWhere: any = {
+        CreatedAt: { [Op.between]: [start, end] },
+        ...tenantCondition,
+      };
+      if (companyId !== "ALL") {
+        oncallWhere.companyId = companyId;
       }
 
-      rows.push({
-        sno: sno++,
-        tripSheetNumber: item.tripSheetNo,
-        invoiceNumber: invoice.onCallInvoiceCode,
-        invoiceDate: formatDate(invoice.createdAt),
-        pickupDate: formatDate(item.date),
-        companyName: invoice.company?.companyName ?? invoice.companyName,
-        vehicleNumber: item.vehicleNo,
-carType: vehicleTypeMap.get(item.vehicleTypeId) || item.vehicleTypeId,
-        userName: item.bookedBy,
-        behalfOfName: item.guestName,
-        pickupPoint: "",
-        tripDetails: item.tripDetails,
-        packageLabel,
-        garageOpenKm: item.garageOpenKm,
-        garageCloseKm: item.garageCloseKm,
-        totalKm:  item.garageKms,
-        garageOpenDateTime: item.startingTime,
-        garageCloseDateTime: item.closingTime,
-        usageHours: item.usageHours,
-        garageKms: Number(item.garageKms || item.totalKm || 0),
-        additionalKms: item.additionalKms,
-        additionalHours: item.additionalHours,
-        packageAmount: item.packageAmount,
-        cabCharge:
-          Number(item.packageAmount || 0) +
-          Number(item.additionalKmsAmount || 0) +
-          Number(item.additionalHoursAmount || 0),
-        driverBata: item.driverBatta,
-        discountAmount: item.discountAmount, // ✅ NEW
-        advanceAmount: item.advanceAmount,   // ✅ NEW
-        grossAmount: item.amount,
-        cgstAmount,
-        sgstAmount,
-        tollParking: item.extraCharges,
-        invoiceAmount: item.totalDue,
-        
+      const invoices = await OnCallInvoice.findAll({
+        where: oncallWhere,
+        include: [
+          { model: Company, as: "company" },
+          { model: OnCallInvoiceItems, as: "invoiceItems" },
+        ],
+        order: [["createdAt", "ASC"]],
       });
-    });
-  });
 
-  return rows;
-};
+      const rows: any[] = [];
+      let sno = 1;
+
+      invoices.forEach((invoice: any) => {
+        invoice.invoiceItems?.forEach((item: any) => {
+          let cgstAmount = 0;
+          let sgstAmount = 0;
+
+          try {
+            const taxes =
+              typeof item.taxes === "string" ? JSON.parse(item.taxes) : item.taxes;
+
+            if (Array.isArray(taxes)) {
+              taxes.forEach((t: any) => {
+                const taxName = (t.taxName || "").toUpperCase();
+                if (taxName.includes("CGST")) cgstAmount += Number(t.taxAmount || 0);
+                if (taxName.includes("SGST")) sgstAmount += Number(t.taxAmount || 0);
+              });
+            }
+          } catch (err) { }
+
+          // ✅ build a detailed package label — works for BOTH localcity AND outstation
+          let packageLabel = item.travelPackage || "";
+          try {
+            const meta =
+              typeof item.selectedPackageMeta === "string"
+                ? JSON.parse(item.selectedPackageMeta || "{}")
+                : item.selectedPackageMeta;
+
+            if (meta) {
+              if (item.packageType === "outstation") {
+                const perKm = meta.perKm ?? 0;
+                const batta = meta.driverBattaPerDay ?? 0;
+                const minKm = meta.minimumKmPerDay;
+                const days = item.packageDays || 1;
+
+                packageLabel =
+                  `Outstation - ₹${perKm}/km, Batta ₹${batta}/day` +
+                  (minKm ? `, Min ${minKm}km/day` : "") +
+                  ` (${days} day${days > 1 ? "s" : ""})`;
+              } else if (meta.title) {
+                packageLabel = `${meta.title} (${meta.hours ?? 0}hrs/${meta.km ?? 0}km) - ₹${meta.amount ?? 0}`;
+              }
+            }
+          } catch (err) {
+            // keep fallback packageLabel as-is if parsing fails
+          }
+
+          rows.push({
+            sno: sno++,
+            tripSheetNumber: item.tripSheetNo,
+            invoiceNumber: invoice.onCallInvoiceCode,
+            invoiceDate: formatDate(invoice.createdAt),
+            pickupDate: formatDate(item.date),
+            companyName: invoice.company?.companyName ?? invoice.companyName,
+            vehicleNumber: item.vehicleNo,
+            carType: vehicleTypeMap.get(item.vehicleTypeId) || item.vehicleTypeId,
+            userName: item.bookedBy,
+            behalfOfName: item.guestName,
+            pickupPoint: "",
+            tripDetails: item.tripDetails,
+            packageLabel,
+            garageOpenKm: item.garageOpenKm,
+            garageCloseKm: item.garageCloseKm,
+            totalKm: item.garageKms,
+            garageOpenDateTime: item.startingTime,
+            garageCloseDateTime: item.closingTime,
+            usageHours: item.usageHours,
+            garageKms: Number(item.garageKms || item.totalKm || 0),
+            additionalKms: item.additionalKms,
+            additionalHours: item.additionalHours,
+            packageAmount: item.packageAmount,
+            cabCharge:
+              Number(item.packageAmount || 0) +
+              Number(item.additionalKmsAmount || 0) +
+              Number(item.additionalHoursAmount || 0),
+            driverBata: item.driverBatta,
+            discountAmount: item.discountAmount, // ✅ NEW
+            advanceAmount: item.advanceAmount,   // ✅ NEW
+            grossAmount: item.amount,
+            cgstAmount,
+            sgstAmount,
+            tollParking: item.extraCharges,
+            invoiceAmount: item.totalDue,
+
+          });
+        });
+      });
+
+      return rows;
+    };
 
     const formatInvoiceMonth = (invoiceMonth: string): string => {
       if (!invoiceMonth) return "";
@@ -3208,159 +3214,159 @@ carType: vehicleTypeMap.get(item.vehicleTypeId) || item.vehicleTypeId,
     /* =========================================================
        MONTHLY ROWS BUILDER
     ========================================================= */
-const buildMonthlyRows = async () => {
-  const monthlyWhere: any = {
-    invoiceDate: { [Op.between]: [start, end] },
-    ...tenantCondition,
-  };
-  if (companyId !== "ALL") {
-    monthlyWhere.companyId = companyId;
-  }
+    const buildMonthlyRows = async () => {
+      const monthlyWhere: any = {
+        invoiceDate: { [Op.between]: [start, end] },
+        ...tenantCondition,
+      };
+      if (companyId !== "ALL") {
+        monthlyWhere.companyId = companyId;
+      }
 
-  const invoices = await MonthlyInvoice.findAll({
-    where: monthlyWhere,
-    include: [
-      { model: Company, as: "company", required: false },
-      { model: Invoice, as: "invoice", required: false },
-      { model: MonthlyInvoiceItems, as: "monthlyInvoiceItems", required: false },
-    ],
-    order: [["createdAt", "ASC"]],
-  });
+      const invoices = await MonthlyInvoice.findAll({
+        where: monthlyWhere,
+        include: [
+          { model: Company, as: "company", required: false },
+          { model: Invoice, as: "invoice", required: false },
+          { model: MonthlyInvoiceItems, as: "monthlyInvoiceItems", required: false },
+        ],
+        order: [["createdAt", "ASC"]],
+      });
 
-  const rows: any[] = [];
-  let sno = 1;
+      const rows: any[] = [];
+      let sno = 1;
 
-  invoices.forEach((m: any) => {
-    const rawItems = m.monthlyInvoiceItems && m.monthlyInvoiceItems.length > 0
-      ? m.monthlyInvoiceItems
-      : [
-          {
-            monthlyInvoiceItemId: m.monthlyInvoiceId,
-            route: m.route,
-            vehicleTypeId: m.vehicleTypeId,
-            vehicleTypeName: m.vehicleTypeName,
-            vehicleNumber: m.vehicleNumber,
-            packageDataId: m.packageDataId,
-            packageDetails: m.packageDetails,
-            packageAmount: m.packageAmount,
-            extraKm: m.extraKm,
-            extraKmAmount: m.extraKmAmount,
-            extraDays: m.extraDays,
-            extraDaysAmount: m.extraDaysAmount,
-            extraHrs: m.extraHrs,
-            extraHrsAmount: m.extraHrsAmount,
-            extraCharges: m.extraCharges,
-            extraChargesInputAmount: m.extraChargesInputAmount,
-            discount: m.discount,
-            advance: m.advance,
-            netTotal: m.netTotal,
-            taxes: m.taxes,
-            totalTaxAmount: m.totalTaxAmount,
-            finalTotal: m.finalTotal,
-            balanceDue: m.balanceDue,
-          },
-        ];
+      invoices.forEach((m: any) => {
+        const rawItems = m.monthlyInvoiceItems && m.monthlyInvoiceItems.length > 0
+          ? m.monthlyInvoiceItems
+          : [
+            {
+              monthlyInvoiceItemId: m.monthlyInvoiceId,
+              route: m.route,
+              vehicleTypeId: m.vehicleTypeId,
+              vehicleTypeName: m.vehicleTypeName,
+              vehicleNumber: m.vehicleNumber,
+              packageDataId: m.packageDataId,
+              packageDetails: m.packageDetails,
+              packageAmount: m.packageAmount,
+              extraKm: m.extraKm,
+              extraKmAmount: m.extraKmAmount,
+              extraDays: m.extraDays,
+              extraDaysAmount: m.extraDaysAmount,
+              extraHrs: m.extraHrs,
+              extraHrsAmount: m.extraHrsAmount,
+              extraCharges: m.extraCharges,
+              extraChargesInputAmount: m.extraChargesInputAmount,
+              discount: m.discount,
+              advance: m.advance,
+              netTotal: m.netTotal,
+              taxes: m.taxes,
+              totalTaxAmount: m.totalTaxAmount,
+              finalTotal: m.finalTotal,
+              balanceDue: m.balanceDue,
+            },
+          ];
 
-    const taxesRaw = typeof m.taxes === "string" ? JSON.parse(m.taxes || "[]") : (m.taxes || []);
-    const taxBreakup = Array.isArray(taxesRaw)
-      ? taxesRaw.map((t: any) => ({
-          taxName: (t.taxName || "UNKNOWN").toString().trim(),
-          amount: Number(t.amount ?? t.taxAmount ?? 0),
-        }))
-      : [];
-
-    const tollParking = Array.isArray(m.extraCharges)
-      ? m.extraCharges.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0)
-      : Number(m.extraChargesInputAmount || 0);
-
-    const invoiceMonthFmt = formatInvoiceMonth(m.invoiceMonth) || m.invoiceMonth || "";
-
-    rawItems.forEach((item: any) => {
-      const pkgDetails = normalizePackageDetails(item.packageDetails, item);
-
-      const pkgDays = pkgDetails.days || 0;
-      const pkgKm = pkgDetails.km || 0;
-      const pkgAmount = Number(item.packageAmount || pkgDetails.amount || 0);
-
-      const vehicleNo = item.vehicleNumber || m.vehicleNumber || "";
-      const vehicleType = item.vehicleTypeName || m.vehicleTypeName || "";
-      const routeStr = item.route || m.route || "";
-
-      const extraKm = Number(item.extraKm || 0);
-      const extraKmAmount = Number(item.extraKmAmount || 0);
-      const extraHrs = Number(item.extraHrs || 0);
-      const extraHrsAmount = Number(item.extraHrsAmount || 0);
-      const driverBata = Number(item.extraDaysAmount || item.driverBatta || 0);
-      const subTotal = Number(item.netTotal || (pkgAmount + extraKmAmount + extraHrsAmount + driverBata));
-
-      // Parse item taxes or fallback to header taxes
-      const itemTaxesRaw = item.taxes && Array.isArray(item.taxes) && item.taxes.length > 0 ? item.taxes : m.taxes;
-      const taxesParsed = typeof itemTaxesRaw === "string" ? JSON.parse(itemTaxesRaw || "[]") : (itemTaxesRaw || []);
-      const taxBreakup = Array.isArray(taxesParsed)
-        ? taxesParsed.map((t: any) => ({
+        const taxesRaw = typeof m.taxes === "string" ? JSON.parse(m.taxes || "[]") : (m.taxes || []);
+        const taxBreakup = Array.isArray(taxesRaw)
+          ? taxesRaw.map((t: any) => ({
             taxName: (t.taxName || "UNKNOWN").toString().trim(),
             amount: Number(t.amount ?? t.taxAmount ?? 0),
           }))
-        : [];
+          : [];
 
-      const totalTaxAmount = taxBreakup.reduce((s, t) => s + Number(t.amount || 0), 0);
+        const tollParking = Array.isArray(m.extraCharges)
+          ? m.extraCharges.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0)
+          : Number(m.extraChargesInputAmount || 0);
 
-      const tollParking = Array.isArray(item.extraCharges || m.extraCharges)
-        ? (item.extraCharges || m.extraCharges).reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0)
-        : Number(item.extraChargesInputAmount ?? m.extraChargesInputAmount ?? 0);
+        const invoiceMonthFmt = formatInvoiceMonth(m.invoiceMonth) || m.invoiceMonth || "";
 
-      const extraChargesInputAmount = Number(item.extraChargesInputAmount ?? m.extraChargesInputAmount ?? tollParking);
-      const discountAmount = Number(item.discount ?? m.discount ?? 0);
-      const advanceAmount = Number(item.advance ?? m.advance ?? 0);
-      const finalTotal = Number(item.finalTotal ?? m.finalTotal ?? (subTotal + totalTaxAmount + extraChargesInputAmount - discountAmount));
-      const balanceDue = Number(item.balanceDue ?? m.balanceDue ?? Math.max(0, finalTotal - advanceAmount));
+        rawItems.forEach((item: any) => {
+          const pkgDetails = normalizePackageDetails(item.packageDetails, item);
 
-      const description = `Towards for the month of ${invoiceMonthFmt}\n\nVehicle No : ${vehicleNo}\n\nVehicle Type : ${vehicleType}\n\nRoute : ${routeStr}\n\nMonthly Cab Charges\n\nCoverage :\n${pkgDays} Days / ${pkgKm} KM - ₹${pkgAmount.toLocaleString("en-IN")}`;
+          const pkgDays = pkgDetails.days || 0;
+          const pkgKm = pkgDetails.km || 0;
+          const pkgAmount = Number(item.packageAmount || pkgDetails.amount || 0);
 
-      rows.push({
-        sno: sno++,
-        monthlyInvoiceId: m.monthlyInvoiceId,
-        orderNumber: m.monthlyBookingCode,
-        tripSheetNumber: "",
-        invoiceNumber: m.monthlyBookingCode || m.invoice?.invoiceNumber || "",
-        invoiceDate: formatDate(m.invoiceDate),
-        invoiceMonth: invoiceMonthFmt,
-        pickupDate: formatDate(m.invoiceDate),
-        companyName: m.companyName || m.company?.companyName || "",
-        vehicleNumber: vehicleNo,
-        carType: vehicleType,
-        route: routeStr,
-        tripDetails: routeStr,
-        packageLabel: pkgDetails.label ?? pkgDetails.packageName ?? "Monthly Package",
-        pkgDays,
-        pkgKm,
-        packageAmount: pkgAmount,
-        extraKm,
-        extraKmAmount,
-        extraHrs,
-        extraHrsAmount,
-        extraDays: Number(item.extraDays || 0),
-        driverBata,
-        subTotal,
-        description,
-        cabCharge: pkgAmount,
-        grossAmount: pkgAmount,
-        taxBreakup,
-        totalTaxAmount,
-        tollParking: extraChargesInputAmount,
-        extraChargesInputAmount,
-        discountAmount,
-        advanceAmount,
-        finalTotal,
-        balanceDue,
-        invoiceAmount: finalTotal,
-        paymentStatus: m.closeStatus === 1 ? "Completed" : "Pending",
+          const vehicleNo = item.vehicleNumber || m.vehicleNumber || "";
+          const vehicleType = item.vehicleTypeName || m.vehicleTypeName || "";
+          const routeStr = item.route || m.route || "";
+
+          const extraKm = Number(item.extraKm || 0);
+          const extraKmAmount = Number(item.extraKmAmount || 0);
+          const extraHrs = Number(item.extraHrs || 0);
+          const extraHrsAmount = Number(item.extraHrsAmount || 0);
+          const driverBata = Number(item.extraDaysAmount || item.driverBatta || 0);
+          const subTotal = Number(item.netTotal || (pkgAmount + extraKmAmount + extraHrsAmount + driverBata));
+
+          // Parse item taxes or fallback to header taxes
+          const itemTaxesRaw = item.taxes && Array.isArray(item.taxes) && item.taxes.length > 0 ? item.taxes : m.taxes;
+          const taxesParsed = typeof itemTaxesRaw === "string" ? JSON.parse(itemTaxesRaw || "[]") : (itemTaxesRaw || []);
+          const taxBreakup = Array.isArray(taxesParsed)
+            ? taxesParsed.map((t: any) => ({
+              taxName: (t.taxName || "UNKNOWN").toString().trim(),
+              amount: Number(t.amount ?? t.taxAmount ?? 0),
+            }))
+            : [];
+
+          const totalTaxAmount = taxBreakup.reduce((s, t) => s + Number(t.amount || 0), 0);
+
+          const tollParking = Array.isArray(item.extraCharges || m.extraCharges)
+            ? (item.extraCharges || m.extraCharges).reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0)
+            : Number(item.extraChargesInputAmount ?? m.extraChargesInputAmount ?? 0);
+
+          const extraChargesInputAmount = Number(item.extraChargesInputAmount ?? m.extraChargesInputAmount ?? tollParking);
+          const discountAmount = Number(item.discount ?? m.discount ?? 0);
+          const advanceAmount = Number(item.advance ?? m.advance ?? 0);
+          const finalTotal = Number(item.finalTotal ?? m.finalTotal ?? (subTotal + totalTaxAmount + extraChargesInputAmount - discountAmount));
+          const balanceDue = Number(item.balanceDue ?? m.balanceDue ?? Math.max(0, finalTotal - advanceAmount));
+
+          const description = `Towards for the month of ${invoiceMonthFmt}\n\nVehicle No : ${vehicleNo}\n\nVehicle Type : ${vehicleType}\n\nRoute : ${routeStr}\n\nMonthly Cab Charges\n\nCoverage :\n${pkgDays} Days / ${pkgKm} KM - ₹${pkgAmount.toLocaleString("en-IN")}`;
+
+          rows.push({
+            sno: sno++,
+            monthlyInvoiceId: m.monthlyInvoiceId,
+            orderNumber: m.monthlyBookingCode,
+            tripSheetNumber: "",
+            invoiceNumber: m.monthlyBookingCode || m.invoice?.invoiceNumber || "",
+            invoiceDate: formatDate(m.invoiceDate),
+            invoiceMonth: invoiceMonthFmt,
+            pickupDate: formatDate(m.invoiceDate),
+            companyName: m.companyName || m.company?.companyName || "",
+            vehicleNumber: vehicleNo,
+            carType: vehicleType,
+            route: routeStr,
+            tripDetails: routeStr,
+            packageLabel: pkgDetails.label ?? pkgDetails.packageName ?? "Monthly Package",
+            pkgDays,
+            pkgKm,
+            packageAmount: pkgAmount,
+            extraKm,
+            extraKmAmount,
+            extraHrs,
+            extraHrsAmount,
+            extraDays: Number(item.extraDays || 0),
+            driverBata,
+            subTotal,
+            description,
+            cabCharge: pkgAmount,
+            grossAmount: pkgAmount,
+            taxBreakup,
+            totalTaxAmount,
+            tollParking: extraChargesInputAmount,
+            extraChargesInputAmount,
+            discountAmount,
+            advanceAmount,
+            finalTotal,
+            balanceDue,
+            invoiceAmount: finalTotal,
+            paymentStatus: m.closeStatus === 1 ? "Completed" : "Pending",
+          });
+        });
       });
-    });
-  });
 
-  return rows;
-};
+      return rows;
+    };
 
     /* =========================================================
        NORMAL (BOOKINGS) ROWS BUILDER
@@ -3579,10 +3585,10 @@ export const companyBookingReport = async (req: Request, res: Response) => {
     else if (to) bookingWhere.createdAt = { [Op.lte]: new Date(to) };
 
     // if (pickupPoint) bookingWhere.pickupPoint = pickupPoint;
-if (pickupPoint && pickupPoint !== "All") {
-  bookingWhere.pickupPoint = pickupPoint.trim();
-}
-// If pickupPoint = "All" or undefined → do not filter, let all pickup points come
+    if (pickupPoint && pickupPoint !== "All") {
+      bookingWhere.pickupPoint = pickupPoint.trim();
+    }
+    // If pickupPoint = "All" or undefined → do not filter, let all pickup points come
 
     // Period grouping
     let periodAttr: any;
@@ -4163,7 +4169,7 @@ export const getPaymentPendingOrdersByUser = async (req: Request, res: Response)
 //     text-align: right;
 // }
 
-    
+
 
 //         .trip-info {
 //             font-size: 11px;
@@ -4352,7 +4358,7 @@ export const getPaymentPendingOrdersByUser = async (req: Request, res: Response)
 
 //       <div class="booking-section">
 //         <div class="section-header">Booking Details</div>
-      
+
 //         <div class="field-group">
 //             <span class="field-label">Order Number</span>
 //             <span class="field-value">${data.orderNumber}</span>
@@ -4383,7 +4389,7 @@ export const getPaymentPendingOrdersByUser = async (req: Request, res: Response)
 //     <!-- Trip Details -->
 //         <div class="section-header">Trip Details</div>
 //         <div class="trip-info">${data.tripDetails}</div>
-      
+
 //   <!-- Usage Table -->
 //         <table class="usage-table">
 //             <thead>
@@ -4417,7 +4423,7 @@ export const getPaymentPendingOrdersByUser = async (req: Request, res: Response)
 //             <span>Amount (Rs)</span>
 //         </div>
 //       <table class="invoice-table">
-     
+
 //       <tbody>
 //   ${data.lineItems
 //     .map((item: any) => {
@@ -4469,9 +4475,9 @@ export const getPaymentPendingOrdersByUser = async (req: Request, res: Response)
 //   `;
 // };
 export const generateInvoiceHTMLForuser = (data: any, branding?: any): string => {
-  const dynamicLogo = branding?.logoSrc || logoSrc;
-  const dynamicFleet = branding?.fleetName || "Grace Cabs";
-  const dynamicHeaderColor = branding?.headerColor || "rgba(82, 121, 152, 1)";
+  const dynamicLogo = branding?.logoSrc || "";
+  const dynamicFleet = branding?.displayName || branding?.legalName || branding?.fleetName || "Fleet Mobility";
+  const dynamicHeaderColor = branding?.headerColor || "#1A365D";
   // ✅ read cp (ClosePending) safely from multiple possible shapes
   const cp =
     data?.closePending ||
@@ -4511,7 +4517,7 @@ export const generateInvoiceHTMLForuser = (data: any, branding?: any): string =>
     return rows;
   };
 
-  // ✅ remove any existing "Tax / CGST / SGST / IGST" rows from lineItems
+  // ✅ remove any existing "Tax / CGST /标识 / IGST" rows from lineItems
   const baseItems: any[] = Array.isArray(data?.lineItems) ? [...data.lineItems] : [];
   const cleanedItems = baseItems.filter((it) => {
     const l = String(it?.label ?? "").toLowerCase().trim();
@@ -4560,6 +4566,10 @@ export const generateInvoiceHTMLForuser = (data: any, branding?: any): string =>
     }
   }
 
+  const logoMarkup = dynamicLogo
+    ? `<img src="${dynamicLogo}" alt="${dynamicFleet}" class="logo-img" />`
+    : `<div style="font-size:20px; font-weight:bold; color:${dynamicHeaderColor};">${dynamicFleet}</div>`;
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -4602,7 +4612,7 @@ export const generateInvoiceHTMLForuser = (data: any, branding?: any): string =>
     .footer-label { font-weight:bold; min-width:80px; }
 
     .logo-section { display:flex; align-items:center; gap:10px; }
-    .logo-img { height:60px; width:auto; }
+    .logo-img { height:60px; max-width:200px; object-fit:contain; }
 
     .email-color{ color: rgb(39, 89, 129); font-weight:bold; }
     .phone-color{ color:#4CAF50; font-weight:bold; }
@@ -4619,7 +4629,7 @@ export const generateInvoiceHTMLForuser = (data: any, branding?: any): string =>
 
     <div class="header">
       <div class="logo-section">
-        <img src="${dynamicLogo}" alt="${dynamicFleet}" class="logo-img" />
+        ${logoMarkup}
       </div>
       <div class="invoice-info">
         <p><strong>Invoice Number:</strong> ${data.invoiceNumber}</p>
@@ -4679,15 +4689,15 @@ export const generateInvoiceHTMLForuser = (data: any, branding?: any): string =>
     <table class="invoice-table">
       <tbody>
         ${finalLineItems
-          .map((item: any) => {
-            const isTotalDue =
-              String(item.label || "").toLowerCase().includes("total due");
+      .map((item: any) => {
+        const isTotalDue =
+          String(item.label || "").toLowerCase().includes("total due");
 
-            const isSubTotal =
-              String(item.label || "").toLowerCase().replace(/\s+/g, " ").includes("sub total") ||
-              item.isSubTotal === true;
+        const isSubTotal =
+          String(item.label || "").toLowerCase().replace(/\s+/g, " ").includes("sub total") ||
+          item.isSubTotal === true;
 
-            return `
+        return `
               <tr class="${isTotalDue ? "total-due-row" : ""} ${isSubTotal ? "subtotal-row" : ""}">
                 <td class="${isTotalDue ? "total-due-label" : ""}">${item.label}</td>
                 <td class="${isTotalDue ? "total-due-amount" : ""}">
@@ -4695,18 +4705,18 @@ export const generateInvoiceHTMLForuser = (data: any, branding?: any): string =>
                 </td>
               </tr>
             `;
-          })
-          .join("")}
+      })
+      .join("")}
       </tbody>
     </table>
 
     <div class="footer-info">
-      <div class="footer-row"><span class="footer-label">Regd.Office:</span><span>${branding?.registeredAddress || 'Grace Cabs  Pvt. Ltd., 7/621 NESAMANI NAGAR, PERUMBAKKAM, CHENNAI - 600100'}</span></div>
-      <div class="footer-row"><span class="footer-label">Website:</span><span>${branding?.portalTitle ? branding.portalTitle.toLowerCase().replace(/\s+/g, '') + '.com' : 'gracecabs.com'}</span></div>
-      <div class="footer-row"><span class="footer-label">GSTIN:</span><span>${branding?.gstNumber || '33AAMCG2518C1Z0'}</span></div>
-      <div class="footer-row"><span class="footer-label">PAN No.:</span><span>AAMCG2518C</span></div>
-      <div class="footer-row"><span class="footer-label">SAC:</span><span>996609</span></div>
-      <div class="footer-row"><p>It is a system generated invoice which does not need a signature</p></div>
+      ${branding?.registeredAddress ? `<div class="footer-row"><span class="footer-label">Regd.Office:</span><span>${branding.registeredAddress}</span></div>` : ''}
+      ${branding?.website ? `<div class="footer-row"><span class="footer-label">Website:</span><span>${branding.website}</span></div>` : ''}
+      ${branding?.gstNumber ? `<div class="footer-row"><span class="footer-label">GSTIN:</span><span>${branding.gstNumber}</span></div>` : ''}
+      ${branding?.panNumber ? `<div class="footer-row"><span class="footer-label">PAN No.:</span><span>${branding.panNumber}</span></div>` : ''}
+      <div class="footer-row"><span class="footer-label">SAC:</span><span>${branding?.sacCode || '996609'}</span></div>
+      ${branding?.billingFooterText ? `<div class="footer-row"><span>${branding.billingFooterText}</span></div>` : '<div class="footer-row"><p>It is a system generated invoice which does not need a signature</p></div>'}
     </div>
 
   </div>
@@ -4749,135 +4759,135 @@ export const downloadUserInvoicePdf = async (req: any, res: Response) => {
     //     { model: Drivers, as: "driver", required: false },
     //   ],
     // });
-     const booking = await Booking.findByPk(bookingId, {
-                include: [
-                    {
-                        model: VehicleType,
-                        as: "vehicleType",
-                        required: false,
-                    },
-                     {
-            model: Vehicle,
-            as: "vehicle",
-            required: false,
-           attributes:["localPerKm","localPerHour"]
+    const booking = await Booking.findByPk(bookingId, {
+      include: [
+        {
+          model: VehicleType,
+          as: "vehicleType",
+          required: false,
         },
+        {
+          model: Vehicle,
+          as: "vehicle",
+          required: false,
+          attributes: ["localPerKm", "localPerHour"]
+        },
+        {
+          model: Payment,
+          as: "payment",
+          required: false,
+          attributes: ["paymentId", "status", "paymentMode", "amount"],
+          include: [
+            {
+              model: Invoice,
+              as: "invoices",
+              required: false,
+              attributes: [
+                "invoiceId",
+                "invoiceNumber",
+                "invoiceAmount",
+                "invoiceStatus",
+                "startDate",
+                "endDate"
+              ],
+              include: [
+                {
+                  model: ClosePending,
+                  as: "closePending",
+                  required: false,
+                  attributes: [
+                    "closependingId",
+                    "pickupDate",
+                    "garageKms",
+                    "garageOpenDateTime",
+                    "garageCloseDateTime",
+                    "guestKms",
+                    "guestOpenDateTime",
+                    "guestCloseDateTime",
+                    "additionalKms",
+                    "additionalHours",
+                    "discountAmount",
+                    "advanceAmount",
+                    "packageAmount",
+                    "totalAmount",
+                    "total",
+                    "totalDue",
+                    "extraCharges",
+                    "chargesTitle",
+                    "cgstApplicable",
+                    "igstApplicable",
+                    "sgstApplicable",
+                    "additionalKmsAmount",
+                    "additionalHoursAmount"
+                  ],
+                  include: [
                     {
-                        model: Payment,
-                        as: "payment",
-                        required: false,
-                        attributes: ["paymentId", "status", "paymentMode", "amount"],
-                        include: [
-                            {
-                                model: Invoice,
-                                as: "invoices",
-                                required: false,
-                                attributes: [
-                                    "invoiceId",
-                                    "invoiceNumber",
-                                    "invoiceAmount",
-                                    "invoiceStatus",
-                                    "startDate",
-                                    "endDate"
-                                ],
-                                include: [
-                                    {
-                                        model: ClosePending,
-                                        as: "closePending",
-                                        required: false,
-                                        attributes: [
-                                            "closependingId",
-                                            "pickupDate",
-                                            "garageKms",
-                                            "garageOpenDateTime",
-                                            "garageCloseDateTime",
-                                            "guestKms",
-                                            "guestOpenDateTime",
-                                            "guestCloseDateTime",
-                                            "additionalKms",
-                                            "additionalHours",
-                                            "discountAmount",
-                                            "advanceAmount",
-                                            "packageAmount",
-                                            "totalAmount",
-                                            "total",
-                                            "totalDue",
-                                            "extraCharges",
-                                            "chargesTitle",
-                                            "cgstApplicable",
-                                            "igstApplicable",
-                                            "sgstApplicable",
-                                            "additionalKmsAmount",
-                                            "additionalHoursAmount"
-                                        ],
-                                        include: [
-                                            {
-                                                model: PackageData,
-                                                as: "packageData",
-                                                required: false,
-                                                attributes: ["packageDataId", "packageType", "companyId", "packages", "isDeleted", "createdAt"]
-                                            }
-                                        ]
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        model: User,
-                        as: "user",
-                        required: false,
-                        attributes: ["userId", "username", "email", "mobile", "city",
-                            "state", "country", "pinCode", "companyId", "userAddress"],
-                        include: [
-                            {
-                                model: Company,
-                                as: "company",
-                                required: false,
-                                attributes: [
-                                    "companyId",
-                                    "companyName",
-                                    "companyAddress",
-                                    "managerEmail",
-                                    "gstNo"
-                                ],
-                            },
-                        ],
-                    },
-                    {
-                        model: Vehicle,
-                        as: "vehicle",
-                        required: false,
-                        attributes:["localPerKm"],
-                        include: [
-                            {
-                                model: VehicleMaster,
-                                as: "vehicleMaster",
-                                required: false,
-                                attributes: ["vehicleNumber", "vehicleModelName", "vehicleType"],
-                            },
-                        ],
-                    },
-                    {
-                        model: Drivers,
-                        as: "driver",
-                        required: false,
-                        attributes: [
-                            "driverId",
-                            "driverName",
-                            "driverEmail",
-                            "phno",
-                            "city",
-                            "state",
-                            "country",
-                            "address",
-                            "pincode",
-                            "licenseNo",
-                            "ratings"
-                        ],
-                    },
-                ],
-            });
+                      model: PackageData,
+                      as: "packageData",
+                      required: false,
+                      attributes: ["packageDataId", "packageType", "companyId", "packages", "isDeleted", "createdAt"]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          model: User,
+          as: "user",
+          required: false,
+          attributes: ["userId", "username", "email", "mobile", "city",
+            "state", "country", "pinCode", "companyId", "userAddress"],
+          include: [
+            {
+              model: Company,
+              as: "company",
+              required: false,
+              attributes: [
+                "companyId",
+                "companyName",
+                "companyAddress",
+                "managerEmail",
+                "gstNo"
+              ],
+            },
+          ],
+        },
+        {
+          model: Vehicle,
+          as: "vehicle",
+          required: false,
+          attributes: ["localPerKm"],
+          include: [
+            {
+              model: VehicleMaster,
+              as: "vehicleMaster",
+              required: false,
+              attributes: ["vehicleNumber", "vehicleModelName", "vehicleType"],
+            },
+          ],
+        },
+        {
+          model: Drivers,
+          as: "driver",
+          required: false,
+          attributes: [
+            "driverId",
+            "driverName",
+            "driverEmail",
+            "phno",
+            "city",
+            "state",
+            "country",
+            "address",
+            "pincode",
+            "licenseNo",
+            "ratings"
+          ],
+        },
+      ],
+    });
 
     if (!booking) {
       return res.status(404).json({ success: false, message: "Booking not found or not accessible" });

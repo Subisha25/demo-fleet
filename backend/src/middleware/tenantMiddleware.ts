@@ -53,8 +53,9 @@ export const tenantMiddleware = (req: Request, res: Response, next: NextFunction
 
       // Strict Platform SuperAdmin validation:
       // Must have role superadmin AND belong to root tenant / root admin identity
+      const configuredSuperAdminEmail = (process.env.SUPERADMIN_EMAIL || 'subisha2002.m@gmail.com').toLowerCase();
       isPlatformSuperAdmin = (tokenRole === 'superadmin' || tokenRole === 'SUPERADMIN') &&
-        (tokenTenantId === ROOT_TENANT_ID || !decoded.tenantId || tokenEmail === 'subisha2002.m@gmail.com');
+        (tokenTenantId === ROOT_TENANT_ID || !decoded.tenantId || tokenEmail?.toLowerCase() === configuredSuperAdminEmail);
     } catch {
       // Invalid/expired token - authMiddleware will formally reject where required
     }
@@ -99,6 +100,20 @@ export const tenantMiddleware = (req: Request, res: Response, next: NextFunction
     selectedTenantId = undefined;
   }
 
+  const isInspectionMode = (
+    req.headers['x-inspection-mode'] === 'true' ||
+    req.headers['X-Inspection-Mode'] === 'true' ||
+    req.headers['x-inspection-mode'] === '1'
+  );
+
+  // Read-only inspection enforcement: SuperAdmin inspecting a customer fleet cannot perform ANY operational mutations!
+  if (isInspectionMode && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method.toUpperCase())) {
+    return res.status(403).json({
+      success: false,
+      message: 'Inspection Mode: Modifications are strictly disabled in read-only fleet inspection.',
+    });
+  }
+
   const context: TenantContextData = {
     tenantId: resolvedTenantId || '',
     tenantCode: resolvedTenantId === ROOT_TENANT_ID ? ROOT_TENANT_CODE : (resolvedTenantId ? 'TENANT' : ''),
@@ -108,11 +123,15 @@ export const tenantMiddleware = (req: Request, res: Response, next: NextFunction
     companyId: tokenCompanyId,
     email: tokenEmail,
     isPlatformSuperAdmin,
+    isInspectionMode,
   };
 
   if (resolvedTenantId) {
     (req as any).tenantId = resolvedTenantId;
     res.setHeader('X-Tenant-ID', resolvedTenantId);
+  }
+  if (isInspectionMode) {
+    res.setHeader('X-Inspection-Mode', 'true');
   }
   (req as any).tenantContext = context;
 

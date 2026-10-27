@@ -1,6 +1,7 @@
 import express from 'express';
 import {getAllVehicleTypes,getVehicleTypeById,updateVehicleType,deleteVehicleType,restoreVehicleType,getAllVehicleTypesforWeb,getVehicleTypeWithVehicles,getAllVehicleTypeByType } from '../services/vehicleTypeServices';
 import { authMiddleware } from '../middleware/authMiddleware';
+import { requirePaidForModification } from '../middleware/entitlementMiddleware';
 
 import { uploadVehicleImg } from "../middleware/uploadConfig";
 const  router = express.Router();
@@ -12,9 +13,9 @@ router.get('/getAllVehicleTypeByType',authMiddleware,getAllVehicleTypeByType );
 router.get('/getAllVehicleTypesforWeb',authMiddleware,getAllVehicleTypesforWeb);
 router.get("/vehicleTypeWithVehicles",authMiddleware,getVehicleTypeWithVehicles);
 router.get('/:id',authMiddleware,getVehicleTypeById );
-router.put('/:id/update',authMiddleware, uploadVehicleImg.array("vehicleImg", 5),updateVehicleType);
+router.put('/:id/update',authMiddleware, requirePaidForModification, uploadVehicleImg.array("vehicleImg", 5),updateVehicleType);
 
-router.delete('/:id/delete',authMiddleware,deleteVehicleType)
-router.patch('/:id/restore', authMiddleware, restoreVehicleType);
+router.delete('/:id/delete',authMiddleware, requirePaidForModification, deleteVehicleType)
+router.patch('/:id/restore', authMiddleware, requirePaidForModification, restoreVehicleType);
 
 export default router;

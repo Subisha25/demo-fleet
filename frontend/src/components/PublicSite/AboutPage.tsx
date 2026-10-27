@@ -31,14 +31,14 @@ export default function AboutPage() {
       <section className="bg-gradient-to-b from-[#FAF8F5] to-[#F5EFEB] py-16 md:py-24 border-b border-[#E0DAD1]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-4">
           <span className="text-xs font-bold uppercase tracking-widest text-[#C04E24]">
-            About Grace Cabs
+            About FleetFlow
           </span>
           <h1 className="text-4xl sm:text-5xl font-black text-[#1C1A18] tracking-tight">
             Pioneering Corporate Transport & Fleet SaaS Excellence
           </h1>
           <p className="text-lg text-[#5A554E] max-w-3xl mx-auto leading-relaxed">
-            Founded with a commitment to seamless mobility in Chennai and expanding nationwide,
-            Grace Cabs combines on-the-ground operational mastery with intelligent cloud fleet automation.
+            Founded with a commitment to seamless enterprise mobility and expanding nationwide,
+            FleetFlow combines operational fleet management with intelligent cloud automation.
           </p>
         </div>
       </section>
@@ -56,7 +56,7 @@ export default function AboutPage() {
               </h2>
               <p className="text-base text-[#5A554E] leading-relaxed">
                 For years, corporate mobility relied on fragmented logbooks, manual odometer recordings,
-                and delayed month-end billing reconciliations. Grace Cabs recognized that transport
+                and delayed month-end billing reconciliations. FleetFlow recognized that transport
                 operators needed more than spreadsheets—they needed an end-to-end operational operating system.
               </p>
               <p className="text-base text-[#5A554E] leading-relaxed">
@@ -85,8 +85,8 @@ export default function AboutPage() {
               <div className="flex items-center gap-3 pb-6 border-b border-[#E0DAD1]">
                 <GraceCabsLogo className="h-10 w-auto" />
                 <div>
-                  <h3 className="font-extrabold text-[#1C1A18] text-lg">Grace Cabs Mobility</h3>
-                  <p className="text-xs text-[#7A7570]">Chennai Headquarters • Tamil Nadu, India</p>
+                  <h3 className="font-extrabold text-[#1C1A18] text-lg">FleetFlow Platform</h3>
+                  <p className="text-xs text-[#7A7570]">Cloud Mobility Network • India</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-6">

@@ -9,6 +9,7 @@ export interface TenantContextData {
   companyId?: string;
   email?: string;
   isPlatformSuperAdmin?: boolean;
+  isInspectionMode?: boolean;
 }
 
 export const ROOT_TENANT_ID = 'e7b8a1c0-0000-0000-0000-000000000001';

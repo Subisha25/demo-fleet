@@ -35,6 +35,85 @@ export class TenantRegistrationRequest extends Model {
   fleetName!: string;
 
   @Column({
+    type: DataType.STRING(150),
+    allowNull: true,
+  })
+  slug!: string | null;
+
+  @Column({
+    type: DataType.STRING(255),
+    allowNull: true,
+  })
+  legalName!: string | null;
+
+  @Column({
+    type: DataType.STRING(255),
+    allowNull: true,
+  })
+  displayName!: string | null;
+
+  @Column({
+    type: DataType.TEXT,
+    allowNull: true,
+  })
+  registeredAddress!: string | null;
+
+  @Column({
+    type: DataType.STRING(20),
+    allowNull: true,
+  })
+  gstin!: string | null;
+
+  @Column({
+    type: DataType.STRING(15),
+    allowNull: true,
+  })
+  panNumber!: string | null;
+
+  @Column({
+    type: DataType.STRING(10),
+    allowNull: true,
+    defaultValue: '996609',
+  })
+  sacCode!: string | null;
+
+  @Column({
+    type: DataType.STRING(255),
+    allowNull: true,
+  })
+  website!: string | null;
+
+  @Column({
+    type: DataType.TEXT,
+    allowNull: true,
+  })
+  billingFooterText!: string | null;
+
+  @Column({
+    type: DataType.STRING(255),
+    allowNull: true,
+  })
+  businessEmail!: string | null;
+
+  @Column({
+    type: DataType.STRING(50),
+    allowNull: true,
+  })
+  businessPhone!: string | null;
+
+  @Column({
+    type: DataType.STRING(20),
+    allowNull: true,
+  })
+  pinCode!: string | null;
+
+  @Column({
+    type: DataType.STRING(500),
+    allowNull: true,
+  })
+  logoUrl!: string | null;
+
+  @Column({
     type: DataType.STRING(20),
     allowNull: false,
   })

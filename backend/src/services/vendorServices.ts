@@ -22,6 +22,8 @@ import bcrypt from 'bcrypt';
 import { dispatchAuditedSms } from './smsServices';
 import { sendSmsNotifications } from '../utils/smsNotifications';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
+import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
+import { Op } from 'sequelize';
 
 export const confirmBooking = async (req: any, res: Response) => {
   try {
@@ -190,8 +192,8 @@ const company = await Company.findOne({ where:  { companyId: userData?.companyId
         Vehicle: ${vehicleName ?? ""}</br/>
         Vehicle Number: ${vehicleNumber ?? ""}<br/>
         `,
-        WEB_SITE_NAME: "www.gracecabs.com",
-        WEB_SITE_EMAIL: "traveldesk@gracecabs.com",
+        WEB_SITE_NAME: "www.fleetflow.com",
+        WEB_SITE_EMAIL: "support@fleetflow.com",
         CONTACT_NO: "+91 98417 22675",
 
       });
@@ -357,8 +359,8 @@ export const confirmBookingforWeb = async (req: any, res: Response) => {
               Vehicle No: ${vehicleNumber}<br/>
             `,
             GraceDetails: `
-              WEB_SITE_NAME: "www.gracecabs.com" <br/>
-              WEB_SITE_EMAIL: "traveldesk@gracecabs.com" <br/>
+              WEB_SITE_NAME: "www.fleetflow.com" <br/>
+              WEB_SITE_EMAIL: "support@fleetflow.com" <br/>
               CONTACT_NO: "+91 98417 22675"<br/>
             `,
           });
@@ -429,66 +431,78 @@ export const confirmBookingforWeb = async (req: any, res: Response) => {
 
 
 
-// Get All Vendors (Simple list without associations)
+// Get All Vendors (Filtered by tenant and deleted status)
 export const getAllVendors = async (req: any, res: Response) => {
   try {
     const role = req.role;
- 
-      const { status } = req.query
-      let vendors;
+    if (role === ROLES.USER) {
+      return res.status(403).json({ message: 'Not Authorized' });
+    }
 
-      if (status === '1') {
-        vendors = await Vendor.unscoped().findAll({
-        where: { isDeleted: true },
+    const { status } = req.query;
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
+    let vendors;
+    if (status === '1') {
+      vendors = await Vendor.unscoped().findAll({
+        where: { isDeleted: true, ...tenantCondition },
         order: [["createdAt", "DESC"]],
-        });
-      }
-      else {
-        vendors = await Vendor.findAll({
-        where: { isDeleted: false },
+      });
+    } else {
+      vendors = await Vendor.findAll({
+        where: { isDeleted: false, ...tenantCondition },
         order: [["createdAt", "DESC"]],
-        });
-      }
-      res.status(200).json({ message: 'Vendors retrieved successfully', vendors });
-      return;
-  
-  } catch (err) {
-    res.status(500).json({ error: err });
+      });
+    }
+    res.status(200).json({ message: 'Vendors retrieved successfully', vendors });
+    return;
+
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || err });
   }
 };
 
-
-
-// Get Vendor by ID (Simple find)
+// Get Vendor by ID
 export const getVendorById = async (req: any, res: Response) => {
   const { vendorId } = req.params;
 
   try {
     const role = req.role;
-    if (role == ROLES.ADMIN) {
-      const vendor = await Vendor.findByPk(vendorId, {
-        include: [
-          {
-            model: Vehicle, required: false,
-            as: 'vehicles' // Only include vehicles owned by vendor
-          }
-        ]
-      });
-
-      if (!vendor) {
-        return res.status(404).json({ message: 'Vendor not found' });
-      }
-
-      res.status(200).json({ message: 'Vendor retrieved successfully', vendor });
-      return;
-    } else {
+    if (role === ROLES.USER) {
       return res.status(403).json({ message: 'Not Authorized' });
     }
-  } catch (err) {
-    res.status(500).json({ error: err });
+
+    const vendor = await Vendor.findByPk(vendorId, {
+      include: [
+        {
+          model: Vehicle, required: false,
+          as: 'vehicles'
+        }
+      ]
+    });
+
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+    assertTenantOwnership(vendor, 'Vendor');
+
+    res.status(200).json({ message: 'Vendor retrieved successfully', vendor });
+    return;
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
+    res.status(500).json({ error: err.message || err });
   }
 };
-
 
 // Update Vendor
 export const updateVendor = async (req: any, res: Response) => {
@@ -497,30 +511,57 @@ export const updateVendor = async (req: any, res: Response) => {
 
   try {
     const role = req.role;
-    if (role == ROLES.ADMIN) {
-      const vendor = await Vendor.findByPk(vendorId);
-
-      if (!vendor) {
-        return res.status(404).json({ message: 'Vendor not found' });
-      }
-
-      // Check if email is being updated and if it already exists
-      if (updateData.email && updateData.email !== vendor.email) {
-        const existingVendor = await Vendor.findOne({ where: { email: updateData.email } });
-        if (existingVendor) {
-          return res.status(400).json({ message: 'Email already exists for another vendor' });
-        }
-      }
-
-      await vendor.update(updateData);
-
-      res.status(200).json({ message: 'Vendor updated successfully', vendor });
-      return;
-    } else {
+    if (role === ROLES.USER) {
       return res.status(403).json({ message: 'Not Authorized' });
     }
-  } catch (err) {
-    res.status(500).json({ error: err });
+
+    const vendor = await Vendor.findByPk(vendorId);
+
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+    assertTenantOwnership(vendor, 'Vendor');
+
+    const ctx = getTenantContext();
+    const tenantId = vendor.tenantId || ctx?.tenantId || ROOT_TENANT_ID;
+
+    // Check if email is being updated and if it already exists within the tenant
+    if (updateData.email && updateData.email !== vendor.email) {
+      const existingVendor = await Vendor.findOne({
+        where: {
+          email: updateData.email,
+          tenantId,
+          vendorId: { [Op.ne]: vendorId }
+        }
+      });
+      if (existingVendor) {
+        return res.status(400).json({ message: 'Email already exists for another vendor in this fleet' });
+      }
+    }
+
+    // Check if phone number is being updated and if it already exists within the tenant
+    if (updateData.phno && updateData.phno !== vendor.phno) {
+      const existingPhone = await Vendor.findOne({
+        where: {
+          phno: updateData.phno,
+          tenantId,
+          vendorId: { [Op.ne]: vendorId }
+        }
+      });
+      if (existingPhone) {
+        return res.status(400).json({ message: 'Phone number already exists for another vendor in this fleet' });
+      }
+    }
+
+    await vendor.update(updateData);
+
+    res.status(200).json({ message: 'Vendor updated successfully', vendor });
+    return;
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
+    res.status(500).json({ error: err.message || err });
   }
 };
 
@@ -530,36 +571,30 @@ export const deleteVendor = async (req: any, res: Response) => {
 
   try {
     const role = req.role;
-    if (role == ROLES.ADMIN) {
-      const vendor = await Vendor.unscoped().findByPk(vendorId);
-
-
-      if (!vendor) {
-        return res.status(404).json({ message: 'Vendor not found' });
-      }
-
-      // Check if vendor has associated vehicles
-      // const associatedVehicles = await Vehicle.findAll({ where: { vendorId } });
-      // if (associatedVehicles.length > 0) {
-      //   return res.status(400).json({
-      //     message: 'Cannot delete vendor. Vendor has associated vehicles. Please reassign or delete vehicles first.'
-      //   });
-      // }
-
-      await vendor.update({ isDeleted: true });
-
-      res.status(200).json({ message: 'Owner deleted successfully' });
-      return;
-    } else {
+    if (role === ROLES.USER) {
       return res.status(403).json({ message: 'Not Authorized' });
     }
-  } catch (err) {
-    res.status(500).json({ error: err });
+
+    const vendor = await Vendor.unscoped().findByPk(vendorId);
+
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+    assertTenantOwnership(vendor, 'Vendor');
+
+    await vendor.update({ isDeleted: true });
+
+    res.status(200).json({ message: 'Owner deleted successfully' });
+    return;
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
+    res.status(500).json({ error: err.message || err });
   }
 };
 
-
-
+// Create Driver (with tenant isolation and exact field error extraction)
 export const createDriver = async (req: any, res: Response) => {
   const { driverName, driverEmail, phno, password, city, state, country, address,
     licenseNo, licExpDate, pincode, vehicleTypeId, trackingSource } = req.body;
@@ -573,47 +608,103 @@ export const createDriver = async (req: any, res: Response) => {
     const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
 
     if (!driverName || !String(driverName).trim()) {
-      return res.status(400).json({ message: 'Driver name is required' });
+      return res.status(400).json({ message: 'Driver name is required', field: 'driverName' });
     }
 
     if (!phno || !String(phno).trim()) {
-      return res.status(400).json({ message: 'Phone number is required' });
+      return res.status(400).json({ message: 'Phone number is required', field: 'phno' });
     }
 
     const cleanPhone = String(phno).trim();
-    const existing = await Drivers.findOne({ where: { phno: cleanPhone, tenantId } });
+
+    // Check active driver with same phone in this fleet
+    const existing = await Drivers.unscoped().findOne({
+      where: { phno: cleanPhone, tenantId, isDeleted: false }
+    });
     if (existing) {
-      return res.status(400).json({ message: 'Phone number already exists in this fleet' });
+      return res.status(400).json({ message: 'Phone number already exists in this fleet', field: 'phno' });
     }
 
+    // Check email if provided
+    let cleanEmail: string | null = null;
     if (driverEmail && String(driverEmail).trim() !== '') {
-      const cleanEmail = String(driverEmail).trim();
-      const existingEmail = await Drivers.findOne({ where: { driverEmail: cleanEmail, tenantId } });
+      cleanEmail = String(driverEmail).trim();
+      const existingEmail = await Drivers.unscoped().findOne({
+        where: { driverEmail: cleanEmail, tenantId, isDeleted: false }
+      });
       if (existingEmail) {
-        return res.status(400).json({ message: 'Email already exists for another driver in this fleet' });
+        return res.status(400).json({ message: 'Email already exists for another driver in this fleet', field: 'driverEmail' });
+      }
+    }
+
+    // Validate license expiration date safely
+    let safeLicExpDate: Date | null = null;
+    if (licExpDate && String(licExpDate).trim() !== '') {
+      const parsedDate = new Date(licExpDate);
+      if (isNaN(parsedDate.getTime())) {
+        return res.status(400).json({ message: 'Invalid license expiry date format', field: 'licExpDate' });
+      }
+      safeLicExpDate = parsedDate;
+    }
+
+    // If vehicleTypeId is provided, validate it belongs to this fleet or root
+    if (vehicleTypeId) {
+      const vt = await VehicleType.findByPk(vehicleTypeId);
+      if (!vt) {
+        return res.status(404).json({ message: 'Vehicle type not found', field: 'vehicleTypeId' });
+      }
+      if (vt.tenantId && vt.tenantId !== tenantId && vt.tenantId !== ROOT_TENANT_ID) {
+        return res.status(403).json({ message: 'Selected vehicle type does not belong to your fleet', field: 'vehicleTypeId' });
       }
     }
 
     const rawPassword = (password && String(password).trim() !== '') ? String(password).trim() : 'Driver@123';
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
-    const driver = await Drivers.create({
-      driverName: String(driverName).trim(),
-      driverEmail: driverEmail ? String(driverEmail).trim() : null,
-      phno: cleanPhone,
-      password: hashedPassword,
-      city,
-      state,
-      country,
-      address,
-      role: role,
-      pincode,
-      licenseNo,
-      licExpDate,
-      vehicleTypeId: vehicleTypeId || null,
-      trackingsource: trackingSource,
-      tenantId
+    // If a soft-deleted record exists for this phone in this tenant, restore and update it
+    const softDeleted = await Drivers.unscoped().findOne({
+      where: { phno: cleanPhone, tenantId, isDeleted: true }
     });
+
+    let driver: Drivers;
+    if (softDeleted) {
+      await softDeleted.update({
+        driverName: String(driverName).trim(),
+        driverEmail: cleanEmail,
+        password: hashedPassword,
+        city: city || null,
+        state: state || null,
+        country: country || null,
+        address: address || null,
+        role,
+        pincode: pincode || null,
+        licenseNo: licenseNo || null,
+        licExpDate: safeLicExpDate,
+        vehicleTypeId: vehicleTypeId || null,
+        trackingsource: trackingSource || null,
+        isDeleted: false,
+      });
+      driver = softDeleted;
+    } else {
+      driver = await Drivers.create({
+        driverName: String(driverName).trim(),
+        driverEmail: cleanEmail,
+        phno: cleanPhone,
+        password: hashedPassword,
+        city: city || null,
+        state: state || null,
+        country: country || null,
+        address: address || null,
+        role,
+        pincode: pincode || null,
+        licenseNo: licenseNo || null,
+        licExpDate: safeLicExpDate,
+        vehicleTypeId: vehicleTypeId || null,
+        trackingsource: trackingSource || null,
+        tenantId,
+        isDeleted: false,
+      });
+    }
 
     const driverWithVehicle = await Drivers.findOne({
       where: { driverId: driver.driverId },
@@ -625,14 +716,14 @@ export const createDriver = async (req: any, res: Response) => {
 
     // Send email notification if email provided
     let emailSent = false;
-    if (driverEmail && String(driverEmail).trim() !== '') {
+    if (cleanEmail) {
       try {
         await sendEmailFromTemplate('DRIVER_REGISTRATION_EMAIL_TO_DRIVER', {
           DriverName: driver.driverName,
-          DriverEmail: driver.driverEmail,
+          DriverEmail: cleanEmail,
           DriverPhone: driver.phno,
           Password: rawPassword,
-          to: driver.driverEmail
+          to: cleanEmail
         });
         emailSent = true;
       } catch (emailErr: any) {
@@ -646,7 +737,7 @@ export const createDriver = async (req: any, res: Response) => {
       const smsRes = await dispatchAuditedSms({
         recipient: cleanPhone,
         templateCode: 'DRIVER_WELCOME_SMS',
-        message: `Welcome to Grace Cabs, ${driver.driverName}! Your driver account is active. Mobile: ${cleanPhone}.`,
+        message: `Welcome to FleetFlow Fleet, ${driver.driverName}! Your driver account is active. Mobile: ${cleanPhone}.`,
         referenceEntity: 'DRIVER',
         referenceId: driver.driverId,
         metadata: { driverId: driver.driverId, driverName: driver.driverName }
@@ -663,8 +754,23 @@ export const createDriver = async (req: any, res: Response) => {
     });
 
   } catch (err: any) {
-    console.error('Driver creation error:', err.errors || err);
-    return res.status(400).json({ message: err.message, errors: err.errors });
+    console.error('Driver creation error:', err);
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
+    if (err?.name === 'SequelizeUniqueConstraintError' || err?.name === 'SequelizeValidationError') {
+      const field = err.errors?.[0]?.path || 'field';
+      const msg = err.errors?.[0]?.message || `${field} failed validation`;
+      return res.status(400).json({
+        message: msg.includes('must be unique') ? `${field} already exists` : msg,
+        field,
+        errors: err.errors
+      });
+    }
+    return res.status(400).json({
+      message: err.message || 'Failed to create driver',
+      errors: err.errors
+    });
   }
 };
 
@@ -750,59 +856,47 @@ export const createDriver = async (req: any, res: Response) => {
 
 
 export const createVehicleType = async (req: any, res: Response) => {
-  const { vehicleType, seatCapacity, priorMinutes } = req.body; // ✅ NEW
+  const { vehicleType, seatCapacity, priorMinutes } = req.body;
   try {
     const role = req.role;
     if (role === ROLES.USER) {
       return res.status(403).json({ message: 'Not Authorized' });
     }
-  const vehicleImg = req.files ? (req.files as Express.Multer.File[]).map(file => file.filename) : [];
 
-    const existing = await VehicleType.findOne({ where: { vehicleType } });
-    if (existing) return res.status(400).json({ message: 'Vehicle already registered' });
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+
+    const vehicleImg = req.files ? (req.files as Express.Multer.File[]).map(file => file.filename) : [];
+
+    const existing = await VehicleType.findOne({ where: { vehicleType, tenantId } });
+    if (existing) return res.status(400).json({ message: 'Vehicle type already registered in this fleet' });
 
     const vehiType = await VehicleType.create({
       vehicleType,
-      seatCapacity,vehicleImg,
-      priorMinutes: Number(priorMinutes ?? 0), // ✅ NEW (safe default)
+      seatCapacity,
+      vehicleImg,
+      priorMinutes: Number(priorMinutes ?? 0),
+      tenantId
     });
 
     res.status(201).json({ message: 'Vehicle type created successfully', vehiType });
     return;
 
-  } catch (err) {
-    res.status(500).json({ error: err });
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
+    res.status(500).json({ error: err.message || err });
   }
 };
 
-// export const createVehicleType = async (req: any, res: Response) => {
-//   const { vehicleType, AdvanceBookingHours, seatCapacity } = req.body;
-//   try {
-//     const role = req.role;
-//     if (role === ROLES.USER) {
-//       return res.status(403).json({ message: 'Not Authorized' });
-//     }
-
-//     const existing = await VehicleType.findOne({ where: { vehicleType } });
-//     if (existing) return res.status(400).json({ message: 'Vehicle already registered' });
-
-//     const vehiType = await VehicleType.create({ vehicleType, AdvanceBookingHours, seatCapacity });
-
-//     res.status(201).json({ message: 'Vehicle type created successfully', vehiType });
-//     return;
-
-//   } catch (err) {
-//     res.status(500).json({ error: err });
-//   }
-// };
-
 export const createVehicle = async (req: any, res: Response) => {
- const {
-  vehicleName,
-  vehicleTypeId,
-  manufacturing,
-  availableStatus
-} = req.body;
+  const {
+    vehicleName,
+    vehicleTypeId,
+    manufacturing,
+    availableStatus
+  } = req.body;
 
   const vehicleImg = req.files ? (req.files as Express.Multer.File[]).map(file => file.filename) : [];
 
@@ -815,11 +909,24 @@ export const createVehicle = async (req: any, res: Response) => {
     const ctx = getTenantContext();
     const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
 
+    if (vehicleTypeId) {
+      const vt = await VehicleType.findByPk(vehicleTypeId);
+      if (!vt) {
+        return res.status(404).json({ message: 'Vehicle type not found' });
+      }
+      if (vt.tenantId && vt.tenantId !== tenantId && vt.tenantId !== ROOT_TENANT_ID) {
+        return res.status(403).json({ message: 'Selected vehicle type does not belong to your fleet' });
+      }
+    }
+
     const existing = await Vehicle.findOne({ where: { vehicleTypeId, vehicleName, tenantId } });
-    if (existing) return res.status(400).json({ message: 'Vehicle already registered' });
+    if (existing) return res.status(400).json({ message: 'Vehicle model already registered in this fleet' });
 
     const vehicle = await Vehicle.create({
-      vehicleName, vehicleTypeId, manufacturing, vehicleImg,
+      vehicleName,
+      vehicleTypeId,
+      manufacturing,
+      vehicleImg,
       availableStatus,
       tenantId
     });
@@ -827,13 +934,13 @@ export const createVehicle = async (req: any, res: Response) => {
     res.status(201).json({ message: 'Registered successfully', vehicle });
     return;
 
-  } catch (err) {
-    res.status(500).json({ error: err });
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
+    res.status(500).json({ error: err.message || err });
   }
 };
-
-
-
 
 export const createVehicleMaster = async (req: any, res: Response) => {
   const { vehicleNumber, vehicleId, vendorId } = req.body;
@@ -843,12 +950,10 @@ export const createVehicleMaster = async (req: any, res: Response) => {
       return res.status(403).json({ message: 'Not Authorized' });
     }
 
-    // const existing = await VehicleMaster.findOne({ where: { vehicleNumber } });
-    // if (existing) {
-    //   return res.status(400).json({ message: 'Vehicle already registered' });
-    // }
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
 
-    // Fetch vehicle details + type name
+    // Fetch vehicle details + validate tenant
     const vehicleData = await Vehicle.findByPk(vehicleId, {
       include: [{ model: VehicleType, required: false, attributes: ['vehicleType'] }]
     });
@@ -856,15 +961,18 @@ export const createVehicleMaster = async (req: any, res: Response) => {
     if (!vehicleData) {
       return res.status(404).json({ message: 'Vehicle not found' });
     }
+    if (vehicleData.tenantId && vehicleData.tenantId !== tenantId) {
+      return res.status(403).json({ message: 'Selected vehicle model does not belong to your fleet' });
+    }
 
-    // Fetch owner details
+    // Fetch owner details + validate tenant
     const vendorData = await Vendor.findByPk(vendorId);
     if (!vendorData) {
       return res.status(404).json({ message: 'Owner not found' });
     }
-
-    const ctx = getTenantContext();
-    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    if (vendorData.tenantId && vendorData.tenantId !== tenantId) {
+      return res.status(403).json({ message: 'Selected owner does not belong to your fleet' });
+    }
 
     const vehicleMaster = await VehicleMaster.create({
       vehicleNumber,
@@ -878,7 +986,10 @@ export const createVehicleMaster = async (req: any, res: Response) => {
     });
 
     res.status(201).json({ message: 'Registered successfully', vehicleMaster });
-  } catch (err) {
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ message: err.message });
+    }
     console.error("Error creating vehicle master:", err);
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }

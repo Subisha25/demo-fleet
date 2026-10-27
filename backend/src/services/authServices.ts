@@ -655,17 +655,20 @@ export const vendorLogin = async (req: Request, res: Response) => {
 };
 
 // Existing owner register
-export const ownerRegister = async (req: Request, res: Response) => {
+export const ownerRegister = async (req: any, res: Response) => {
   const { vendorName, email, phno, address, country, state, city } = req.body;
   try {
-    const existing = await Vendor.findOne({ where: { email } });
-    if (existing) return res.status(400).json({ message: 'Email already registered' });
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || req.tenantId || ROOT_TENANT_ID;
 
-    const owner = await Vendor.create({ vendorName, email, phno, address, country, state, city });
+    const existing = await Vendor.findOne({ where: { email, tenantId } });
+    if (existing) return res.status(400).json({ message: 'Email already registered in this fleet' });
 
-     res.status(201).json({ message: 'Registered successfully', owner })
-    } catch (err) {
-    res.status(500).json({ error: err });
+    const owner = await Vendor.create({ vendorName, email, phno, address, country, state, city, tenantId });
+
+    res.status(201).json({ message: 'Registered successfully', owner });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || err });
   }
 };
 
@@ -969,15 +972,15 @@ export const forgetPasswordSendOtp = async (req: Request, res: Response) => {
       expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
     });
 
-    // Send email if template exists
+    // Send email if template exists strictly to requested user email
     if (otpConf) {
       await sendEmailFromTemplate(otpConf.emailCode, {
-        UserName: userResult.userData.username ?? "",
-        UserEmail: userResult.userData.email ?? email,
+        UserName: userResult.userData?.username ?? "User",
+        UserEmail: userResult.userData?.email ?? email,
         OTP: otp,
-        WEB_SITE_NAME: "www.gracecabs.com",
-        WEB_SITE_EMAIL: "traveldesk@gracecabs.com",
-        CONTACT_NO: "+91 98417 22675",
+        WEB_SITE_NAME: "www.fleetflow.com",
+        WEB_SITE_EMAIL: "support@fleetflow.com",
+        CONTACT_NO: "+91 90000 00000",
       });
     }
     console.log("otp",otp);

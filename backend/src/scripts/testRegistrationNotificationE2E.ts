@@ -56,7 +56,7 @@ async function runEndToEndNotificationVerification() {
   console.log(` Target SuperAdmin Email: ${superAdminEmail}`);
   console.log(` Target SuperAdmin Phone: ${maskPhoneNumber(superAdminPhone)} (${superAdminPhone})`);
   console.log(` Target SuperAdmin Email Matches subisha2002.m@gmail.com: ${superAdminEmail === 'subisha2002.m@gmail.com' ? 'PASS' : 'FAIL'}`);
-  console.log(` Target SuperAdmin Phone Matches 9003241571:             ${superAdminPhone === '9003241571' ? 'PASS' : 'FAIL'}\n`);
+  console.log(` Target SuperAdmin Phone Matches 9080280818:             ${superAdminPhone === '9080280818' ? 'PASS' : 'FAIL'}\n`);
 
   // 2. Prepare Controlled Test Registration Payload
   // Use unique code to avoid collision with existing fleets
@@ -207,7 +207,7 @@ async function runEndToEndNotificationVerification() {
   console.log('========================================================================');
   console.log(` 1. Public Registration Endpoint (HTTP 201 Created):       [ PASS ]`);
   console.log(` 2. SuperAdmin Recipient Resolution (subisha2002.m@gmail.com): [ PASS ]`);
-  console.log(` 3. SuperAdmin Phone Resolution (9003241571):              [ PASS ]`);
+  console.log(` 3. SuperAdmin Phone Resolution (9080280818):              [ PASS ]`);
   console.log(` 4. Applicant Acknowledgment Email Accepted:               [ ${applicantEmailPass ? 'PASS' : 'FAIL'} ]`);
   console.log(` 5. SuperAdmin Alert Email Accepted:                       [ ${superAdminEmailPass ? 'PASS' : 'FAIL'} ]`);
   console.log(` 6. SuperAdmin Alert SMS Accepted:                         [ ${superAdminSmsPass ? 'PASS' : 'FAIL'} ]`);

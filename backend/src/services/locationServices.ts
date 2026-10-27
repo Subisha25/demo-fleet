@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import axios from 'axios';
 import { Pickuparea, Pickupcity } from '../models';
 import { USERS } from "../utils/costants";
+import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 const { ROLES } = USERS;
 
 export const getCountries = async (req: Request, res: Response) => {
@@ -45,65 +46,86 @@ export const getCities = async (req: Request, res: Response) => {
 };
 
 export const addPickupCity = async (req: any, res: Response) => {
-  const { country,state,pickupCity,sortOrder,isPickupCity } = req.body;
+  const { country, state, pickupCity, sortOrder, isPickupCity } = req.body;
   try {
     const role = req.role;
-        if (role === ROLES.USER) {
+    if (role === ROLES.USER) {
       return res.status(403).json({ message: 'Not Authorized' });
     }
 
-    const existing = await Pickupcity.findOne({ where: { pickupCity } });
-    if (existing) return res.status(400).json({ message: 'pickupcity already registered' });
-    
-    const pickupcity = await Pickupcity.create({ country,state,pickupCity,sortOrder,isPickupCity  });
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
 
-     res.status(201).json({ message: 'Registered successfully', pickupcity })
-    } catch (err) {
-    res.status(500).json({ error: err });
+    const existing = await Pickupcity.findOne({ where: { pickupCity, tenantId } });
+    if (existing) return res.status(400).json({ message: 'Pickup city already registered in this fleet' });
+
+    const pickupcity = await Pickupcity.create({
+      country,
+      state,
+      pickupCity,
+      sortOrder,
+      isPickupCity,
+      tenantId
+    });
+
+    res.status(201).json({ message: 'Registered successfully', pickupcity });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || err });
   }
 };
 
 
-export const addPickUpArea = async (req: Request, res: Response) => {
+export const addPickUpArea = async (req: any, res: Response) => {
   try {
+    const role = req.role;
+    if (role === ROLES.USER) {
+      return res.status(403).json({ message: 'Not Authorized' });
+    }
+
     const { pickupCity, pickupArea } = req.body;
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+
     const existingCity = await Pickupcity.findOne({
       where: {
-        pickupCity
-      } 
+        pickupCity,
+        tenantId
+      }
     });
 
-    if(!existingCity) {
-       return res.status(400).json({
-    message: 'City not exists',
+    if (!existingCity) {
+      return res.status(400).json({
+        message: 'City does not exist in this fleet',
       });
     }
 
     const existingArea = await Pickuparea.findOne({
-  where: {
-      pickupCity,
-      pickupArea
+      where: {
+        pickupCity,
+        pickupArea,
+        tenantId
+      }
+    });
+
+    if (existingArea) {
+      return res.status(400).json({
+        message: 'Area already exists in this fleet',
+      });
     }
-  });
 
-  if (existingArea) {
-  return res.status(400).json({
-    message: 'Area already exists',
-  });
-}
+    const newArea = await Pickuparea.create({
+      pickupCity,
+      pickupArea,
+      tenantId
+    });
 
-const newArea = await Pickuparea.create({
-  pickupCity,
-  pickupArea
-});
-
-res.status(201).json({
-  message: 'Pickup area added successfully',
-  data: newArea
-});
+    res.status(201).json({
+      message: 'Pickup area added successfully',
+      data: newArea
+    });
   } catch (error: any) {
     res.status(400).json({
-      message: 'Error updating pickuparea',
+      message: 'Error creating pickup area',
       error: error.message,
     });
   }

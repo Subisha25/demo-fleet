@@ -15,7 +15,7 @@ export default function PublicFooter() {
             <Link to="/" className="flex items-center gap-3">
               <GraceCabsLogo className="h-10 w-auto" />
               <div>
-                <span className="text-xl font-black tracking-tight text-white">GRACE CABS</span>
+                <span className="text-xl font-black tracking-tight text-white">FLEETFLOW</span>
                 <span className="block text-[10px] font-bold tracking-widest text-[#C04E24] uppercase">
                   Multi-Tenant Fleet Platform
                 </span>
@@ -47,7 +47,7 @@ export default function PublicFooter() {
               </li>
               <li>
                 <Link to="/about" className="hover:text-[#C04E24] transition-colors">
-                  About Grace Cabs
+                  About FleetFlow
                 </Link>
               </li>
               <li>
@@ -108,8 +108,8 @@ export default function PublicFooter() {
                 <svg className="w-5 h-5 text-[#C04E24] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
-                <a href="mailto:traveldesk@gracecabs.com" className="hover:text-[#C04E24] transition-colors break-all">
-                  traveldesk@gracecabs.com
+                <a href="mailto:support@fleetflow.com" className="hover:text-[#C04E24] transition-colors break-all">
+                  support@fleetflow.com
                 </a>
               </li>
               <li className="flex items-start gap-2.5">
@@ -133,7 +133,7 @@ export default function PublicFooter() {
 
         {/* Bottom Legal Bar */}
         <div className="mt-12 pt-8 border-t border-[#332F2C] flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[#8C847B]">
-          <p>© {currentYear} Grace Cabs SaaS. All rights reserved.</p>
+          <p>© {currentYear} FleetFlow SaaS. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <Link to="/terms" className="hover:text-[#E0DAD1] transition-colors">
               Terms & Conditions

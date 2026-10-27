@@ -1,0 +1,382 @@
+{
+  "backupPath": "d:\\demobooking\\demo-bookings\\backend\\backup_demodb_precleanup_20261024_1326.sql",
+  "totalDeleted": 638,
+  "cleanupSummary": [
+    {
+      "tableName": "booking",
+      "beforeCount": 38,
+      "afterCount": 0,
+      "deletedCount": 38,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (38 rows)"
+    },
+    {
+      "tableName": "booking_sequence",
+      "beforeCount": 6,
+      "afterCount": 0,
+      "deletedCount": 6,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (6 rows)"
+    },
+    {
+      "tableName": "closependings",
+      "beforeCount": 19,
+      "afterCount": 0,
+      "deletedCount": 19,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (19 rows)"
+    },
+    {
+      "tableName": "company",
+      "beforeCount": 73,
+      "afterCount": 0,
+      "deletedCount": 73,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (73 rows)"
+    },
+    {
+      "tableName": "company_policies",
+      "beforeCount": 1,
+      "afterCount": 0,
+      "deletedCount": 1,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (1 rows)"
+    },
+    {
+      "tableName": "configuration",
+      "beforeCount": 1,
+      "afterCount": 1,
+      "deletedCount": 0,
+      "status": "PRESERVED",
+      "notes": "Mandatory Protected Table - 100% Preserved"
+    },
+    {
+      "tableName": "customer_notifications",
+      "beforeCount": 0,
+      "afterCount": 0,
+      "deletedCount": 0,
+      "status": "SKIPPED_EMPTY",
+      "notes": "Already empty before cleanup"
+    },
+    {
+      "tableName": "driver_notifications",
+      "beforeCount": 0,
+      "afterCount": 0,
+      "deletedCount": 0,
+      "status": "SKIPPED_EMPTY",
+      "notes": "Already empty before cleanup"
+    },
+    {
+      "tableName": "drivers",
+      "beforeCount": 67,
+      "afterCount": 0,
+      "deletedCount": 67,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (67 rows)"
+    },
+    {
+      "tableName": "emailconfiguration",
+      "beforeCount": 23,
+      "afterCount": 23,
+      "deletedCount": 0,
+      "status": "PRESERVED",
+      "notes": "Mandatory Protected Table - 100% Preserved"
+    },
+    {
+      "tableName": "employee",
+      "beforeCount": 14,
+      "afterCount": 1,
+      "deletedCount": 13,
+      "status": "PARTIALLY_CLEARED",
+      "notes": "Preserved SuperAdmin, deleted demo fleet admins"
+    },
+    {
+      "tableName": "invoice",
+      "beforeCount": 39,
+      "afterCount": 0,
+      "deletedCount": 39,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (39 rows)"
+    },
+    {
+      "tableName": "invoice_sequences",
+      "beforeCount": 9,
+      "afterCount": 0,
+      "deletedCount": 9,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (9 rows)"
+    },
+    {
+      "tableName": "mapcount",
+      "beforeCount": 0,
+      "afterCount": 0,
+      "deletedCount": 0,
+      "status": "SKIPPED_EMPTY",
+      "notes": "Already empty before cleanup"
+    },
+    {
+      "tableName": "monthly_invoice",
+      "beforeCount": 19,
+      "afterCount": 0,
+      "deletedCount": 19,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (19 rows)"
+    },
+    {
+      "tableName": "monthly_invoice_items",
+      "beforeCount": 19,
+      "afterCount": 0,
+      "deletedCount": 19,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (19 rows)"
+    },
+    {
+      "tableName": "monthlybookingsequence",
+      "beforeCount": 0,
+      "afterCount": 0,
+      "deletedCount": 0,
+      "status": "SKIPPED_EMPTY",
+      "notes": "Already empty before cleanup"
+    },
+    {
+      "tableName": "notification_logs",
+      "beforeCount": 252,
+      "afterCount": 252,
+      "deletedCount": 0,
+      "status": "PRESERVED",
+      "notes": "System Configuration / Audit Log - Preserved"
+    },
+    {
+      "tableName": "oncallinvoice",
+      "beforeCount": 1,
+      "afterCount": 0,
+      "deletedCount": 1,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (1 rows)"
+    },
+    {
+      "tableName": "oncallinvoiceitems",
+      "beforeCount": 1,
+      "afterCount": 0,
+      "deletedCount": 1,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (1 rows)"
+    },
+    {
+      "tableName": "ordersummery",
+      "beforeCount": 0,
+      "afterCount": 0,
+      "deletedCount": 0,
+      "status": "SKIPPED_EMPTY",
+      "notes": "Already empty before cleanup"
+    },
+    {
+      "tableName": "otp",
+      "beforeCount": 0,
+      "afterCount": 0,
+      "deletedCount": 0,
+      "status": "SKIPPED_EMPTY",
+      "notes": "Already empty before cleanup"
+    },
+    {
+      "tableName": "owner",
+      "beforeCount": 0,
+      "afterCount": 0,
+      "deletedCount": 0,
+      "status": "SKIPPED_EMPTY",
+      "notes": "Already empty before cleanup"
+    },
+    {
+      "tableName": "package",
+      "beforeCount": 18,
+      "afterCount": 0,
+      "deletedCount": 18,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (18 rows)"
+    },
+    {
+      "tableName": "packagedata",
+      "beforeCount": 12,
+      "afterCount": 0,
+      "deletedCount": 12,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (12 rows)"
+    },
+    {
+      "tableName": "partners",
+      "beforeCount": 0,
+      "afterCount": 0,
+      "deletedCount": 0,
+      "status": "SKIPPED_EMPTY",
+      "notes": "Already empty before cleanup"
+    },
+    {
+      "tableName": "payment",
+      "beforeCount": 18,
+      "afterCount": 0,
+      "deletedCount": 18,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (18 rows)"
+    },
+    {
+      "tableName": "payment_sequence",
+      "beforeCount": 1,
+      "afterCount": 0,
+      "deletedCount": 1,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (1 rows)"
+    },
+    {
+      "tableName": "paymentmode",
+      "beforeCount": 18,
+      "afterCount": 6,
+      "deletedCount": 12,
+      "status": "PARTIALLY_CLEARED",
+      "notes": "Preserved 6 root payment modes, deleted demo fleet modes"
+    },
+    {
+      "tableName": "pickuparea",
+      "beforeCount": 9,
+      "afterCount": 2,
+      "deletedCount": 7,
+      "status": "PARTIALLY_CLEARED",
+      "notes": "Preserved 1 root area, deleted demo fleet areas"
+    },
+    {
+      "tableName": "pickupcity",
+      "beforeCount": 18,
+      "afterCount": 4,
+      "deletedCount": 14,
+      "status": "PARTIALLY_CLEARED",
+      "notes": "Preserved 4 root cities, deleted demo fleet cities"
+    },
+    {
+      "tableName": "saas_plans",
+      "beforeCount": 4,
+      "afterCount": 4,
+      "deletedCount": 0,
+      "status": "PRESERVED",
+      "notes": "System Configuration / Audit Log - Preserved"
+    },
+    {
+      "tableName": "short_links",
+      "beforeCount": 21,
+      "afterCount": 21,
+      "deletedCount": 0,
+      "status": "PRESERVED",
+      "notes": "Mandatory Protected Table - 100% Preserved"
+    },
+    {
+      "tableName": "sms_logs",
+      "beforeCount": 30,
+      "afterCount": 30,
+      "deletedCount": 0,
+      "status": "PRESERVED",
+      "notes": "Mandatory Protected Table - 100% Preserved"
+    },
+    {
+      "tableName": "sms_templates",
+      "beforeCount": 7,
+      "afterCount": 7,
+      "deletedCount": 0,
+      "status": "PRESERVED",
+      "notes": "System Configuration / Audit Log - Preserved"
+    },
+    {
+      "tableName": "subscription_invoices",
+      "beforeCount": 0,
+      "afterCount": 0,
+      "deletedCount": 0,
+      "status": "SKIPPED_EMPTY",
+      "notes": "Already empty before cleanup"
+    },
+    {
+      "tableName": "tax",
+      "beforeCount": 23,
+      "afterCount": 1,
+      "deletedCount": 22,
+      "status": "PARTIALLY_CLEARED",
+      "notes": "Preserved Root CGST, deleted demo fleet taxes"
+    },
+    {
+      "tableName": "tenant_activation_tokens",
+      "beforeCount": 15,
+      "afterCount": 0,
+      "deletedCount": 15,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (15 rows)"
+    },
+    {
+      "tableName": "tenant_registration_requests",
+      "beforeCount": 12,
+      "afterCount": 0,
+      "deletedCount": 12,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (12 rows)"
+    },
+    {
+      "tableName": "tenant_subscriptions",
+      "beforeCount": 25,
+      "afterCount": 1,
+      "deletedCount": 24,
+      "status": "PARTIALLY_CLEARED",
+      "notes": "Preserved Root Subscription, deleted demo subscriptions"
+    },
+    {
+      "tableName": "tenant_usage_meters",
+      "beforeCount": 0,
+      "afterCount": 0,
+      "deletedCount": 0,
+      "status": "SKIPPED_EMPTY",
+      "notes": "Already empty before cleanup"
+    },
+    {
+      "tableName": "tenants",
+      "beforeCount": 25,
+      "afterCount": 1,
+      "deletedCount": 24,
+      "status": "PARTIALLY_CLEARED",
+      "notes": "Preserved Root Tenant (GC), deleted demo tenants"
+    },
+    {
+      "tableName": "user",
+      "beforeCount": 73,
+      "afterCount": 0,
+      "deletedCount": 73,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (73 rows)"
+    },
+    {
+      "tableName": "vehicle",
+      "beforeCount": 59,
+      "afterCount": 0,
+      "deletedCount": 59,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (59 rows)"
+    },
+    {
+      "tableName": "vehiclemaster",
+      "beforeCount": 7,
+      "afterCount": 0,
+      "deletedCount": 7,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (7 rows)"
+    },
+    {
+      "tableName": "vehicletype",
+      "beforeCount": 13,
+      "afterCount": 5,
+      "deletedCount": 8,
+      "status": "PARTIALLY_CLEARED",
+      "notes": "Preserved 4 root vehicle types, deleted demo fleet types"
+    },
+    {
+      "tableName": "vendor",
+      "beforeCount": 7,
+      "afterCount": 0,
+      "deletedCount": 7,
+      "status": "CLEARED",
+      "notes": "Fully cleared demo/operational data (7 rows)"
+    }
+  ]
+}

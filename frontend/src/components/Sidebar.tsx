@@ -10,12 +10,13 @@ import {
   faCrown, faUserPen,
   faCalendarAlt,
   faCalendarCheck,
-  faFileLines
+  faFileLines,
+  faComments
 } from '@fortawesome/free-solid-svg-icons';
-import { NavLink } from 'react-router-dom'; // ✅ Changed from Link to NavLink
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'; // ✅ Changed from Link to NavLink
 import { useTenant } from '../context/TenantContext';
 
-import GraceCabsLogo from './GraceCabsLogo';
+import { FleetFlowLogo } from './FleetFlowLogo';
 
 // Interface for menu items
 interface MenuItem {
@@ -38,9 +39,12 @@ const menu: MenuItem[] = [
     children: [
       { label: 'Fleet Operators', path: '/tenants/list', icon: faList },
       { label: 'Registration Queue', path: '/tenants/registrations', icon: faClipboardCheck },
+      { label: 'SaaS Plans', path: '/tenants/plans', icon: faCrown },
       { label: 'Provision Tenant', path: '/tenants/add', icon: faPlus },
       { label: 'Corporate Policies', path: '/tenants/policies', icon: faClipboardList },
       { label: 'Subscription & Billing', path: '/admin/billing', icon: faReceipt },
+      { label: 'Subscription Reports', path: '/admin/billing/reports', icon: faReceipt },
+      { label: 'Notification Logs', path: '/admin/notifications/audit', icon: faBell },
     ],
   },
   {
@@ -93,8 +97,9 @@ const menu: MenuItem[] = [
     label: 'Configuration',
     icon: faCogs,
     children: [
-      { label: 'Configuration', path: '/configuration/master', icon: faCogs },
-      { label: 'Email Configuration', path: '/configuration/email', icon: faEnvelope }
+      { label: 'Settings', path: '/configuration/master', icon: faCogs },
+      { label: 'Email Templates', path: '/configuration/email', icon: faEnvelope },
+      { label: 'SMS Templates', path: '/configuration/sms', icon: faComments },
     ],
   },
   {
@@ -109,30 +114,8 @@ const menu: MenuItem[] = [
     label: 'Vehicle',
     icon: faCar,
     children: [
-      {
-        label: 'Vehicle Type',
-        icon: faList,
-        children: [
-          { label: 'Add Vehicle Type', path: '/vehicle/vehicletype/add', icon: faPlus },
-          { label: 'List Vehicle Type', path: '/vehicle/vehicletype/list', icon: faCarSide },
-        ],
-      },
-      {
-        label: 'Vehicle Model',
-        icon: faList,
-        children: [
-          { label: 'Add Vehicle Model', path: '/vehicle/vehiclemodel/add', icon: faPlus },
-          { label: 'List Vehicle Model', path: '/vehicle/vehiclemodel/list', icon: faCarAlt },
-        ],
-      },
-      {
-        label: 'Vehicle Master',
-        icon: faList,
-        children: [
-          { label: 'Add Vehicle Master', path: '/vehicle/vehiclemaster/add', icon: faPlus },
-          { label: 'List Vehicle Master', path: '/vehicle/vehiclemaster/list', icon: faTruck },
-        ],
-      },
+      { label: 'Add Vehicle', path: '/vehicle/add', icon: faPlus },
+      { label: 'Vehicle List', path: '/vehicle/vehiclemaster/list', icon: faTruck },
     ],
   },
   {
@@ -206,14 +189,27 @@ const menu: MenuItem[] = [
   },
   { label: 'Uploads', icon: faDatabase, path: '/uploads' },
   { label: 'Cache', icon: faDatabase, path: '/cache' },
+  {
+    label: 'Subscription',
+    icon: faCrown,
+    children: [
+      { label: 'Current Plan', path: '/subscription/current', icon: faCrown },
+      { label: 'Plan Details / History', path: '/subscription/history', icon: faReceipt },
+    ],
+  },
+  {
+    label: 'Profile',
+    icon: faUser,
+    path: '/profile',
+  },
 ];
 
 const Sidebar: React.FC = () => {
   const [openDropdown, setOpenDropdown] = useState<string[]>([]);
   const [collapsed, setCollapsed] = useState(false);
   const { currentTenant } = useTenant();
-  const role = localStorage.getItem('role') || '';
-  const isSuperAdmin = role === 'superadmin';
+  const role = (localStorage.getItem('role') || '').toLowerCase().trim();
+  const isSuperAdmin = role === 'superadmin' || role === 'platform_admin';
 
   const toggleDropdown = (label: string) => {
     setOpenDropdown((prev: any) =>
@@ -223,16 +219,33 @@ const Sidebar: React.FC = () => {
     );
   };
 
-  const tenantName = currentTenant?.brandingTokens?.portalTitle || currentTenant?.name || 'Grace Cabs';
-  const logoUrl = currentTenant?.brandingTokens?.logoUrl || '/images/favicon1.jpeg';
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isInspecting = location.pathname.startsWith('/tenants/inspect') || location.pathname.startsWith('/tenants/overview');
 
-  // Strict role-based menu filtering: platform SaaS Tenants & Configuration are SuperAdmin only
-  const visibleMenu = menu.filter((item) => {
-    if (item.label === 'SaaS Tenants' || item.label === 'Configuration') {
-      return isSuperAdmin;
-    }
-    return true;
-  });
+  const tenantName = currentTenant?.brandingTokens?.portalTitle || currentTenant?.name || 'FleetFlow';
+  const logoUrl = currentTenant?.brandingTokens?.logoUrl || '/images/fleetflow_logo.svg';
+
+  // Strict role-based menu filtering:
+  // For SuperAdmin: Platform navigation with Dashboard, SaaS Tenants, Configuration (Platform Templates & Audit), Profile, Cache
+  // For Fleet Admin: Has full operational workflow menus, but NEVER platform SaaS Tenants
+  const superAdminConfigurationItem: MenuItem = {
+    label: 'Configuration',
+    icon: faCogs,
+    children: [
+      { label: 'Platform Email Templates', path: '/admin/configuration/email', icon: faEnvelope },
+      { label: 'Notification Audit Logs', path: '/admin/notifications/audit-logs', icon: faComments },
+      { label: 'Platform Settings', path: '/configuration/master', icon: faCogs },
+    ],
+  };
+
+  const visibleMenu = isSuperAdmin
+    ? [
+        ...menu.filter((item) => item.label === 'Dashboard' || item.label === 'SaaS Tenants'),
+        superAdminConfigurationItem,
+        ...menu.filter((item) => item.label === 'Profile' || item.label === 'Cache'),
+      ]
+    : menu.filter((item) => item.label !== 'SaaS Tenants');
 
   return (
     <aside
@@ -245,23 +258,39 @@ const Sidebar: React.FC = () => {
       <div className="sticky top-0 z-10 bg-[#141312] border-b border-[#2E2A26] px-4 py-3.5">
         <div className="flex items-center gap-3">
           {collapsed ? (
-            <div className="w-10 h-10 rounded-xl bg-[#C04E24] flex items-center justify-center font-black text-white text-lg shadow-md">
-              GC
+            <div className="w-10 h-10 rounded-xl bg-teal-700 flex items-center justify-center font-black text-white text-lg shadow-md">
+              FF
             </div>
           ) : (
             <div className="flex items-center gap-2.5">
-              <GraceCabsLogo size="sm" variant="light" showTagline={false} />
+              <FleetFlowLogo size="sm" variant="light" showTagline={false} />
             </div>
           )}
         </div>
         {!collapsed && (
           <div className="mt-2 pt-2 border-t border-[#2E2A26]/80 flex items-center justify-between">
             <span className="text-xs font-bold text-white truncate max-w-[150px]">
-              {isSuperAdmin ? 'Grace Cabs SaaS Platform' : (currentTenant?.name || tenantName)}
+              {isSuperAdmin && !isInspecting ? 'FleetFlow SaaS Platform' : (currentTenant?.name || tenantName)}
             </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#C04E24]/20 text-[#E9B195] border border-[#C04E24]/40 uppercase tracking-wider">
-              {isSuperAdmin ? 'Platform Admin' : `${currentTenant?.planTier || 'PRO'} Plan`}
+              {isSuperAdmin && !isInspecting ? 'Platform Admin' : `${currentTenant?.planTier || 'PRO'} Plan`}
             </span>
+          </div>
+        )}
+        {!collapsed && isInspecting && (
+          <div className="mt-2 p-2 bg-amber-950/40 border border-amber-500/40 rounded-lg text-amber-200 text-xs">
+            <div className="font-bold flex items-center justify-between">
+              <span>🔍 Inspection Mode</span>
+              <button
+                onClick={() => navigate('/tenants/list')}
+                className="text-[10px] bg-amber-500/20 hover:bg-amber-500/40 text-amber-100 px-1.5 py-0.5 rounded transition"
+              >
+                Back to Tenants
+              </button>
+            </div>
+            <div className="truncate text-[11px] text-amber-300/80 mt-0.5">
+              {currentTenant?.name}
+            </div>
           </div>
         )}
       </div>
@@ -379,7 +408,7 @@ const Sidebar: React.FC = () => {
       <div className="p-3 bg-[#141312] border-t border-[#2E2A26] flex items-center justify-between">
         {!collapsed && (
           <div className="text-[11px] text-[#7A7570] font-medium">
-            <span>Grace Cabs SaaS v2.5</span>
+            <span>FleetFlow SaaS v2.5</span>
           </div>
         )}
         <button

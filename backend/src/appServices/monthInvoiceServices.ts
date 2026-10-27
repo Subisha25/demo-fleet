@@ -13,13 +13,11 @@ import { Length } from 'sequelize-typescript';
 import { Invoice, User } from '../models';
 import { Op } from "sequelize";
 import { normalizePackageDetails } from '../services/closependingorderServices';
+import { getFleetDocumentBranding } from '../services/fleetBrandingService';
 
 
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 const { ROLES } = USERS;
-const logoPath = path.join(__dirname, "..", "images", "logo.png");
-const logoBase64 = fs.readFileSync(logoPath, "base64");
-const logoSrc = `data:image/jpeg;base64,${logoBase64}`;
 
 // Interface for line items in invoice
 interface InvoiceLineItem {
@@ -141,16 +139,16 @@ const formatInvoiceMonth = (invoiceMonth: string): string => {
 
 
 // Generate HTML for MONTHLY INVOICE PDF
-export const generateMonthlyInvoiceHTML = (data: any): string => {
+export const generateMonthlyInvoiceHTML = (data: any, branding?: any): string => {
+  const fleetLogo = branding?.logoSrc || "";
+  const fleetLegalName = branding?.legalName || branding?.displayName || branding?.fleetName || "Fleet Mobility";
+  const fleetAddress = branding?.registeredAddress || "";
+  const fleetGstin = branding?.gstNumber || "";
+  const fleetPan = branding?.panNumber || "";
+  const fleetSac = branding?.sacCode || "996609";
+  const fleetWebsite = branding?.website || "";
+  const fleetFooterText = branding?.billingFooterText || "";
   const { monthlyInvoice, items = [], company, invoiceCode, invoiceDate, invoiceMonth, amountInWords } = data;
-
-  let logoSrc = "";
-  try {
-    const logoBase64 = fs.readFileSync(logoPath, { encoding: "base64" });
-    logoSrc = `data:image/png;base64,${logoBase64}`;
-  } catch {
-    logoSrc = "";
-  }
 
   const companyAddress = company?.companyAddress || monthlyInvoice?.companyAddress || "-";
   const addressParts = String(companyAddress).split(",");
@@ -536,7 +534,7 @@ height:36px;">
 
 <!-- HEADER -->
 <div class="page-header">
-  ${logoSrc ? `<img src="${logoSrc}" class="logo" />` : `<div><b style="font-size:16px;color:#1a4f7a;">Grace Cabs</b></div>`}
+  ${fleetLogo ? `<img src="${fleetLogo}" class="logo" />` : `<div><b style="font-size:16px;color:#1a4f7a;">${fleetLegalName}</b></div>`}
   <div class="header-right">
     <div class="inv-no">Invoice No: ${invoiceCode}</div>
     <div>Invoice Date: ${invoiceDate}</div>
@@ -552,11 +550,10 @@ height:36px;">
   <!-- LEFT COLUMN: BILLING FROM -->
   <div class="billing-box">
     <div class="billing-label">Billing From</div>
-    <div class="billing-row" style="font-weight: bold; color: #1a4f7a;">Grace Cabs Private Limited</div>
-    <div class="billing-row">7/621 Nesamani Nagar</div>
-    <div class="billing-row">Perumbakkam</div>
-    <div class="billing-row">Chennai - 600100</div>
-    <div class="billing-row" style="margin-top: 2px;"><span class="bk">GSTIN :</span><span class="bv">33AAMCG2518C1Z0</span></div>
+    <div class="billing-row" style="font-weight: bold; color: #1a4f7a;">${fleetLegalName}</div>
+    ${fleetAddress ? `<div class="billing-row">${fleetAddress}</div>` : ''}
+    ${fleetGstin ? `<div class="billing-row" style="margin-top: 2px;"><span class="bk">GSTIN :</span><span class="bv">${fleetGstin}</span></div>` : ''}
+    ${fleetPan ? `<div class="billing-row"><span class="bk">PAN :</span><span class="bv">${fleetPan}</span></div>` : ''}
   </div>
 
   <!-- RIGHT COLUMN: BILLING TO -->
@@ -633,17 +630,17 @@ height:36px;">
 <!-- FOOTER -->
 <div class="footer">
   <div>
-    <div><b>Grace Cabs Pvt. Ltd.</b></div>
-    <div>7/621 Nesamani Nagar, Perumbakkam, Chennai - 600100</div>
-    <div>Website: gracecabs.com</div>
+    <div><b>${fleetLegalName}</b></div>
+    ${fleetAddress ? `<div>${fleetAddress}</div>` : ''}
+    ${fleetWebsite ? `<div>Website: ${fleetWebsite}</div>` : ''}
   </div>
   <div>
-    <div><b>GSTIN:</b> 33AAMCG2518C1Z0</div>
-    <div><b>PAN No:</b> AAMCG2518C</div>
-    <div><b>SAC:</b> 996609</div>
+    ${fleetGstin ? `<div><b>GSTIN:</b> ${fleetGstin}</div>` : ''}
+    ${fleetPan ? `<div><b>PAN No:</b> ${fleetPan}</div>` : ''}
+    <div><b>SAC:</b> ${fleetSac}</div>
   </div>
   <div class="footer-note">
-    <div>* System generated invoice — no signature required</div>
+    ${fleetFooterText ? `<div>${fleetFooterText}</div>` : '<div>* System generated invoice — no signature required</div>'}
     <div>* GST 5% - Without ITC | GST 12% - With ITC</div>
   </div>
 </div>
@@ -1096,6 +1093,8 @@ export const monthGenerateInvoicePDF = async (req: any, res: Response) => {
     const invoiceMonth = formatInvoiceMonth(jsonMonthly.invoiceMonth) || "N/A";
     const amountInWordsVal = numberToWords(safeNumber(jsonMonthly.balanceDue || jsonMonthly.finalTotal));
 
+    const branding = await getFleetDocumentBranding(jsonMonthly.tenantId);
+
     const htmlContent = generateMonthlyInvoiceHTML({
       monthlyInvoice: jsonMonthly,
       items,
@@ -1104,7 +1103,7 @@ export const monthGenerateInvoicePDF = async (req: any, res: Response) => {
       invoiceDate,
       invoiceMonth,
       amountInWords: amountInWordsVal,
-    });
+    }, branding);
 
     const uploadsDir = path.join(process.cwd(), 'uploads', 'invoices', 'monthly');
     if (!fs.existsSync(uploadsDir)) {

@@ -107,6 +107,38 @@ export class TenantSubscription extends Model {
   })
   trialEndsAt!: Date;
 
+  @Column({
+    type: DataType.ENUM('MONTHLY', 'ANNUAL'),
+    defaultValue: 'MONTHLY',
+    allowNull: false,
+  })
+  billingCycle!: 'MONTHLY' | 'ANNUAL';
+
+  @Column({
+    type: DataType.DECIMAL(10, 2),
+    allowNull: true,
+  })
+  agreedPrice!: number | null;
+
+  @Column({
+    type: DataType.STRING(10),
+    defaultValue: 'INR',
+    allowNull: false,
+  })
+  currency!: string;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true,
+  })
+  lastPaymentDate!: Date | null;
+
+  @Column({
+    type: DataType.DECIMAL(10, 2),
+    allowNull: true,
+  })
+  lastPaymentAmount!: number | null;
+
   @CreatedAt
   @Column(DataType.DATE)
   createdAt!: Date;

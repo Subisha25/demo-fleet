@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import axiosInstance from "../../utils/axiosInstance";
-import GraceCabsLogo from "../GraceCabsLogo";
+import FleetFlowLogo from "../FleetFlowLogo";
 import PublicLayout from "../PublicSite/PublicLayout";
 
 interface TokenVerificationData {
@@ -118,7 +118,7 @@ export default function ActivateAccount() {
             </div>
             <h1 className="text-2xl font-extrabold tracking-tight">Activate Operator Account</h1>
             <p className="text-xs sm:text-sm text-[#EDE9E3] mt-1">
-              Secure single-use onboarding for verified Grace Cabs fleet operators.
+              Secure single-use onboarding for verified FleetFlow fleet operators.
             </p>
           </div>
 

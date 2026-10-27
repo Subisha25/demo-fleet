@@ -807,8 +807,7 @@ const validBehalfPhone =
 //   return email.toLowerCase().endsWith("@danfoss.com");
 // };
 const isValidManagerEmail = (email: string) => {
-  //const regex = /^[a-zA-Z0-9._%+-]+@danfoss\.com$/i;
-    const regex = /^[a-zA-Z0-9._%+-]+@(gmail\.com|gracecabs\.com|danfoss\.com)$/i;
+    const regex = /^[a-zA-Z0-9._%+-]+@(gmail\.com|gracecabs\.com|fleetflow\.com|vahanaflow\.com|danfoss\.com)$/i;
   return regex.test(email.trim());
 };
   const handleBooking = async () => {

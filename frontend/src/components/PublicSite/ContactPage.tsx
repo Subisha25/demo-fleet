@@ -35,7 +35,7 @@ export default function ContactPage() {
             Transport Desk & Support
           </span>
           <h1 className="text-4xl sm:text-5xl font-black text-[#1C1A18] tracking-tight">
-            Connect with Grace Cabs Mobility Desk
+            Connect with FleetFlow Mobility Desk
           </h1>
           <p className="text-lg text-[#5A554E] max-w-3xl mx-auto leading-relaxed">
             Have questions about fleet onboarding, corporate employee contracts, spot car rentals, or
@@ -54,8 +54,8 @@ export default function ContactPage() {
                 <div className="flex items-center gap-3 pb-4 border-b border-[#E0DAD1]">
                   <GraceCabsLogo className="h-9 w-auto" />
                   <div>
-                    <h3 className="font-bold text-[#1C1A18] text-base">Grace Cabs Central</h3>
-                    <p className="text-xs text-[#7A7570]">Fleet Operations Office</p>
+                    <h3 className="font-bold text-[#1C1A18] text-base">FleetFlow Platform</h3>
+                    <p className="text-xs text-[#7A7570]">Fleet Operations Desk</p>
                   </div>
                 </div>
 
@@ -68,8 +68,8 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <div className="text-[10px] uppercase font-bold text-[#7A7570]">Email Inquiries</div>
-                      <a href="mailto:traveldesk@gracecabs.com" className="font-semibold text-[#1C1A18] hover:text-[#C04E24]">
-                        traveldesk@gracecabs.com
+                      <a href="mailto:support@fleetflow.com" className="font-semibold text-[#1C1A18] hover:text-[#C04E24]">
+                        support@fleetflow.com
                       </a>
                     </div>
                   </div>
@@ -128,7 +128,7 @@ export default function ContactPage() {
                     </div>
                     <h3 className="text-2xl font-extrabold text-[#1C1A18]">Inquiry Received!</h3>
                     <p className="text-sm text-[#5A554E] max-w-md mx-auto">
-                      Thank you for contacting Grace Cabs. Our transport desk coordinator will reach out
+                      Thank you for contacting FleetFlow. Our transport desk coordinator will reach out
                       to you within 2 hours during active business shifts.
                     </p>
                     <button

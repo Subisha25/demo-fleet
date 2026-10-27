@@ -276,7 +276,7 @@ export default function Pricing() {
         <div className="text-center mb-12">
           <h2 className="text-3xl font-extrabold text-[#1C1A18]">Frequently Asked Questions</h2>
           <p className="text-[#7A7570] mt-2 text-sm">
-            Everything you need to know about Grace Cabs SaaS billing and provisioning.
+            Everything you need to know about FleetFlow SaaS billing and provisioning.
           </p>
         </div>
 

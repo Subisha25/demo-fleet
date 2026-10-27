@@ -138,7 +138,7 @@ const Header: React.FC = () => {
           </div>
           <span className="font-bold tracking-tight text-base sm:text-lg">
             {isSuperAdmin
-              ? 'Grace Cabs SaaS'
+              ? 'FleetFlow SaaS'
               : currentTenant?.name || 'Fleet Mobility Portal'}
           </span>
         </div>
@@ -149,19 +149,54 @@ const Header: React.FC = () => {
             SuperAdmin
           </span>
         ) : (
-          currentTenant?.planTier && (
-            <span
-              className={`px-2.5 py-0.5 text-[11px] font-extrabold rounded-full uppercase tracking-wider shadow-sm border ${
-                currentTenant.planTier === 'ENTERPRISE'
-                  ? 'bg-[#FDF6F0] text-[#C04E24] border-[#F3D0BD]'
-                  : currentTenant.planTier === 'PRO'
-                  ? 'bg-[#F5F2EB] text-[#843217] border-[#E0DAD1]'
-                  : 'bg-[#262320] text-[#E0DAD1] border-[#3D3833]'
-              }`}
-            >
-              {currentTenant.planTier}
-            </span>
-          )
+          <div className="flex items-center gap-2">
+            {currentTenant?.planTier && (
+              <span
+                className={`px-2.5 py-0.5 text-[11px] font-extrabold rounded-full uppercase tracking-wider shadow-sm border ${
+                  currentTenant.planTier === 'ENTERPRISE'
+                    ? 'bg-[#FDF6F0] text-[#C04E24] border-[#F3D0BD]'
+                    : currentTenant.planTier === 'PRO'
+                    ? 'bg-[#F5F2EB] text-[#843217] border-[#E0DAD1]'
+                    : 'bg-[#262320] text-[#E0DAD1] border-[#3D3833]'
+                }`}
+              >
+                {currentTenant.planTier} ({currentTenant.subscription?.billingCycle || 'MONTHLY'})
+              </span>
+            )}
+
+            {/* Subscription Status Indicator */}
+            {currentTenant?.subscription?.status && (
+              <span
+                className={`px-2 py-0.5 text-[10px] font-black rounded-full uppercase tracking-wider border ${
+                  currentTenant.subscription.status === 'ACTIVE'
+                    ? 'bg-emerald-950 text-emerald-300 border-emerald-700/60'
+                    : currentTenant.subscription.status === 'TRIALING'
+                    ? 'bg-blue-950 text-blue-300 border-blue-700/60'
+                    : currentTenant.subscription.status === 'PAST_DUE'
+                    ? 'bg-amber-950 text-amber-300 border-amber-700/60'
+                    : 'bg-rose-950 text-rose-300 border-rose-700/60 animate-pulse'
+                }`}
+              >
+                {currentTenant.subscription.status === 'ACTIVE'
+                  ? 'Active'
+                  : currentTenant.subscription.status === 'TRIALING'
+                  ? 'Trial Setup'
+                  : currentTenant.subscription.status === 'PAST_DUE'
+                  ? 'Grace Period'
+                  : 'Suspended'}
+              </span>
+            )}
+
+            {/* Renewal / Upgrade CTA if not active */}
+            {currentTenant?.subscription?.status && currentTenant.subscription.status !== 'ACTIVE' && (
+              <a
+                href="/subscription/current"
+                className="px-2.5 py-0.5 text-[10px] font-black rounded bg-[#C04E24] hover:bg-[#A43D1A] text-white transition shadow-sm"
+              >
+                Renew &rarr;
+              </a>
+            )}
+          </div>
         )}
 
         {/* Persistent Global Fleet Selector — STRICTLY SuperAdmin Only */}

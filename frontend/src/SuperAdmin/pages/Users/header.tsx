@@ -104,7 +104,7 @@ const TravelHeader: React.FC = () => {
             </span>
             <span className="flex items-center">
               <span className="mr-1">✉️</span>
-              <span className="hidden lg:inline">traveldesk@gracecabs.com</span>
+              <span className="hidden lg:inline">support@fleetflow.com</span>
               <span className="lg:hidden">Contact</span>
             </span>
           </div>
@@ -135,11 +135,11 @@ const TravelHeader: React.FC = () => {
           <div className="flex items-center">
             <img
               src="/images/favicon1.jpeg"
-              alt="Driver logo"
+              alt="Platform logo"
               className="h-8 w-8 sm:h-10 sm:w-10 lg:h-11 lg:w-12 rounded-full mr-2"
             />
             <span className="text-lg sm:text-2xl lg:text-3xl font-medium text-gray-800 tracking-wide">
-              GRACE<span className="text-yellow-500 font-bold">C</span>ABS
+              FLEET<span className="text-[#C04E24] font-bold">F</span>LOW
             </span>
           </div>
 

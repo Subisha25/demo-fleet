@@ -50,8 +50,9 @@ export const requireSuperAdmin = (req: AuthenticatedRequest, res: Response, next
   const email = req.email;
 
   // Root platform superadmin check
+  const configuredSuperAdminEmail = (process.env.SUPERADMIN_EMAIL || 'subisha2002.m@gmail.com').toLowerCase();
   const isSuper = (role === 'superadmin' || role === 'SUPERADMIN') &&
-    (tenantId === 'e7b8a1c0-0000-0000-0000-000000000001' || !tenantId || email === 'subisha2002.m@gmail.com');
+    (tenantId === 'e7b8a1c0-0000-0000-0000-000000000001' || !tenantId || email?.toLowerCase() === configuredSuperAdminEmail);
 
   if (!isSuper) {
     return res.status(403).json({

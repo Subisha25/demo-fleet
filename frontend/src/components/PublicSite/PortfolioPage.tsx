@@ -102,7 +102,7 @@ export default function PortfolioPage() {
             Commercial Fleet Portfolio & Specifications
           </h1>
           <p className="text-lg text-[#5A554E] max-w-3xl mx-auto leading-relaxed">
-            Every vehicle in the Grace Cabs mobility network undergoes mandatory periodic fitness audits,
+            Every vehicle in the FleetFlow mobility network undergoes mandatory periodic fitness audits,
             carries active comprehensive commercial insurance, and operates with verified chauffeurs.
           </p>
 

@@ -16,6 +16,9 @@ import {
   Building,
   Sparkles,
   RefreshCw,
+  DollarSign,
+  TrendingUp,
+  Receipt,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -129,6 +132,7 @@ const Dashboard: React.FC = () => {
   const [pendingPercentage, setPendingPercentage] = useState<number>(0);
   const [completedPercentage, setCompletedPercentage] = useState<number>(0);
   const [fleetOverview, setFleetOverview] = useState<FleetOverviewData | null>(null);
+  const [revenueSummary, setRevenueSummary] = useState<any>(null);
 
   const { selectedFleet, fleetChangeVersion, currentTenant } = useTenant();
   const role = localStorage.getItem('role') || 'User';
@@ -230,6 +234,18 @@ const Dashboard: React.FC = () => {
           }
         } catch (e) {
           // Fallback or SuperAdmin
+        }
+
+        // Fetch SuperAdmin SaaS Subscription Revenue Summary
+        if (isSuperAdmin) {
+          try {
+            const revRes = await axiosInstance.get('/tenants/admin/billing/revenue-summary');
+            if (revRes.data?.success) {
+              setRevenueSummary(revRes.data);
+            }
+          } catch (revErr) {
+            // Handled silently
+          }
         }
       } catch (err) {
         showToast('Error fetching dashboard telemetry', 'error');
@@ -472,6 +488,115 @@ const Dashboard: React.FC = () => {
                   />
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* SuperAdmin SaaS Subscription Revenue Summary Cards (Phase 7.1) */}
+        {isSuperAdmin && revenueSummary && (
+          <div className="bg-white rounded-xl border border-[#E0DAD1] p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#FAF8F5] gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-[#FDF6F0] text-[#C04E24] rounded-lg border border-[#F3D0BD]">
+                  <TrendingUp size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#1C1A18] tracking-tight">
+                    FleetFlow Platform SaaS Subscription Revenue
+                  </h3>
+                  <p className="text-xs text-[#7A7570]">
+                    Verified collections from active tenant subscriptions ({revenueSummary?.data?.currency || revenueSummary?.currency || 'INR'})
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-semibold px-2.5 py-1 bg-[#F0FDF4] text-[#166534] border border-[#BBF7D0] rounded-md">
+                  Total Collected: ₹{(revenueSummary?.data?.totalCollected ?? revenueSummary?.totalCollected ?? 0).toLocaleString()} ({(revenueSummary?.data?.totalInvoices ?? revenueSummary?.totalInvoices ?? 0)} Paid Invoices)
+                </span>
+                <a
+                  href="/admin/billing/reports"
+                  className="text-xs font-semibold text-[#C04E24] hover:text-[#A43D1A] flex items-center gap-1 transition"
+                >
+                  <span>Full Ledger</span>
+                  <ArrowRight size={14} />
+                </a>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Monthly Collections Card */}
+              {(() => {
+                const monthly = revenueSummary?.data?.monthly || revenueSummary?.monthly;
+                const byPlan = monthly?.byPlan || {};
+                return (
+                  <div className="p-4 bg-[#FAF8F5] rounded-xl border border-[#E0DAD1] flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <CreditCard size={16} className="text-[#C04E24]" />
+                        <span className="font-bold text-xs uppercase tracking-wider text-[#1C1A18]">Monthly Subscriptions</span>
+                      </div>
+                      <span className="text-xs font-bold text-[#C04E24] bg-white px-2.5 py-0.5 rounded border border-[#E0DAD1]">
+                        ₹{(monthly?.totalAmount ?? 0).toLocaleString()} ({monthly?.invoiceCount ?? 0} paid)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#E0DAD1]">
+                      <div className="p-2.5 bg-white rounded-lg border border-[#E0DAD1] text-center">
+                        <div className="text-[10px] uppercase font-bold text-[#7A7570]">Basic</div>
+                        <div className="text-xs font-bold text-[#1C1A18] mt-0.5">₹{(byPlan?.BASIC?.amount ?? 0).toLocaleString()}</div>
+                        <div className="text-[10px] text-[#A8A29E] mt-0.5">{byPlan?.BASIC?.count ?? 0} paid</div>
+                      </div>
+                      <div className="p-2.5 bg-white rounded-lg border border-[#E0DAD1] text-center">
+                        <div className="text-[10px] uppercase font-bold text-[#C04E24]">Pro</div>
+                        <div className="text-xs font-bold text-[#C04E24] mt-0.5">₹{(byPlan?.PRO?.amount ?? 0).toLocaleString()}</div>
+                        <div className="text-[10px] text-[#A8A29E] mt-0.5">{byPlan?.PRO?.count ?? 0} paid</div>
+                      </div>
+                      <div className="p-2.5 bg-white rounded-lg border border-[#E0DAD1] text-center">
+                        <div className="text-[10px] uppercase font-bold text-[#7A7570]">Enterprise</div>
+                        <div className="text-xs font-bold text-[#1C1A18] mt-0.5">₹{(byPlan?.ENTERPRISE?.amount ?? 0).toLocaleString()}</div>
+                        <div className="text-[10px] text-[#A8A29E] mt-0.5">{byPlan?.ENTERPRISE?.count ?? 0} paid</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Annual Collections Card */}
+              {(() => {
+                const annual = revenueSummary?.data?.annual || revenueSummary?.annual;
+                const byPlan = annual?.byPlan || {};
+                return (
+                  <div className="p-4 bg-[#FAF8F5] rounded-xl border border-[#E0DAD1] flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Calendar size={16} className="text-[#C04E24]" />
+                        <span className="font-bold text-xs uppercase tracking-wider text-[#1C1A18]">Annual Subscriptions</span>
+                      </div>
+                      <span className="text-xs font-bold text-[#C04E24] bg-white px-2.5 py-0.5 rounded border border-[#E0DAD1]">
+                        ₹{(annual?.totalAmount ?? 0).toLocaleString()} ({annual?.invoiceCount ?? 0} paid)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[#E0DAD1]">
+                      <div className="p-2.5 bg-white rounded-lg border border-[#E0DAD1] text-center">
+                        <div className="text-[10px] uppercase font-bold text-[#7A7570]">Basic</div>
+                        <div className="text-xs font-bold text-[#1C1A18] mt-0.5">₹{(byPlan?.BASIC?.amount ?? 0).toLocaleString()}</div>
+                        <div className="text-[10px] text-[#A8A29E] mt-0.5">{byPlan?.BASIC?.count ?? 0} paid</div>
+                      </div>
+                      <div className="p-2.5 bg-white rounded-lg border border-[#E0DAD1] text-center">
+                        <div className="text-[10px] uppercase font-bold text-[#C04E24]">Pro</div>
+                        <div className="text-xs font-bold text-[#C04E24] mt-0.5">₹{(byPlan?.PRO?.amount ?? 0).toLocaleString()}</div>
+                        <div className="text-[10px] text-[#A8A29E] mt-0.5">{byPlan?.PRO?.count ?? 0} paid</div>
+                      </div>
+                      <div className="p-2.5 bg-white rounded-lg border border-[#E0DAD1] text-center">
+                        <div className="text-[10px] uppercase font-bold text-[#7A7570]">Enterprise</div>
+                        <div className="text-xs font-bold text-[#1C1A18] mt-0.5">₹{(byPlan?.ENTERPRISE?.amount ?? 0).toLocaleString()}</div>
+                        <div className="text-[10px] text-[#A8A29E] mt-0.5">{byPlan?.ENTERPRISE?.count ?? 0} paid</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}

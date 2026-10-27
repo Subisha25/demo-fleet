@@ -12,20 +12,24 @@ const router = express.Router();
 
 // Protected routes (authentication required)
 
-import { requireVehicleQuota, requireDriverQuota } from '../middleware/entitlementMiddleware';
+import { requireVehicleQuota, requireDriverQuota, requirePaidForModification, requireActiveSubscriptionForBookings } from '../middleware/entitlementMiddleware';
 
 router.get('/getAllVendors',authMiddleware, getAllVendors);
 router.get('/:vendorId',authMiddleware, getVendorById);
-router.put('/:vendorId/update',authMiddleware,updateVendor);
-router.delete('/:vendorId/delete',authMiddleware,deleteVendor)
+router.put('/:vendorId/update',authMiddleware, requirePaidForModification, updateVendor);
+router.delete('/:vendorId/delete',authMiddleware, requirePaidForModification, deleteVendor);
 
-router.post('/createVehicleType', authMiddleware, uploadVehicleImg.array("vehicleImg", 5), createVehicleType);
+import { createUnifiedVehicle, getUnifiedVehicleOptions } from '../services/vehicleMasterServices';
+
+router.post('/createVehicleType', authMiddleware, requirePaidForModification, uploadVehicleImg.array("vehicleImg", 5), createVehicleType);
 router.post('/createVehicle', authMiddleware, requireVehicleQuota, uploadVehicleImg.array("vehicleImg", 5), createVehicle);
 router.post('/createVehicleMaster', authMiddleware, requireVehicleQuota, createVehicleMaster);
+router.post('/createUnifiedVehicle', authMiddleware, requireVehicleQuota, uploadVehicleImg.array("vehicleImg", 5), createUnifiedVehicle);
+router.get('/unifiedVehicleOptions', authMiddleware, getUnifiedVehicleOptions);
 router.post('/createDriver', authMiddleware, requireDriverQuota, createDriver);
 
-router.patch('/confirmBooking',authMiddleware, confirmBooking);
-router.patch('/confirmBookingforWeb',authMiddleware, confirmBookingforWeb);
-router.patch("/updateBookingVehicleDriver", authMiddleware, updateBookingVehicleDriver);
+router.patch('/confirmBooking',authMiddleware, requireActiveSubscriptionForBookings, confirmBooking);
+router.patch('/confirmBookingforWeb',authMiddleware, requireActiveSubscriptionForBookings, confirmBookingforWeb);
+router.patch("/updateBookingVehicleDriver", authMiddleware, requireActiveSubscriptionForBookings, updateBookingVehicleDriver);
 
 export default router;
