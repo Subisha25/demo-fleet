@@ -2,8 +2,10 @@ import React from 'react';
 import Footer from "./Footer";
 import SimpleHeader from './simpleheader';
 import { Link } from 'react-router-dom';
+import { usePublicContact } from '../../services/contactConfig';
 
 const PrivacyPolicy: React.FC = () => {
+  const { contact } = usePublicContact();
   return (
     <div className="min-h-screen bg-gray-50">
       <SimpleHeader />
@@ -154,9 +156,9 @@ const PrivacyPolicy: React.FC = () => {
 
             <p>If you have concerns or questions:</p>
             <ul className="list-disc ml-6 space-y-2">
-              <li>Email: <strong>support@fleetflow.com</strong></li>
-              <li>Support Desk: <strong>+91 98417 22675</strong></li>
-              <li>Platform Support Desk: Chennai, Tamil Nadu, India</li>
+              <li>Email: <strong>{contact.email}</strong></li>
+              <li>Support Desk: <strong>{contact.phone}</strong></li>
+              <li>Platform Support Desk: {contact.address}</li>
             </ul>
 
           </div>

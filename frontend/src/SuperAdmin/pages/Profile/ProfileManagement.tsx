@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PageLayout from '../../../components/PageLayout';
 import axiosInstance from '../../../utils/axiosInstance';
+import config from '../../../config/config';
 import { showToast, AlertContainer } from '../../../components/AlertBox';
 import {
   User,
@@ -16,19 +17,30 @@ import {
   FileText,
   CreditCard,
   CheckCircle,
+  Lock,
+  Key,
+  AlertCircle,
+  X,
+  Camera,
 } from 'lucide-react';
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 const SAC_REGEX = /^[0-9]{6}$/;
 
+const BASE_URL = config.baseurl.apibaseurl;
+
 const ProfileManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'PERSONAL' | 'BUSINESS'>('PERSONAL');
   const [loading, setLoading] = useState(true);
   const [savingPersonal, setSavingPersonal] = useState(false);
   const [savingBusiness, setSavingBusiness] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
-  const role = (localStorage.getItem('role') || '').toLowerCase();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const role = (localStorage.getItem('role') || '').toLowerCase().trim();
   const isSuperAdmin = role === 'superadmin' || role === 'platform_admin';
 
   // Personal Profile fields
@@ -36,6 +48,24 @@ const ProfileManagement: React.FC = () => {
   const [personalEmail, setPersonalEmail] = useState('');
   const [personalPhone, setPersonalPhone] = useState('');
   const [userRole, setUserRole] = useState('');
+  const [address, setAddress] = useState('');
+  const [gstinProfile, setGstinProfile] = useState('');
+  const [profileImage, setProfileImage] = useState('');
+
+  // Initial snapshot for cancel / reset
+  const [initialData, setInitialData] = useState({
+    name: '',
+    phone: '',
+    address: '',
+    gstin: '',
+    profileImage: '',
+  });
+
+  // Password Change fields
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
 
   // Business Profile fields (Fleet Admin)
   const [legalName, setLegalName] = useState('');
@@ -63,6 +93,17 @@ const ProfileManagement: React.FC = () => {
         setPersonalEmail(p.email || '');
         setPersonalPhone(p.phone || '');
         setUserRole(p.role || role);
+        setAddress(p.address || '');
+        setGstinProfile(p.gstin || '');
+        setProfileImage(p.profileImage || '');
+
+        setInitialData({
+          name: p.name || '',
+          phone: p.phone || '',
+          address: p.address || '',
+          gstin: p.gstin || '',
+          profileImage: p.profileImage || '',
+        });
 
         const f = res.data.fleetProfile;
         if (f) {
@@ -93,29 +134,149 @@ const ProfileManagement: React.FC = () => {
     fetchProfile();
   }, []);
 
+  const handleCancelPersonal = () => {
+    setPersonalName(initialData.name);
+    setPersonalPhone(initialData.phone);
+    setAddress(initialData.address);
+    setGstinProfile(initialData.gstin);
+    setProfileImage(initialData.profileImage);
+    showToast('Changes discarded. Profile restored to saved state.', 'info');
+  };
+
   const handleSavePersonal = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!personalName.trim()) {
+      showToast('Name is required.', 'error');
+      return;
+    }
+
+    // Phone validation
+    const digitsOnly = personalPhone.replace(/\D/g, '');
+    if (digitsOnly.endsWith('9003241571')) {
+      showToast('The phone number 9003241571 is permanently deprecated and blocked by security policy.', 'error');
+      return;
+    }
+
+    if (personalPhone.trim() && (digitsOnly.length < 10 || digitsOnly.length > 12)) {
+      showToast('Please enter a valid 10-digit mobile number.', 'error');
+      return;
+    }
+
+    // GSTIN validation (optional for SuperAdmin, but if provided must follow format)
+    if (gstinProfile.trim() && !GSTIN_REGEX.test(gstinProfile.trim().toUpperCase())) {
+      showToast('Invalid GSTIN format. Expected 15-character Indian GSTIN (e.g. 33AAMCG2518C1Z0)', 'error');
+      return;
+    }
+
     try {
       setSavingPersonal(true);
       const res = await axiosInstance.put('/user/profile', {
-        name: personalName,
-        phone: personalPhone,
+        name: personalName.trim(),
+        phone: personalPhone.trim(),
+        address: address.trim(),
+        gstin: gstinProfile.trim().toUpperCase(),
+        profileImage,
       });
 
       if (res.data && res.data.success) {
-        showToast('Personal account details updated successfully!', 'success');
+        showToast('Profile updated successfully!', 'success');
+        setInitialData({
+          name: personalName.trim(),
+          phone: personalPhone.trim(),
+          address: address.trim(),
+          gstin: gstinProfile.trim().toUpperCase(),
+          profileImage,
+        });
       }
     } catch (err: any) {
-      showToast(err?.response?.data?.message || 'Failed to update personal details.', 'error');
+      showToast(err?.response?.data?.message || 'Failed to update profile details.', 'error');
     } finally {
       setSavingPersonal(false);
+    }
+  };
+
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      showToast('Only JPEG, PNG, and WebP images are allowed.', 'error');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Image size exceeds maximum limit of 2MB.', 'error');
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const res = await axiosInstance.post('/user/profile/image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      if (res.data && res.data.success) {
+        setProfileImage(res.data.imageUrl);
+        setInitialData((prev) => ({ ...prev, profileImage: res.data.imageUrl }));
+        showToast('Profile photo uploaded and saved successfully!', 'success');
+      }
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || 'Failed to upload profile photo.', 'error');
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!currentPassword) {
+      showToast('Please enter your current password.', 'error');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      showToast('New password must be at least 6 characters long.', 'error');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showToast('New passwords do not match.', 'error');
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      const res = await axiosInstance.put('/user/profile/password', {
+        currentPassword,
+        newPassword,
+      });
+
+      if (res.data && res.data.success) {
+        showToast('Password changed successfully!', 'success');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setShowPasswordSection(false);
+      }
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || 'Failed to change password.', 'error');
+    } finally {
+      setChangingPassword(false);
     }
   };
 
   const handleSaveBusiness = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validations
     if (gstin && !GSTIN_REGEX.test(gstin.trim().toUpperCase())) {
       showToast('Invalid GSTIN format. Expected 15-character Indian GSTIN (e.g., 33AAMCG2518C1Z0)', 'error');
       return;
@@ -168,6 +329,18 @@ const ProfileManagement: React.FC = () => {
     );
   }
 
+  const getImageSrc = (imgPath: string) => {
+    if (!imgPath) return '';
+    if (imgPath.startsWith('http://') || imgPath.startsWith('https://')) return imgPath;
+    return `${BASE_URL}${imgPath.startsWith('/') ? '' : '/'}${imgPath}`;
+  };
+
+  const hasPersonalChanges =
+    personalName !== initialData.name ||
+    personalPhone !== initialData.phone ||
+    address !== initialData.address ||
+    gstinProfile !== initialData.gstin;
+
   return (
     <PageLayout>
       <AlertContainer />
@@ -186,7 +359,7 @@ const ProfileManagement: React.FC = () => {
             </h1>
             <p className="text-xs text-[#EDE9E3] mt-1">
               {isSuperAdmin
-                ? 'Manage your platform administrator account credentials and personal contact details.'
+                ? 'Manage platform administrator credentials, verified mobile contact, office address, and profile image.'
                 : 'Manage personal administrator details and official fleet legal identity for invoices and PDFs.'}
             </p>
           </div>
@@ -202,7 +375,7 @@ const ProfileManagement: React.FC = () => {
           </div>
         </div>
 
-        {/* Tab Selection */}
+        {/* Tab Selection (Non-SuperAdmin Only) */}
         {!isSuperAdmin && (
           <div className="bg-white rounded-xl border border-[#E0DAD1] p-2 shadow-sm flex gap-2">
             <button
@@ -230,27 +403,104 @@ const ProfileManagement: React.FC = () => {
           </div>
         )}
 
-        {/* Tab 1: Personal Profile */}
+        {/* Section 1: Profile Avatar & Identity Card */}
+        <div className="bg-white rounded-xl border border-[#E0DAD1] p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+            <div className="relative group">
+              <div className="w-24 h-24 rounded-full border-4 border-[#F3EFEA] shadow-inner overflow-hidden bg-slate-100 flex items-center justify-center">
+                {profileImage ? (
+                  <img
+                    src={getImageSrc(profileImage)}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <User size={42} className="text-slate-400" />
+                )}
+              </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageFileChange}
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingImage}
+                title="Upload Profile Photo"
+                className="absolute bottom-0 right-0 p-2 bg-[#C04E24] hover:bg-[#A43D1A] text-white rounded-full shadow-md border-2 border-white transition flex items-center justify-center disabled:opacity-50"
+              >
+                {uploadingImage ? (
+                  <RefreshCw size={13} className="animate-spin" />
+                ) : (
+                  <Camera size={13} />
+                )}
+              </button>
+            </div>
+
+            <div className="flex-1 text-center sm:text-left space-y-1">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <h2 className="text-xl font-bold text-[#1C1A18]">{personalName || 'Operator'}</h2>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200">
+                  <Shield size={12} />
+                  {isSuperAdmin ? 'SuperAdmin (Platform Root)' : userRole}
+                </span>
+              </div>
+              <p className="text-xs text-[#5C5752] flex items-center justify-center sm:justify-start gap-1.5">
+                <Mail size={13} className="text-[#C04E24]" />
+                {personalEmail}
+              </p>
+              <p className="text-xs text-[#5C5752] flex items-center justify-center sm:justify-start gap-1.5">
+                <Phone size={13} className="text-[#C04E24]" />
+                {personalPhone ? personalPhone : 'No mobile registered'}
+              </p>
+              <div className="pt-2 flex flex-wrap gap-2 justify-center sm:justify-start">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  className="px-3 py-1.5 bg-[#F3EFEA] hover:bg-[#E0DAD1] text-[#1C1A18] text-xs font-bold rounded-lg border border-[#D5CFC9] transition flex items-center gap-1.5"
+                >
+                  <Upload size={12} />
+                  <span>{uploadingImage ? 'Uploading...' : 'Change Photo (JPEG, PNG, WebP)'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2: Personal Profile / SuperAdmin Details */}
         {(isSuperAdmin || activeTab === 'PERSONAL') && (
           <div className="bg-white rounded-xl border border-[#E0DAD1] p-6 shadow-sm space-y-5">
             <div className="pb-3 border-b border-[#FAF8F5] flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-bold text-[#1C1A18] uppercase tracking-wider flex items-center gap-2">
                   <User size={16} className="text-[#C04E24]" />
-                  <span>Personal Operator Details</span>
+                  <span>{isSuperAdmin ? 'SuperAdmin Account & Contact Credentials' : 'Personal Operator Details'}</span>
                 </h2>
-                <p className="text-xs text-[#7A7570] mt-0.5">Your personal credentials for logging into FleetFlow.</p>
+                <p className="text-xs text-[#7A7570] mt-0.5">
+                  {isSuperAdmin
+                    ? 'The verified contact number here is used dynamically as the authoritative recipient for platform notifications.'
+                    : 'Your personal account credentials for logging into FleetFlow.'}
+                </p>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider">
-                Role: {userRole}
-              </span>
+              {hasPersonalChanges && (
+                <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                  Unsaved Changes
+                </span>
+              )}
             </div>
 
             <form onSubmit={handleSavePersonal} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-1.5">
-                    Full Name / Username
+                    Full Name / Administrator Name <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -263,7 +513,7 @@ const ProfileManagement: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-1.5">
-                    Email Address (Read-Only)
+                    Login Email Address (Read-Only)
                   </label>
                   <input
                     type="email"
@@ -271,35 +521,178 @@ const ProfileManagement: React.FC = () => {
                     className="w-full border border-[#D5CFC9] bg-slate-50 px-3.5 py-2.5 rounded-lg text-sm text-slate-500 cursor-not-allowed"
                     value={personalEmail}
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Platform identity email cannot be altered directly from this screen.
+                  </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-1.5">
-                    Contact Mobile Number
+                    Authoritative SuperAdmin Mobile Number <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
                     className="w-full border border-[#D5CFC9] px-3.5 py-2.5 rounded-lg text-sm text-[#1C1A18] focus:ring-2 focus:ring-[#C04E24] focus:outline-none"
                     value={personalPhone}
                     onChange={(e) => setPersonalPhone(e.target.value)}
-                    placeholder="+91 9876543210"
+                    placeholder="9080280818"
+                    maxLength={13}
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Configured platform SMS recipient. Old number 9003241571 is strictly rejected.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-1.5">
+                    GSTIN Number (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border border-[#D5CFC9] px-3.5 py-2.5 rounded-lg text-sm text-[#1C1A18] font-mono uppercase focus:ring-2 focus:ring-[#C04E24] focus:outline-none"
+                    value={gstinProfile}
+                    onChange={(e) => setGstinProfile(e.target.value.toUpperCase())}
+                    placeholder="33AAMCG2518C1Z0"
+                    maxLength={15}
                   />
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-[#FAF8F5] flex justify-end">
+              <div>
+                <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-1.5">
+                  Operating Office Address / Location
+                </label>
+                <textarea
+                  className="w-full border border-[#D5CFC9] px-3.5 py-2.5 rounded-lg text-sm text-[#1C1A18] focus:ring-2 focus:ring-[#C04E24] focus:outline-none h-20"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Door No, Street Name, Tech Park, City, State, PIN..."
+                />
+              </div>
+
+              <div className="pt-4 border-t border-[#FAF8F5] flex items-center justify-end gap-3">
+                {hasPersonalChanges && (
+                  <button
+                    type="button"
+                    onClick={handleCancelPersonal}
+                    disabled={savingPersonal}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition flex items-center gap-1.5"
+                  >
+                    <X size={13} />
+                    <span>Cancel / Revert</span>
+                  </button>
+                )}
                 <button
                   type="submit"
                   disabled={savingPersonal}
                   className="px-5 py-2.5 bg-[#C04E24] hover:bg-[#A43D1A] text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <Save size={13} />
-                  <span>{savingPersonal ? 'Saving...' : 'Save Personal Details'}</span>
+                  <span>{savingPersonal ? 'Saving...' : 'Save Profile Details'}</span>
                 </button>
               </div>
             </form>
           </div>
         )}
+
+        {/* Section 3: Security & Password Management */}
+        <div className="bg-white rounded-xl border border-[#E0DAD1] p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#FAF8F5]">
+            <div>
+              <h2 className="text-sm font-bold text-[#1C1A18] uppercase tracking-wider flex items-center gap-2">
+                <Lock size={16} className="text-[#C04E24]" />
+                <span>Security & Password</span>
+              </h2>
+              <p className="text-xs text-[#7A7570] mt-0.5">
+                Update account password with current-password verification.
+              </p>
+            </div>
+            {!showPasswordSection && (
+              <button
+                type="button"
+                onClick={() => setShowPasswordSection(true)}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-[#1C1A18] text-xs font-bold rounded-lg transition flex items-center gap-1.5"
+              >
+                <Key size={13} />
+                <span>Change Password</span>
+              </button>
+            )}
+          </div>
+
+          {showPasswordSection && (
+            <form onSubmit={handleChangePassword} className="space-y-4 pt-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-1.5">
+                    Current Password <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    className="w-full border border-[#D5CFC9] px-3.5 py-2.5 rounded-lg text-sm text-[#1C1A18] focus:ring-2 focus:ring-[#C04E24] focus:outline-none"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-1.5">
+                    New Password <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    className="w-full border border-[#D5CFC9] px-3.5 py-2.5 rounded-lg text-sm text-[#1C1A18] focus:ring-2 focus:ring-[#C04E24] focus:outline-none"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Min 6 characters"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-1.5">
+                    Confirm New Password <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    className="w-full border border-[#D5CFC9] px-3.5 py-2.5 rounded-lg text-sm text-[#1C1A18] focus:ring-2 focus:ring-[#C04E24] focus:outline-none"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repeat new password"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordSection(false);
+                    setCurrentPassword('');
+                    setNewPassword('');
+                    setConfirmPassword('');
+                  }}
+                  disabled={changingPassword}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={changingPassword}
+                  className="px-5 py-2 bg-[#1C1A18] hover:bg-[#2E2A26] text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Key size={13} />
+                  <span>{changingPassword ? 'Verifying...' : 'Update Password'}</span>
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
 
         {/* Tab 2: Fleet Business Profile (Fleet Admin Only) */}
         {!isSuperAdmin && activeTab === 'BUSINESS' && (

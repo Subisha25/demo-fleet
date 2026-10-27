@@ -1,5 +1,6 @@
 import express from 'express';
-import {uploadUsersFromExcel, getCurrentUser, getUserProfile, updateUserProfile, getUsersByStatus, getAllUsers, getUserById, updateUser,updateUserStatus, deleteUser,logout, getAllUserByCompany,
+import path from 'path';
+import {uploadUsersFromExcel, getCurrentUser, getUserProfile, updateUserProfile, changeUserPassword, uploadProfileImage, getPublicContactInfo, getUsersByStatus, getAllUsers, getUserById, updateUser,updateUserStatus, deleteUser,logout, getAllUserByCompany,
     getUsersByConfirmationStatus, getUsersByGender, confirmUser, addNewAddress, 
     getUserAddresses, getUserByManager, updateUserAddress, deleteUserAddress, restoreUser, permanentDeleteUser,
     getCompanyManagers,
@@ -15,11 +16,38 @@ import multer from "multer";
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 
+// Dedicated safe profile image upload storage & validation (JPEG/PNG/WebP, max 2MB)
+const profileStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, path.join(process.cwd(), 'uploads', 'profileImg'));
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `profile_${Date.now()}_${Math.floor(Math.random() * 10000)}${ext}`);
+  },
+});
+
+const profileUpload = multer({
+  storage: profileStorage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPEG, PNG, and WebP images are allowed.'));
+    }
+  },
+});
+
 // Protected routes (authentication required)
 router.post("/upload-users", authMiddleware, requirePaidForModification, upload.single("file"), uploadUsersFromExcel);
 
 router.get('/profile', authMiddleware, getUserProfile);
 router.put('/profile', authMiddleware, updateUserProfile);
+router.put('/profile/password', authMiddleware, changeUserPassword);
+router.post('/profile/image', authMiddleware, profileUpload.single('image'), uploadProfileImage);
+router.get('/public/contact-info', getPublicContactInfo);
 router.get('/getCurrentUser', authMiddleware, getCurrentUser);
 router.get('/getUsersByStatus/:status', authMiddleware, getUsersByStatus);
 router.post('/logout', logout);

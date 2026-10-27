@@ -80,20 +80,13 @@ export function isTestOrSyntheticRecipient(recipient: string): boolean {
 
 /**
  * Resolves the authorized SuperAdmin email address dynamically from root platform data.
- * Always resolves to the intended SuperAdmin (subisha2002.m@gmail.com).
- * Eliminates stale/incorrect fallbacks to old gracecabs domain addresses.
+ * Precedence:
+ * 1. Primary Source: Verified Database SuperAdmin Profile (employee table: role='superadmin', tenantId=ROOT_TENANT_ID)
+ * 2. Fallback Source: SUPERADMIN_EMAIL in backend/.env
+ * 3. Fail-safe: Generic platform fallback (admin@fleetflow.app)
  */
 export async function getSuperAdminEmail(): Promise<string> {
-  const envEmail = process.env.SUPERADMIN_EMAIL?.trim();
-  if (
-    envEmail &&
-    envEmail.includes('@') &&
-    !envEmail.toLowerCase().includes('gracecabs.com') &&
-    !envEmail.toLowerCase().includes('gracecabs.in')
-  ) {
-    return envEmail;
-  }
-
+  // 1. Primary: Database SuperAdmin Employee Record
   try {
     const rootAdmin = await Employee.findOne({
       where: {
@@ -111,7 +104,18 @@ export async function getSuperAdminEmail(): Promise<string> {
       return rootAdmin.email.trim();
     }
   } catch (err) {
-    console.warn('[NotificationService] Could not resolve superadmin from DB:', err);
+    console.warn('[NotificationService] Could not resolve superadmin email from DB:', err);
+  }
+
+  // 2. Fallback: Environment configuration
+  const envEmail = process.env.SUPERADMIN_EMAIL?.trim();
+  if (
+    envEmail &&
+    envEmail.includes('@') &&
+    !envEmail.toLowerCase().includes('gracecabs.com') &&
+    !envEmail.toLowerCase().includes('gracecabs.in')
+  ) {
+    return envEmail;
   }
 
   return 'admin@fleetflow.app';
@@ -119,14 +123,13 @@ export async function getSuperAdminEmail(): Promise<string> {
 
 /**
  * Resolves the authorized SuperAdmin SMS recipient phone number dynamically.
- * Prioritizes SUPERADMIN_PHONE / ADMIN_PHONE in .env, falling back to root Employee or authorized support number.
+ * Precedence:
+ * 1. Primary Source: Verified Database SuperAdmin Profile (employee table: role='superadmin', tenantId=ROOT_TENANT_ID)
+ * 2. Fallback Source: SUPERADMIN_PHONE / ADMIN_PHONE in backend/.env (default 9080280818)
+ * 3. Fail-safe: Returns empty string '' (Never falls back to 9003241571 or placeholder numbers)
  */
 export async function getSuperAdminPhone(): Promise<string> {
-  const envPhone = (process.env.SUPERADMIN_PHONE || process.env.ADMIN_PHONE || '').trim();
-  if (envPhone && envPhone.length >= 10) {
-    return envPhone;
-  }
-
+  // 1. Primary: Database SuperAdmin Employee Record
   try {
     const rootAdmin = await Employee.findOne({
       where: {
@@ -135,14 +138,25 @@ export async function getSuperAdminPhone(): Promise<string> {
       },
     });
 
-    if (rootAdmin?.phno && rootAdmin.phno.length >= 10 && !rootAdmin.phno.startsWith('99999')) {
-      return rootAdmin.phno.trim();
+    if (rootAdmin?.phno) {
+      const cleanDb = String(rootAdmin.phno).replace(/\D/g, '');
+      if (cleanDb && cleanDb.length >= 10 && !cleanDb.startsWith('99999') && !cleanDb.includes('9003241571')) {
+        return cleanDb.slice(-10);
+      }
     }
   } catch (err) {
     console.warn('[NotificationService] Could not resolve superadmin phone from DB:', err);
   }
 
-  return '9999999999';
+  // 2. Fallback: Environment configuration
+  const envPhone = (process.env.SUPERADMIN_PHONE || process.env.ADMIN_PHONE || '').trim();
+  const cleanEnv = envPhone.replace(/\D/g, '');
+  if (cleanEnv && cleanEnv.length >= 10 && !cleanEnv.includes('9003241571')) {
+    return cleanEnv.slice(-10);
+  }
+
+  // 3. Fail safely: If SuperAdmin number is missing or invalid, fail safely instead of sending to another number.
+  return '';
 }
 
 /**
@@ -253,14 +267,14 @@ export async function sendNotification(options: SendNotificationOptions): Promis
   let providerMessageId: string | null = null;
   let errorDetails: string | null = null;
 
-  // Strict isolation hard stop: Prohibit transmission to obsolete Grace Cabs customer
-  if (channel === 'EMAIL' && recipient.toLowerCase().includes('subisha2002.m')) {
-    const blockedMsg = 'Blocked: Delivery to obsolete Grace Cabs customer (subisha2002.m) is prohibited.';
-    console.warn(`[NotificationService: ISOLATION GUARD] ${blockedMsg}`);
+  // Strict validation: recipient must not be empty or missing
+  if (!recipient || !recipient.trim()) {
+    const emptyMsg = `Failed: Destination ${channel} recipient address/number is missing or empty.`;
+    console.warn(`[NotificationService] ${emptyMsg}`);
     await NotificationLog.create({
       logId,
       channel,
-      recipient,
+      recipient: recipient || 'UNSPECIFIED',
       tenantId: tenantId || null,
       templateCode,
       referenceEntity: referenceEntity || null,
@@ -268,14 +282,16 @@ export async function sendNotification(options: SendNotificationOptions): Promis
       idempotencyKey: idempotencyKey || null,
       providerStatus: 'FAILED',
       providerMessageId: null,
-      errorDetails: blockedMsg,
+      errorDetails: emptyMsg,
       metadata: sanitizeMetadata(metadata),
     });
-    return { success: false, logId, providerStatus: 'FAILED', error: blockedMsg };
+    return { success: false, logId, providerStatus: 'FAILED', error: emptyMsg };
   }
 
-  if (channel === 'SMS' && recipient.includes('90802')) {
-    const blockedMsg = 'Blocked: Delivery to obsolete Grace Cabs customer phone (90802) is prohibited.';
+  // Strict isolation hard stop: Permanently block obsolete legacy contact (9003241571) across all formatted variants
+  const cleanRecipientPhone = String(recipient || '').replace(/\D/g, '');
+  if (channel === 'SMS' && (cleanRecipientPhone === '9003241571' || cleanRecipientPhone.endsWith('9003241571') || cleanRecipientPhone.includes('9003241571'))) {
+    const blockedMsg = 'Blocked: Delivery to obsolete legacy contact (9003241571) is permanently prohibited.';
     console.warn(`[NotificationService: ISOLATION GUARD] ${blockedMsg}`);
     await NotificationLog.create({
       logId,

@@ -132,9 +132,10 @@ export async function send2FactorTemplateSms(options: {
   const apiKey = (process.env.TWO_FACTOR_API_KEY || process.env.TWOFACTOR_API_KEY || '').trim();
   const senderId = (process.env.TWO_FACTOR_SENDER_ID || process.env.TWOFACTOR_SENDER_ID || 'GRCCAB').trim();
 
-  // Strict isolation guard: Never dispatch to obsolete customer phone 90802...
-  if (options.to && (options.to.includes('90802') || options.to.replace(/\D/g, '').includes('9080280818'))) {
-    const msg = 'Blocked: Transmission to obsolete customer phone number (90802...) is prohibited.';
+  // Strict isolation guard: Never dispatch to obsolete legacy phone number 9003241571
+  const cleanTo = String(options.to || '').replace(/\D/g, '');
+  if (cleanTo === '9003241571' || cleanTo.endsWith('9003241571') || cleanTo.includes('9003241571')) {
+    const msg = 'Blocked: Transmission to legacy phone number (9003241571) is permanently prohibited.';
     console.warn(`[SMS Service: ISOLATION GUARD] ${msg}`);
     return {
       success: false,
@@ -149,6 +150,16 @@ export async function send2FactorTemplateSms(options: {
       success: false,
       providerStatus: 'FAILED',
       error: phoneCheck.error || 'Invalid destination phone number',
+    };
+  }
+
+  // Safety mock mode check: Prevent real SMS transmission in test/mock environment
+  if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
+    console.log(`[SMS Service: MOCK MODE] Destination: ${maskPhoneNumber(phoneCheck.normalizedPhone)} | Template: ${options.templateName} | Status: MOCK`);
+    return {
+      success: true,
+      providerStatus: 'SENT',
+      providerMessageId: `mock_2factor_${Date.now()}`,
     };
   }
 
@@ -209,9 +220,10 @@ export async function sendDirectSms(
   providerMessageId?: string;
   error?: string;
 }> {
-  // Strict isolation guard: Never dispatch to obsolete customer phone 90802...
-  if (to && (to.includes('90802') || to.replace(/\D/g, '').includes('9080280818'))) {
-    const msg = 'Blocked: Transmission to obsolete customer phone number (90802...) is prohibited.';
+  // Strict isolation guard: Never dispatch to obsolete legacy phone number 9003241571
+  const cleanTo = String(to || '').replace(/\D/g, '');
+  if (cleanTo === '9003241571' || cleanTo.endsWith('9003241571') || cleanTo.includes('9003241571')) {
+    const msg = 'Blocked: Transmission to legacy phone number (9003241571) is permanently prohibited.';
     console.warn(`[SMS Service: ISOLATION GUARD] ${msg}`);
     return {
       success: false,
@@ -226,6 +238,16 @@ export async function sendDirectSms(
       success: false,
       providerStatus: 'FAILED',
       error: phoneCheck.error || 'Invalid destination phone number',
+    };
+  }
+
+  // Safety mock mode check: Prevent real SMS transmission in test/mock environment
+  if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
+    console.log(`[SMS Service: MOCK MODE] Destination: ${maskPhoneNumber(phoneCheck.normalizedPhone)} | Status: MOCK`);
+    return {
+      success: true,
+      providerStatus: 'SENT',
+      providerMessageId: `mock_direct_${Date.now()}`,
     };
   }
 

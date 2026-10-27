@@ -296,7 +296,6 @@ export const sendEmailFromTemplate = async (
   const isObsoleteContact = (email: string) => {
     const lower = (email || '').toLowerCase().trim();
     return (
-      lower.includes('subisha2002.m') ||
       lower.includes('traveldesk@gracecabs.com') ||
       lower.includes('robertjayakumar@gmail.com') ||
       lower.endsWith('@gracecabs.com')

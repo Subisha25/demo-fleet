@@ -135,20 +135,33 @@ async function runSuite() {
     return count === 0;
   });
 
-  await assert('Dispatching SMS to old customer phone (9080280818) is strictly BLOCKED server-side', async () => {
-    const res = await sendDirectSms('9080280818', 'Test message to old phone');
-    return res.success === false && String(res.error).includes('Blocked');
+  await assert('Dispatching SMS to legacy phone (9003241571) is strictly BLOCKED server-side across formats', async () => {
+    const rawRes = await sendDirectSms('9003241571', 'Test message to legacy phone');
+    const formattedRes = await sendDirectSms('+91 90032 41571', 'Test formatted legacy phone');
+    return rawRes.success === false && String(rawRes.error).includes('Blocked') &&
+           formattedRes.success === false && String(formattedRes.error).includes('Blocked');
   });
 
-  await assert('Dispatching Email to old customer address (subisha2002.m@gmail.com) is strictly BLOCKED server-side', async () => {
+  await assert('SuperAdmin recipient 9080280818 is eligible and NOT blocked server-side', async () => {
+    const res = await sendNotification({
+      channel: 'SMS',
+      recipient: '9080280818',
+      templateCode: 'TEST_SUPERADMIN_ALERT',
+      subject: 'SuperAdmin Alert Test',
+      body: 'FleetFlow Operational Test Alert',
+    });
+    return res.success === true && (res.providerStatus === 'MOCK' || res.providerStatus === 'SENT');
+  });
+
+  await assert('SuperAdmin email (subisha2002.m@gmail.com) is eligible and NOT blocked server-side', async () => {
     const res = await sendNotification({
       channel: 'EMAIL',
       recipient: 'subisha2002.m@gmail.com',
-      templateCode: 'TEST_PROHIBITED_CONTACT',
-      subject: 'Prohibited Test',
-      body: 'Should never send',
+      templateCode: 'TEST_SUPERADMIN_EMAIL',
+      subject: 'SuperAdmin Operational Test',
+      body: 'Operational email verification',
     });
-    return res.success === false && String(res.error).includes('Blocked');
+    return res.success === true && (res.providerStatus === 'MOCK' || res.providerStatus === 'SENT');
   });
 
   // ===========================================================================

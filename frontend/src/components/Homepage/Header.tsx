@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { usePublicContact } from "../../services/contactConfig";
 
 import Banner from "../../assets/hero.png";
 import Logo from "../../assets/logo.png";
@@ -17,6 +18,7 @@ import MobileToggleIcon from "../../assets/header/Group 21.png"
 import mobilelogo from "../../assets/header/mobilelogo.png"
 
 export default function HeaderHero() {
+  const { contact } = usePublicContact();
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileSize, setMobileSize] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
 
@@ -119,7 +121,7 @@ return (
 
    {/* PHONE */}
 <a
-  href="tel:+919841722675"
+  href={`tel:${contact.phone.replace(/\s+/g, '')}`}
   className="flex items-center gap-1"
 >
   <img
@@ -128,14 +130,14 @@ return (
     alt="phone"
   />
   <span className="text-[#221C84] yb-text whitespace-nowrap font-bold">
-    +91 98417 22675
+    {contact.phone}
   </span>
 </a>
 
 
    {/* MAIL */}
 <a
-  href="mailto:support@fleetflow.com"
+  href={`mailto:${contact.email}`}
   className="flex items-center gap-1"
 >
   <img
@@ -144,7 +146,7 @@ return (
     alt="mail"
   />
   <span className="text-[#221C84] yb-text whitespace-nowrap font-bold">
-    support@fleetflow.com
+    {contact.email}
   </span>
 </a>
 
@@ -452,16 +454,16 @@ return (
 
       <div className="flex items-center gap-3">
         <img src={PhoneIcon} className="w-6 h-6" />
-        <span className="text-white font-semibold text-[16px]">
-          +91 98417 22675
-        </span>
+        <a href={`tel:${contact.phone.replace(/\s+/g, '')}`} className="text-white font-semibold text-[16px] hover:underline">
+          {contact.phone}
+        </a>
       </div>
 
       <div className="flex items-center gap-3">
         <img src={MailIcon} className="w-6 h-6" />
-        <span className="text-white font-semibold text-[16px]">
-          support@fleetflow.com
-        </span>
+        <a href={`mailto:${contact.email}`} className="text-white font-semibold text-[16px] hover:underline">
+          {contact.email}
+        </a>
       </div>
 <button
   onClick={() => {
@@ -650,17 +652,17 @@ backgroundPosition: "left -80px top",  // ⭐ shifts image to left
 
     <div className="flex items-center gap-2 whitespace-nowrap">
   <img src={PhoneIcon} className="w-3 h-3" />
-  <span className="text-white text-[13px] font-medium leading-none">
-    +91 98417 22675
-  </span>
+  <a href={`tel:${contact.phone.replace(/\s+/g, '')}`} className="text-white text-[13px] font-medium leading-none hover:underline">
+    {contact.phone}
+  </a>
 </div>
 
 
  <div className="flex items-center gap-2 whitespace-nowrap">
   <img src={MailIcon} className="w-3 h-3" />
-  <span className="text-white text-[13px] font-medium leading-none">
-    support@fleetflow.com
-  </span>
+  <a href={`mailto:${contact.email}`} className="text-white text-[13px] font-medium leading-none hover:underline">
+    {contact.email}
+  </a>
 </div>
 <button
     onClick={() => {

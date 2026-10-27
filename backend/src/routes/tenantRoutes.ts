@@ -39,6 +39,7 @@ import {
   sendTestEmailEndpoint,
   downloadPlanSummaryPDF,
 } from '../services/registrationService';
+import { getPublicContactInfo } from '../services/userServices';
 import {
   createSubscriptionCheckout,
   verifySubscriptionPayment,
@@ -73,6 +74,10 @@ router.get('/plan-summary/download/:fileName', downloadPlanSummaryPDF);
 router.get('/public/slug/:slug', getPublicFleetBySlug);
 router.get('/public/fleet-by-slug/:slug', getPublicFleetBySlug);
 router.post('/public/login/:slug', fleetLoginBySlug);
+
+// Public Contact Configuration Endpoint (Dynamic single source of truth for public website)
+router.get('/contact-info', getPublicContactInfo);
+router.get('/public/contact-info', getPublicContactInfo);
 
 // =============================================================================
 // SUPERADMIN REGISTRATION REVIEW & ONBOARDING QUEUE

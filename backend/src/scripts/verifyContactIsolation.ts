@@ -48,23 +48,31 @@ async function verify() {
   console.log(`   2Factor API Key Present: ${twoFactorKey ? 'YES (MASKED ' + twoFactorKey.substring(0, 4) + '****)' : 'NO'}`);
   console.log(`   2Factor Sender ID: ${twoFactorSender}`);
 
-  // 4. Isolation Guard: Prohibited Old Customer SMS Block
-  console.log('\n4. ISOLATION GUARD: PROHIBITED OLD CUSTOMER SMS BLOCK:');
-  const oldPhoneTest = await sendDirectSms('9080280818', 'Test message should never send');
-  console.log(`   Old Phone (9080280818) Send Result: success=${oldPhoneTest.success}, status=${oldPhoneTest.providerStatus}`);
-  console.log(`   Error returned: "${oldPhoneTest.error}" -> ${oldPhoneTest.success === false && String(oldPhoneTest.error).includes('Blocked') ? 'PASS (Safely Blocked)' : 'FAIL'}`);
+  // 4. Isolation Guard: Prohibited Legacy Phone (9003241571) Block
+  console.log('\n4. ISOLATION GUARD: PROHIBITED LEGACY PHONE (9003241571) BLOCK:');
+  const legacyPhoneTest = await sendDirectSms('9003241571', 'Test message to legacy phone');
+  console.log(`   Legacy Phone (9003241571) Send Result: success=${legacyPhoneTest.success}, status=${legacyPhoneTest.providerStatus}`);
+  console.log(`   Error returned: "${legacyPhoneTest.error}" -> ${legacyPhoneTest.success === false && String(legacyPhoneTest.error).includes('Blocked') ? 'PASS (Safely Blocked)' : 'FAIL'}`);
 
-  // 5. Isolation Guard: Prohibited Old Customer Email Block
-  console.log('\n5. ISOLATION GUARD: PROHIBITED OLD CUSTOMER EMAIL BLOCK:');
-  const oldEmailTest = await sendNotification({
+  // 5. Operational Eligibility: SuperAdmin Contacts (9080280818 / subisha2002.m@gmail.com)
+  console.log('\n5. OPERATIONAL ELIGIBILITY: SUPERADMIN CONTACTS:');
+  const superAdminSmsTest = await sendNotification({
+    channel: 'SMS',
+    recipient: '9080280818',
+    templateCode: 'TEST_SUPERADMIN_SMS',
+    subject: 'SuperAdmin SMS Verification',
+    body: 'Operational test message',
+  });
+  console.log(`   SuperAdmin Phone (9080280818) Result: success=${superAdminSmsTest.success}, status=${superAdminSmsTest.providerStatus} -> ${superAdminSmsTest.success ? 'PASS (Eligible)' : 'FAIL'}`);
+
+  const superAdminEmailTest = await sendNotification({
     channel: 'EMAIL',
     recipient: 'subisha2002.m@gmail.com',
-    templateCode: 'TEST_ISOLATION',
-    subject: 'Prohibited Test',
-    body: 'This must not be sent',
+    templateCode: 'TEST_SUPERADMIN_EMAIL',
+    subject: 'SuperAdmin Email Verification',
+    body: 'Operational test email',
   });
-  console.log(`   Old Email (subisha2002.m@gmail.com) Send Result: success=${oldEmailTest.success}, status=${oldEmailTest.providerStatus}`);
-  console.log(`   Error returned: "${oldEmailTest.error}" -> ${oldEmailTest.success === false && String(oldEmailTest.error).includes('Blocked') ? 'PASS (Safely Blocked)' : 'FAIL'}`);
+  console.log(`   SuperAdmin Email (subisha2002.m@gmail.com) Result: success=${superAdminEmailTest.success}, status=${superAdminEmailTest.providerStatus} -> ${superAdminEmailTest.success ? 'PASS (Eligible)' : 'FAIL'}`);
 
   console.log('\n===============================================================');
   console.log('🏁 ALL CONTACT ISOLATION CHECKS PASSED SUCCESSFULLY!');

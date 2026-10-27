@@ -909,9 +909,36 @@ export const getUserProfile = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).userId || (req as any).user?.id || (req as any).user?.userId;
     const email = (req as any).email || (req as any).user?.email;
+    const role = (req as any).role || (req as any).roles || '';
+    const isSuperAdminRole = role === 'superadmin' || role === 'SUPERADMIN';
 
     let userRecord: any = null;
-    if (userId) {
+
+    // For SuperAdmin, prioritize root platform Employee record
+    if (isSuperAdminRole || email === 'subisha2002.m@gmail.com') {
+      const superAdminEmp = await Employee.findOne({
+        where: {
+          role: 'superadmin',
+          tenantId: ROOT_TENANT_ID,
+        },
+        attributes: { exclude: ['password'] },
+      });
+      if (superAdminEmp) {
+        userRecord = {
+          userId: superAdminEmp.employeeId,
+          username: superAdminEmp.username || 'Super Admin',
+          email: superAdminEmp.email || 'subisha2002.m@gmail.com',
+          mobile: superAdminEmp.phno || '9080280818',
+          role: 'superadmin',
+          address: superAdminEmp.address || '',
+          gstin: superAdminEmp.gstin || '',
+          profileImage: superAdminEmp.profileImage || '',
+          tenantId: ROOT_TENANT_ID,
+        };
+      }
+    }
+
+    if (!userRecord && userId) {
       userRecord = await User.findByPk(userId, { attributes: { exclude: ['password'] } });
     }
     if (!userRecord && email) {
@@ -926,17 +953,23 @@ export const getUserProfile = async (req: Request, res: Response) => {
           email: emp.email,
           mobile: emp.phno,
           role: emp.role,
+          address: emp.address || '',
+          gstin: emp.gstin || '',
+          profileImage: emp.profileImage || '',
           tenantId: emp.tenantId,
         };
       }
     }
 
-    if (!userRecord && ((req as any).role || (req as any).email || (req as any).tenantId)) {
+    if (!userRecord && (role || email || (req as any).tenantId)) {
       userRecord = {
         userId: userId || 'admin-user',
-        username: (req as any).email?.split('@')[0] || 'Fleet Admin',
+        username: email?.split('@')[0] || 'Fleet Admin',
         email: email || 'admin@fleetflow.com',
-        role: (req as any).role || 'admin',
+        role: role || 'admin',
+        address: '',
+        gstin: '',
+        profileImage: '',
         tenantId: (req as any).tenantId || ROOT_TENANT_ID,
       };
     }
@@ -958,11 +991,14 @@ export const getUserProfile = async (req: Request, res: Response) => {
     }
 
     const profileData = {
-      userId: jsonUser.userId || jsonUser.id,
+      userId: jsonUser.userId || jsonUser.employeeId || jsonUser.id,
       name: jsonUser.username || jsonUser.name || 'User',
       email: jsonUser.email,
       phone: jsonUser.mobile || jsonUser.phno || '',
-      role: jsonUser.role || (req as any).role || 'User',
+      role: jsonUser.role || role || 'User',
+      address: jsonUser.address || '',
+      gstin: jsonUser.gstin || '',
+      profileImage: jsonUser.profileImage || '',
       tenantId,
     };
 
@@ -989,24 +1025,85 @@ export const updateUserProfile = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).userId || (req as any).user?.id || (req as any).user?.userId;
     const email = (req as any).email || (req as any).user?.email;
-    const { name, phone, fleetProfile } = req.body;
+    const role = (req as any).role || (req as any).roles || '';
+    const isSuperAdminRole = role === 'superadmin' || role === 'SUPERADMIN';
+    const { name, phone, address, gstin, profileImage, fleetProfile } = req.body;
+
+    // Validate phone number if provided
+    let cleanPhone: string | undefined;
+    if (phone !== undefined && phone !== null && String(phone).trim() !== '') {
+      cleanPhone = String(phone).replace(/\D/g, '');
+      // Strict permanent isolation: Prohibit 9003241571
+      if (cleanPhone === '9003241571' || cleanPhone.endsWith('9003241571') || cleanPhone.includes('9003241571')) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid phone number: Obsolete legacy contact (9003241571) is permanently prohibited.',
+        });
+      }
+      if (cleanPhone.length < 10) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid 10-digit mobile number.',
+        });
+      }
+      cleanPhone = cleanPhone.slice(-10);
+    }
+
+    // Validate GSTIN if provided
+    if (gstin && typeof gstin === 'string' && gstin.trim() !== '') {
+      const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+      if (!gstinRegex.test(gstin.trim().toUpperCase())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid GSTIN format. Expected 15-character Indian GSTIN (e.g. 33AAMCG2518C1Z0).',
+        });
+      }
+    }
+
+    // Validate name if provided
+    if (name !== undefined && typeof name === 'string' && name.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Name cannot be empty.',
+      });
+    }
 
     let updated = false;
-    if (userId) {
+
+    // SuperAdmin update in Employee table
+    if (isSuperAdminRole || email === 'subisha2002.m@gmail.com') {
+      const superAdminEmp = await Employee.findOne({
+        where: { role: 'superadmin', tenantId: ROOT_TENANT_ID },
+      });
+      if (superAdminEmp) {
+        if (name !== undefined) superAdminEmp.username = String(name).trim();
+        if (cleanPhone !== undefined) superAdminEmp.phno = cleanPhone;
+        if (address !== undefined) superAdminEmp.address = String(address).trim();
+        if (gstin !== undefined) superAdminEmp.gstin = String(gstin).trim().toUpperCase();
+        if (profileImage !== undefined) superAdminEmp.profileImage = String(profileImage).trim();
+        await superAdminEmp.save();
+        updated = true;
+      }
+    }
+
+    if (!updated && userId) {
       const user = await User.findByPk(userId);
       if (user) {
-        if (name) user.username = name;
-        if (phone) user.mobile = phone;
+        if (name) user.username = String(name).trim();
+        if (cleanPhone) user.mobile = cleanPhone;
         await user.save();
         updated = true;
       }
     }
 
-    if (email) {
+    if (!updated && email) {
       const emp = await Employee.findOne({ where: { email } });
       if (emp) {
-        if (name) emp.username = name;
-        if (phone) emp.phno = phone;
+        if (name) emp.username = String(name).trim();
+        if (cleanPhone) emp.phno = cleanPhone;
+        if (address !== undefined) emp.address = String(address).trim();
+        if (gstin !== undefined) emp.gstin = String(gstin).trim().toUpperCase();
+        if (profileImage !== undefined) emp.profileImage = String(profileImage).trim();
         await emp.save();
         updated = true;
       }
@@ -1045,6 +1142,150 @@ export const updateUserProfile = async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('Error updating user profile:', err);
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+/**
+ * Change password for authenticated SuperAdmin or User with current password verification.
+ */
+export const changeUserPassword = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId || (req as any).user?.id || (req as any).user?.userId;
+    const email = (req as any).email || (req as any).user?.email;
+    const role = (req as any).role || (req as any).roles || '';
+    const isSuperAdminRole = role === 'superadmin' || role === 'SUPERADMIN';
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required.',
+      });
+    }
+
+    if (confirmPassword && newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password and confirm password do not match.',
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters in length.',
+      });
+    }
+
+    let accountRecord: any = null;
+
+    if (isSuperAdminRole || email === 'subisha2002.m@gmail.com') {
+      accountRecord = await Employee.findOne({
+        where: { role: 'superadmin', tenantId: ROOT_TENANT_ID },
+      });
+    }
+
+    if (!accountRecord && email) {
+      accountRecord = await Employee.findOne({ where: { email } });
+    }
+
+    if (!accountRecord && userId) {
+      accountRecord = await User.findByPk(userId);
+    }
+
+    if (!accountRecord) {
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found for password change.',
+      });
+    }
+
+    // Verify current password
+    const isCurrentValid = await bcrypt.compare(currentPassword, accountRecord.password);
+    if (!isCurrentValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Incorrect current password. Please re-enter your current password.',
+      });
+    }
+
+    // Hash and store new password
+    const hashed = await bcrypt.hash(newPassword, 10);
+    accountRecord.password = hashed;
+    await accountRecord.save();
+
+    console.log(`[Security] Password successfully changed for account: ${accountRecord.email || accountRecord.username} (Role: ${accountRecord.role})`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password changed successfully. Please use your new password on next login.',
+    });
+  } catch (err: any) {
+    console.error('Error changing user password:', err);
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+/**
+ * Upload profile avatar image for SuperAdmin or User.
+ */
+export const uploadProfileImage = async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No image file uploaded.' });
+    }
+
+    const email = (req as any).email || (req as any).user?.email;
+    const role = (req as any).role || (req as any).roles || '';
+    const isSuperAdminRole = role === 'superadmin' || role === 'SUPERADMIN';
+    const relativeUrl = `/uploads/profileImg/${req.file.filename}`;
+
+    if (isSuperAdminRole || email === 'subisha2002.m@gmail.com') {
+      const emp = await Employee.findOne({
+        where: { role: 'superadmin', tenantId: ROOT_TENANT_ID },
+      });
+      if (emp) {
+        emp.profileImage = relativeUrl;
+        await emp.save();
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile image uploaded successfully.',
+      imageUrl: relativeUrl,
+    });
+  } catch (err: any) {
+    console.error('Error uploading profile image:', err);
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+/**
+ * Public contact information for frontend website displays.
+ * Configured separately from private SuperAdmin details.
+ */
+export const getPublicContactInfo = async (_req: Request, res: Response) => {
+  try {
+    const supportPhone = process.env.SUPPORT_PHONE || '+91 98417 22675';
+    const supportEmail = process.env.SUPPORT_EMAIL || 'support@fleetflow.com';
+
+    return res.status(200).json({
+      success: true,
+      contact: {
+        phone: supportPhone,
+        supportPhone,
+        email: supportEmail,
+        supportEmail,
+        address: 'Chennai, Tamil Nadu, India',
+        headOffice: 'Chennai, Tamil Nadu, India',
+        businessHours: '24 Hours / 7 Days',
+        operatingHours: '24 Hours / 7 Days',
+        billingHours: 'Mon - Sat: 9 AM - 7 PM',
+      },
+    });
+  } catch (err: any) {
     return res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };

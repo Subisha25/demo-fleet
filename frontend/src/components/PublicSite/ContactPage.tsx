@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import PublicLayout from "./PublicLayout";
 import GraceCabsLogo from "../GraceCabsLogo";
+import { usePublicContact } from "../../services/contactConfig";
 
 export default function ContactPage() {
+  const { contact } = usePublicContact();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -68,8 +70,8 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <div className="text-[10px] uppercase font-bold text-[#7A7570]">Email Inquiries</div>
-                      <a href="mailto:support@fleetflow.com" className="font-semibold text-[#1C1A18] hover:text-[#C04E24]">
-                        support@fleetflow.com
+                      <a href={`mailto:${contact.email}`} className="font-semibold text-[#1C1A18] hover:text-[#C04E24]">
+                        {contact.email}
                       </a>
                     </div>
                   </div>
@@ -82,8 +84,8 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <div className="text-[10px] uppercase font-bold text-[#7A7570]">Direct Phone / WhatsApp</div>
-                      <a href="tel:+919841722675" className="font-semibold text-[#1C1A18] hover:text-[#C04E24]">
-                        +91 98417 22675
+                      <a href={`tel:${contact.phone.replace(/\s+/g, '')}`} className="font-semibold text-[#1C1A18] hover:text-[#C04E24]">
+                        {contact.phone}
                       </a>
                     </div>
                   </div>
@@ -98,7 +100,7 @@ export default function ContactPage() {
                     <div>
                       <div className="text-[10px] uppercase font-bold text-[#7A7570]">Head Office</div>
                       <p className="font-semibold text-[#1C1A18]">
-                        Chennai, Tamil Nadu, India
+                        {contact.address}
                       </p>
                     </div>
                   </div>

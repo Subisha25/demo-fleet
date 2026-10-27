@@ -60,6 +60,24 @@ export class Employee extends Model {
   })
   fcm_token!: string;
 
+  @Column({
+    type: DataType.STRING(500),
+    allowNull: true,
+  })
+  address!: string;
+
+  @Column({
+    type: DataType.STRING(15),
+    allowNull: true,
+  })
+  gstin!: string;
+
+  @Column({
+    type: DataType.STRING(500),
+    allowNull: true,
+  })
+  profileImage!: string;
+
   @CreatedAt
   @Column(DataType.DATE)
   createdAt!: Date;

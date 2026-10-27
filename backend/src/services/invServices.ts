@@ -1378,6 +1378,19 @@ export const cancelInvoice = async (req: any, res: Response) => {
         const mobileNumber = user.mobile;
 
         try {
+          // Normalize and check legacy phone block
+          const cleanMobile = String(mobileNumber || '').replace(/\D/g, '');
+          if (cleanMobile === '9003241571' || cleanMobile.endsWith('9003241571') || cleanMobile.includes('9003241571')) {
+            console.warn('[InvoiceCancel SMS: BLOCKED] Transmission to legacy number 9003241571 is prohibited.');
+            return;
+          }
+
+          // Safety mock mode check
+          if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
+            console.log(`[InvoiceCancel SMS: MOCK MODE] Mobile: ${cleanMobile} | Template: Invoice Cancel | Status: MOCK`);
+            return;
+          }
+
           // 2Factor API configuration from environment variables
           const apiKey = process.env.TWO_FACTOR_API_KEY;
           const senderId = process.env.TWO_FACTOR_SENDER_ID;

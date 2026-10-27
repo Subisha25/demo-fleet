@@ -2452,6 +2452,17 @@ if (shortDropPoint.length > 27) {
 if (shortPickup.length > 27) {
   shortPickup = shortPickup.split(",")[0];
 }
+
+    const cleanMobile = String(managerMobile || '').replace(/\D/g, '');
+    if (cleanMobile === '9003241571' || cleanMobile.endsWith('9003241571') || cleanMobile.includes('9003241571')) {
+      console.warn('[Manager SMS: BLOCKED] Transmission to legacy number 9003241571 is prohibited.');
+      return;
+    }
+    if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
+      console.log(`[Manager SMS: MOCK MODE] Mobile: ${cleanMobile} | Status: MOCK`);
+      return;
+    }
+
     const smsUrl = `https://2factor.in/API/R1/?module=TRANS_SMS&apikey=${apiKey}&to=${managerMobile}&from=${senderId}&templatename=${encodeURIComponent(
       "ManageAlert"
     )}&var1=${encodeURIComponent(booking.managerName || "Manager")}
@@ -2573,6 +2584,16 @@ export const rejectBookingByManager = async (req: any, res: Response) => {
 
           if (shortPickup.length > 27) {
             shortPickup = shortPickup.split(",")[0];
+          }
+
+          const cleanCancelMobile = String(user?.mobile || '').replace(/\D/g, '');
+          if (cleanCancelMobile === '9003241571' || cleanCancelMobile.endsWith('9003241571') || cleanCancelMobile.includes('9003241571')) {
+            console.warn('[ManagerCancelBooking SMS: BLOCKED] Transmission to legacy number 9003241571 is prohibited.');
+            return;
+          }
+          if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
+            console.log(`[ManagerCancelBooking SMS: MOCK MODE] Mobile: ${cleanCancelMobile} | Status: MOCK`);
+            return;
           }
 
           // Build SMS URL with parameters

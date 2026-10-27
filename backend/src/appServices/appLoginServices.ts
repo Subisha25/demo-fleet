@@ -21,8 +21,36 @@ const TWOFACTOR_TEMPLATE_NAME = config.twofactor?.templateName || process.env.TW
 // Helper function to send OTP via 2Factor
 const send2FactorOTP = async (mobile: string, otp: string) => {
   try {
-    // Format mobile number (remove +91 if present, 2Factor API handles it)
+    // Format mobile number (remove +91 if present, extract digits)
     const cleanMobile = mobile.replace(/^\+91/, '').replace(/[^\d]/g, '');
+
+    // Isolation Guard: Never dispatch OTP to legacy phone number 9003241571
+    if (cleanMobile === '9003241571' || cleanMobile.endsWith('9003241571') || cleanMobile.includes('9003241571')) {
+      const msg = 'Blocked: Transmission to legacy phone number (9003241571) is permanently prohibited.';
+      console.warn(`[AppLogin OTP: ISOLATION GUARD] ${msg}`);
+      return {
+        success: false,
+        error: msg
+      };
+    }
+
+    // Mock Mode Check: respect NOTIFICATION_MOCK_MODE to prevent real SMS transmission
+    const isMock = process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test';
+    if (isMock) {
+      console.log(`[AppLogin OTP: MOCK MODE] Mobile: ${cleanMobile} | OTP: ${otp} | Template: ${TWOFACTOR_TEMPLATE_NAME} | Status: MOCK (No external API call)`);
+      return {
+        success: true,
+        sessionId: `mock_session_${Date.now()}`,
+        message: '2Factor OTP sent successfully (MOCK)'
+      };
+    }
+
+    if (!TWOFACTOR_API_KEY) {
+      return {
+        success: false,
+        error: '2Factor API key not configured'
+      };
+    }
    
     // 2Factor API URL format:
     // https://2factor.in/API/V1/{api_key}/SMS/{phone_number}/{otp}/{template_name}

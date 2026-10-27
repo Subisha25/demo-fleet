@@ -100,6 +100,7 @@ app.use('/uploads/vehicleImg', express.static(path.join(process.cwd(), 'uploads'
 app.use('/uploads/signature', authMiddleware, express.static(path.join(process.cwd(), 'uploads', 'signature')));
 app.use('/uploads/companyLogo', express.static(path.join(process.cwd(), 'uploads', 'companyLogo'))); 
 app.use('/uploads/fleetLogo', express.static(path.join(process.cwd(), 'uploads', 'fleetLogo'))); 
+app.use('/uploads/profileImg', express.static(path.join(process.cwd(), 'uploads', 'profileImg'))); 
 
 app.use('/api/public/booking', publicBookingRoutes);
 app.use('/api/auth', authRoutes);
