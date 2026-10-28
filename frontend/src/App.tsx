@@ -177,17 +177,12 @@ import OnCallInvoiceView from './SuperAdmin/pages/Orders/view/Oncallinvoiceview'
 const Layout = () => {
   const role = localStorage.getItem("role");
   const [subModalOpen, setSubModalOpen] = React.useState(false);
-  const [subModalTitle, setSubModalTitle] = React.useState<string | undefined>();
-  const [subModalMessage, setSubModalMessage] = React.useState<string | undefined>();
+  const [subModalDetail, setSubModalDetail] = React.useState<any>({});
 
   React.useEffect(() => {
     const handleSubRequired = (event: any) => {
       const detail = event?.detail || {};
-      setSubModalTitle(detail.title || 'Subscription Required');
-      setSubModalMessage(
-        detail.message ||
-          'You have reached the limits of your current subscription or your plan has expired. Please subscribe to continue creating or modifying records.'
-      );
+      setSubModalDetail(detail);
       setSubModalOpen(true);
     };
 
@@ -206,8 +201,13 @@ const Layout = () => {
       <SubscriptionRequiredModal
         isOpen={subModalOpen}
         onClose={() => setSubModalOpen(false)}
-        title={subModalTitle}
-        message={subModalMessage}
+        title={subModalDetail.title}
+        message={subModalDetail.message}
+        isExpired={subModalDetail.isExpired}
+        resource={subModalDetail.resource}
+        current={subModalDetail.current}
+        limit={subModalDetail.limit}
+        planTier={subModalDetail.planTier}
       />
       <main
         className={`flex-1 bg-gray-100 p-2 overflow-auto ${

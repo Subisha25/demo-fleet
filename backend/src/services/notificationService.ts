@@ -126,7 +126,7 @@ export async function getSuperAdminEmail(): Promise<string> {
  * Precedence:
  * 1. Primary Source: Verified Database SuperAdmin Profile (employee table: role='superadmin', tenantId=ROOT_TENANT_ID)
  * 2. Fallback Source: SUPERADMIN_PHONE / ADMIN_PHONE in backend/.env (default 9080280818)
- * 3. Fail-safe: Returns empty string '' (Never falls back to 9003241571 or placeholder numbers)
+ * 3. Fail-safe: Returns empty string '' (Never falls back to unconfigured or placeholder numbers)
  */
 export async function getSuperAdminPhone(): Promise<string> {
   // 1. Primary: Database SuperAdmin Employee Record
@@ -140,7 +140,7 @@ export async function getSuperAdminPhone(): Promise<string> {
 
     if (rootAdmin?.phno) {
       const cleanDb = String(rootAdmin.phno).replace(/\D/g, '');
-      if (cleanDb && cleanDb.length >= 10 && !cleanDb.startsWith('99999') && !cleanDb.includes('9003241571')) {
+      if (cleanDb && cleanDb.length >= 10 && !cleanDb.startsWith('99999')) {
         return cleanDb.slice(-10);
       }
     }
@@ -151,7 +151,7 @@ export async function getSuperAdminPhone(): Promise<string> {
   // 2. Fallback: Environment configuration
   const envPhone = (process.env.SUPERADMIN_PHONE || process.env.ADMIN_PHONE || '').trim();
   const cleanEnv = envPhone.replace(/\D/g, '');
-  if (cleanEnv && cleanEnv.length >= 10 && !cleanEnv.includes('9003241571')) {
+  if (cleanEnv && cleanEnv.length >= 10 && !cleanEnv.startsWith('99999')) {
     return cleanEnv.slice(-10);
   }
 
@@ -288,26 +288,31 @@ export async function sendNotification(options: SendNotificationOptions): Promis
     return { success: false, logId, providerStatus: 'FAILED', error: emptyMsg };
   }
 
-  // Strict isolation hard stop: Permanently block obsolete legacy contact (9003241571) across all formatted variants
-  const cleanRecipientPhone = String(recipient || '').replace(/\D/g, '');
-  if (channel === 'SMS' && (cleanRecipientPhone === '9003241571' || cleanRecipientPhone.endsWith('9003241571') || cleanRecipientPhone.includes('9003241571'))) {
-    const blockedMsg = 'Blocked: Delivery to obsolete legacy contact (9003241571) is permanently prohibited.';
-    console.warn(`[NotificationService: ISOLATION GUARD] ${blockedMsg}`);
-    await NotificationLog.create({
-      logId,
-      channel,
-      recipient,
-      tenantId: tenantId || null,
-      templateCode,
-      referenceEntity: referenceEntity || null,
-      referenceId: referenceId || null,
-      idempotencyKey: idempotencyKey || null,
-      providerStatus: 'FAILED',
-      providerMessageId: null,
-      errorDetails: blockedMsg,
-      metadata: sanitizeMetadata(metadata),
-    });
-    return { success: false, logId, providerStatus: 'FAILED', error: blockedMsg };
+
+  // Strict format validation for SMS
+  let normalizedRecipient = recipient.trim();
+  if (channel === 'SMS') {
+    const phoneCheck = normalizePhoneNumberForSms(recipient);
+    if (!phoneCheck.valid) {
+      const invalidMsg = phoneCheck.error || 'Invalid destination phone number format';
+      console.warn(`[NotificationService] ${invalidMsg}: "${recipient}"`);
+      await NotificationLog.create({
+        logId,
+        channel,
+        recipient,
+        tenantId: tenantId || null,
+        templateCode,
+        referenceEntity: referenceEntity || null,
+        referenceId: referenceId || null,
+        idempotencyKey: idempotencyKey || null,
+        providerStatus: 'FAILED',
+        providerMessageId: null,
+        errorDetails: invalidMsg,
+        metadata: sanitizeMetadata(metadata),
+      });
+      return { success: false, logId, providerStatus: 'FAILED', error: invalidMsg };
+    }
+    normalizedRecipient = phoneCheck.normalizedPhone;
   }
 
   // Idempotency: Prevent duplicate dispatch of the same notification for the same reference within 15 minutes

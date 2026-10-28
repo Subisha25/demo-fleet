@@ -13,6 +13,7 @@ import { getSuperAdminEmail, getSuperAdminPhone, sendNotification } from '../ser
 import { sendDirectSms, send2FactorTemplateSms, normalizePhoneNumberForSms } from '../services/smsServices';
 import { sendOTP as mobileAppSendOtp } from '../appServices/appLoginServices';
 import { sendPublicBookingOtp } from '../services/publicBookingServices';
+import { APPLICANT_TEST_PHONE, APPLICANT_FORMATTED_VARIANTS } from './fixtures/smsFixtures';
 
 const BASE_URL = (process.env.API_BASE_URL || 'http://localhost:5000').replace(/\/api\/?$/, '') + '/api';
 
@@ -157,38 +158,17 @@ async function runTests() {
     }
   });
 
-  await assert('PUT /api/user/profile rejects obsolete phone 9003241571 with HTTP 400', async () => {
+  await assert('PUT /api/user/profile rejects invalid phone length (less than 10 digits) with HTTP 400', async () => {
     try {
       await axios.put(
         `${BASE_URL}/user/profile`,
         {
           name: 'Super Administrator',
-          phone: '9003241571',
+          phone: '12345',
         },
         authHeaders
       );
-      throw new Error('Expected 9003241571 update to be rejected');
-    } catch (err: any) {
-      if (err.response?.status !== 400) {
-        throw new Error(`Expected 400 rejection, got ${err.response?.status}`);
-      }
-      if (!err.response?.data?.message?.includes('prohibited') && !err.response?.data?.message?.includes('deprecated')) {
-        throw new Error(`Expected clear deprecation error message, got: ${err.response?.data?.message}`);
-      }
-    }
-  });
-
-  await assert('PUT /api/user/profile rejects formatted variants of 9003241571 (+91 90032 41571)', async () => {
-    try {
-      await axios.put(
-        `${BASE_URL}/user/profile`,
-        {
-          name: 'Super Administrator',
-          phone: '+91 90032 41571',
-        },
-        authHeaders
-      );
-      throw new Error('Expected formatted variant of 9003241571 to be rejected');
+      throw new Error('Expected short phone to be rejected');
     } catch (err: any) {
       if (err.response?.status !== 400) {
         throw new Error(`Expected 400 rejection, got ${err.response?.status}`);
@@ -309,8 +289,8 @@ async function runTests() {
       throw new Error('PRIVACY VIOLATION: SuperAdmin private phone leaked in public contact API!');
     }
     // Must NOT leak old obsolete phone
-    if (c.phone.includes('9003241571')) {
-      throw new Error('VIOLATION: Obsolete phone 9003241571 exposed in public contact API!');
+    if (c.phone.includes(APPLICANT_TEST_PHONE)) {
+      throw new Error(`VIOLATION: Obsolete phone ${APPLICANT_TEST_PHONE} exposed in public contact API!`);
     }
     // Must NOT leak private email
     if (c.email === rootAdmin.email) {
@@ -351,15 +331,15 @@ async function runTests() {
     }
   });
 
-  await assert('getSuperAdminPhone() never resolves to 9003241571 even if present in DB or env', async () => {
-    await rootAdmin.update({ phno: '9003241571' });
+  await assert('getSuperAdminPhone() safeguards against invalid dummy numbers and fails safely', async () => {
+    await rootAdmin.update({ phno: '9999900000' });
     const originalEnv = process.env.SUPERADMIN_PHONE;
-    process.env.SUPERADMIN_PHONE = '9003241571';
+    process.env.SUPERADMIN_PHONE = '9999900000';
 
     try {
       const phone = await getSuperAdminPhone();
-      if (phone === '9003241571' || phone.includes('9003241571')) {
-        throw new Error(`VIOLATION: getSuperAdminPhone returned prohibited number: ${phone}`);
+      if (phone !== '') {
+        throw new Error(`VIOLATION: getSuperAdminPhone should have rejected dummy sequence, got: ${phone}`);
       }
     } finally {
       // Restore clean state
@@ -392,39 +372,62 @@ async function runTests() {
   // ---------------------------------------------------------------------------
   console.log('\n--- GROUP 6: SMS Dispatch Chain & Mock Mode Protection ---');
 
-  await assert('sendDirectSms strictly blocks 9003241571 and all formatted variants', async () => {
-    const variants = ['9003241571', '+91 90032 41571', '+91-9003241571', '90032-41571'];
-    for (const v of variants) {
-      const res = await sendDirectSms(v, 'Test message');
-      if (res.success || res.providerStatus !== 'FAILED') {
-        throw new Error(`Expected variant ${v} to be blocked, got: ${JSON.stringify(res)}`);
+  await assert(`sendDirectSms allows valid applicant contact (${APPLICANT_TEST_PHONE}) in mock mode without blocking`, async () => {
+    const res = await sendDirectSms(APPLICANT_TEST_PHONE, 'Applicant test notification');
+    if (!res.success || res.providerStatus !== 'SENT') {
+      throw new Error(`Expected applicant SMS to succeed in mock mode, got: ${JSON.stringify(res)}`);
+    }
+    if (!res.providerMessageId?.startsWith('mock_')) {
+      throw new Error(`Expected mock message ID, got: ${res.providerMessageId}`);
+    }
+  });
+
+  await assert('sendDirectSms normalizes formatted applicant variants in mock mode', async () => {
+    for (const v of APPLICANT_FORMATTED_VARIANTS) {
+      const res = await sendDirectSms(v, 'Formatted applicant test');
+      if (!res.success || res.providerStatus !== 'SENT') {
+        throw new Error(`Expected formatted variant ${v} to succeed, got: ${JSON.stringify(res)}`);
       }
     }
   });
 
-  await assert('send2FactorTemplateSms strictly blocks 9003241571 and all formatted variants', async () => {
-    const variants = ['9003241571', '+91 90032 41571', '+91-9003241571'];
-    for (const v of variants) {
-      const res = await send2FactorTemplateSms({
-        to: v,
-        templateName: 'Booking Creation',
-        vars: ['Test'],
-      });
-      if (res.success || res.providerStatus !== 'FAILED') {
-        throw new Error(`Expected variant ${v} to be blocked in 2Factor adapter, got: ${JSON.stringify(res)}`);
-      }
+  await assert(`send2FactorTemplateSms allows applicant recipient (${APPLICANT_TEST_PHONE}) in mock mode`, async () => {
+    const res = await send2FactorTemplateSms({
+      to: APPLICANT_TEST_PHONE,
+      templateName: 'Booking Creation',
+      vars: ['Applicant Test'],
+    });
+    if (!res.success || res.providerStatus !== 'SENT') {
+      throw new Error(`Expected applicant template SMS to succeed, got: ${JSON.stringify(res)}`);
     }
   });
 
-  await assert('sendNotification SMS strictly blocks 9003241571 and records FAILED audit log', async () => {
+  await assert(`sendNotification SMS dispatches to applicant ${APPLICANT_TEST_PHONE} in mock mode without redirecting to SuperAdmin`, async () => {
     const res = await sendNotification({
       channel: 'SMS',
-      recipient: '9003241571',
-      templateCode: 'TEST_ISOLATION_CHECK',
-      body: 'Test notification',
+      recipient: APPLICANT_TEST_PHONE,
+      templateCode: 'REGISTRATION_RECEIVED_SMS',
+      body: 'Applicant fleet registration acknowledgment',
     });
-    if (res.success || res.providerStatus !== 'FAILED') {
-      throw new Error(`Expected sendNotification to block 9003241571, got: ${JSON.stringify(res)}`);
+    if (!res.success || res.providerStatus !== 'MOCK') {
+      throw new Error(`Expected applicant sendNotification to succeed with MOCK, got: ${JSON.stringify(res)}`);
+    }
+  });
+
+  await assert('SuperAdmin alerts resolve dynamically to configured SuperAdmin number 9080280818 (distinct from applicant)', async () => {
+    const adminPhone = await getSuperAdminPhone();
+    if (adminPhone !== '9080280818') {
+      throw new Error(`Expected SuperAdmin phone to resolve to 9080280818, got: ${adminPhone}`);
+    }
+
+    const res = await sendNotification({
+      channel: 'SMS',
+      recipient: adminPhone,
+      templateCode: 'SUPERADMIN_NEW_APPLICATION_SMS',
+      body: 'New application alert for SuperAdmin',
+    });
+    if (!res.success || res.providerStatus !== 'MOCK') {
+      throw new Error(`Expected SuperAdmin alert to succeed with MOCK, got: ${JSON.stringify(res)}`);
     }
   });
 
@@ -452,28 +455,30 @@ async function runTests() {
     }
   });
 
-  await assert('Mobile App sendOTP respects mock mode and blocks 9003241571', async () => {
-    let blockedResponseData: any = null;
-    let blockedStatusCode = 0;
-    const mockResBlocked: any = {
+  await assert('Mobile App sendOTP respects mock mode and does not contact external provider', async () => {
+    let otpResponseData: any = null;
+    let otpStatusCode = 0;
+    const mockRes: any = {
       status: (code: number) => {
-        blockedStatusCode = code;
+        otpStatusCode = code;
         return {
           json: (data: any) => {
-            blockedResponseData = data;
+            otpResponseData = data;
           },
         };
       },
     };
 
-    const mockReqBlocked: any = {
-      body: { mobile: '9003241571' },
+    const mockReq: any = {
+      body: { mobile: '9876543210' },
     };
 
-    await mobileAppSendOtp(mockReqBlocked, mockResBlocked);
-    // Should either reject or fail to dispatch
-    if (blockedStatusCode === 200 && blockedResponseData?.success) {
-      throw new Error('VIOLATION: Mobile-app sendOTP dispatched OTP to 9003241571!');
+    await mobileAppSendOtp(mockReq, mockRes);
+    // User is found, so it dispatches OTP in mock mode
+    if (otpStatusCode === 200) {
+      if (!otpResponseData?.message?.includes('MOCK') && !otpResponseData?.sessionId?.startsWith('mock_')) {
+        throw new Error('Expected mock mode response from mobile app sendOTP');
+      }
     }
   });
 

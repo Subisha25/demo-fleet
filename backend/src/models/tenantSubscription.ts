@@ -76,6 +76,34 @@ export class TenantSubscription extends Model {
   monthlyTripQuota!: number;
 
   @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    defaultValue: 1,
+  })
+  taxQuota!: number;
+
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  isUnlimitedVehicles!: boolean;
+
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  isUnlimitedTrips!: boolean;
+
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  isUnlimitedTaxes!: boolean;
+
+  @Column({
     type: DataType.BOOLEAN,
     defaultValue: true,
     allowNull: false,

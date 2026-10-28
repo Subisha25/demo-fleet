@@ -36,7 +36,7 @@ const config = {
 
   twofactor: {
     apiKey: process.env.TWO_FACTOR_API_KEY || process.env.TWOFACTOR_API_KEY || '',
-    senderId: process.env.TWO_FACTOR_SENDER_ID || process.env.TWOFACTOR_SENDER_ID || 'FLTFLW',
+    senderId: process.env.TWO_FACTOR_SENDER_ID || process.env.TWOFACTOR_SENDER_ID || 'GRCCAB',
     templateName: process.env.TWOFACTOR_TEMPLATE_NAME || 'OTP1',
   },
  

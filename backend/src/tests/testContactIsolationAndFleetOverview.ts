@@ -6,6 +6,7 @@ import axios from 'axios';
 import sequelize from '../config/dbConfig';
 import { getSuperAdminEmail, getSuperAdminPhone, sendNotification } from '../services/notificationService';
 import { sendDirectSms } from '../services/smsServices';
+import { APPLICANT_TEST_PHONE } from './fixtures/smsFixtures';
 import { EmailConfiguration } from '../models/emailConfiguration';
 import { Employee } from '../models/employee';
 import { Tenant } from '../models/tenant';
@@ -135,11 +136,11 @@ async function runSuite() {
     return count === 0;
   });
 
-  await assert('Dispatching SMS to legacy phone (9003241571) is strictly BLOCKED server-side across formats', async () => {
-    const rawRes = await sendDirectSms('9003241571', 'Test message to legacy phone');
-    const formattedRes = await sendDirectSms('+91 90032 41571', 'Test formatted legacy phone');
-    return rawRes.success === false && String(rawRes.error).includes('Blocked') &&
-           formattedRes.success === false && String(formattedRes.error).includes('Blocked');
+  await assert(`Applicant/user SMS to valid contact (${APPLICANT_TEST_PHONE}) is allowed and dispatched in mock mode`, async () => {
+    const rawRes = await sendDirectSms(APPLICANT_TEST_PHONE, 'Test message to applicant phone');
+    const formattedRes = await sendDirectSms(`+91 ${APPLICANT_TEST_PHONE.slice(0, 5)} ${APPLICANT_TEST_PHONE.slice(5)}`, 'Test formatted applicant phone');
+    return rawRes.success === true && rawRes.providerStatus === 'SENT' &&
+           formattedRes.success === true && formattedRes.providerStatus === 'SENT';
   });
 
   await assert('SuperAdmin recipient 9080280818 is eligible and NOT blocked server-side', async () => {

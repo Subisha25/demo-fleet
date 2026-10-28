@@ -7,6 +7,7 @@ import { getSuperAdminEmail, getSuperAdminPhone, diagnoseSmtpConfig, sendNotific
 import { sendDirectSms, send2FactorTemplateSms } from '../services/smsServices';
 import { sendEmailFromTemplate } from '../services/emailConfServices';
 import { EmailConfiguration } from '../models/emailConfiguration';
+import { APPLICANT_TEST_PHONE } from '../tests/fixtures/smsFixtures';
 
 async function verify() {
   console.log('===============================================================');
@@ -48,11 +49,11 @@ async function verify() {
   console.log(`   2Factor API Key Present: ${twoFactorKey ? 'YES (MASKED ' + twoFactorKey.substring(0, 4) + '****)' : 'NO'}`);
   console.log(`   2Factor Sender ID: ${twoFactorSender}`);
 
-  // 4. Isolation Guard: Prohibited Legacy Phone (9003241571) Block
-  console.log('\n4. ISOLATION GUARD: PROHIBITED LEGACY PHONE (9003241571) BLOCK:');
-  const legacyPhoneTest = await sendDirectSms('9003241571', 'Test message to legacy phone');
-  console.log(`   Legacy Phone (9003241571) Send Result: success=${legacyPhoneTest.success}, status=${legacyPhoneTest.providerStatus}`);
-  console.log(`   Error returned: "${legacyPhoneTest.error}" -> ${legacyPhoneTest.success === false && String(legacyPhoneTest.error).includes('Blocked') ? 'PASS (Safely Blocked)' : 'FAIL'}`);
+  // 4. Normal Applicant Routing Check:
+  console.log(`\n4. APPLICANT CONTACT ROUTING (${APPLICANT_TEST_PHONE}) CHECK:`);
+  const applicantSmsTest = await sendDirectSms(APPLICANT_TEST_PHONE, 'Test message to applicant phone');
+  console.log(`   Applicant Phone (${APPLICANT_TEST_PHONE}) Send Result: success=${applicantSmsTest.success}, status=${applicantSmsTest.providerStatus}`);
+  console.log(`   Routing check -> ${applicantSmsTest.success && applicantSmsTest.providerStatus === 'SENT' ? 'PASS (Allowed & Dispatched in Mock Mode)' : 'FAIL'}`);
 
   // 5. Operational Eligibility: SuperAdmin Contacts (9080280818 / subisha2002.m@gmail.com)
   console.log('\n5. OPERATIONAL ELIGIBILITY: SUPERADMIN CONTACTS:');

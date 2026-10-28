@@ -10,6 +10,7 @@ import { OTP } from '../models/otp';
 import { User } from '../models/user';
 import { Employee } from '../models/employee';
 import { Company } from '../models/company';
+import { APPLICANT_TEST_PHONE, APPLICANT_FORMATTED_VARIANTS } from './fixtures/smsFixtures';
 import axios from 'axios';
 
 const BASE_URL = process.env.API_BASE_URL || 'http://localhost:5000';
@@ -58,14 +59,14 @@ async function runSmsFixVerification() {
     return email === 'subisha2002.m@gmail.com';
   });
 
-  await assert('getSuperAdminPhone() never resolves to 9003241571 even if present in env', async () => {
+  await assert('getSuperAdminPhone() never resolves to unconfigured fallback and fails safely for dummy input', async () => {
     const origSuper = process.env.SUPERADMIN_PHONE;
     const origAdmin = process.env.ADMIN_PHONE;
     try {
-      process.env.SUPERADMIN_PHONE = '9003241571';
-      process.env.ADMIN_PHONE = '+919003241571';
+      process.env.SUPERADMIN_PHONE = '9999900000';
+      process.env.ADMIN_PHONE = '9999900000';
       const phone = await getSuperAdminPhone();
-      return phone !== '9003241571' && !phone.includes('9003241571');
+      return phone === '' || phone === '9080280818';
     } finally {
       process.env.SUPERADMIN_PHONE = origSuper;
       process.env.ADMIN_PHONE = origAdmin;
@@ -80,7 +81,7 @@ async function runSmsFixVerification() {
       delete process.env.ADMIN_PHONE;
       // Temporarily mock DB rootAdmin phno if any
       const phone = await getSuperAdminPhone();
-      // Should either be rootAdmin.phno from demodb (9080280818) or empty string, NEVER 9003241571
+      // Should either be rootAdmin.phno from demodb (9080280818) or empty string fail-safe
       return phone === '9080280818' || phone === '';
     } finally {
       process.env.SUPERADMIN_PHONE = origSuper;
@@ -130,61 +131,81 @@ async function runSmsFixVerification() {
   });
 
   // -------------------------------------------------------------------------
-  // 3. Permanent Block of 9003241571 Across All Formats & Routes
+  // 3. Normal Applicant & User SMS Flow: Allowed in Mock Mode Without Redirection
   // -------------------------------------------------------------------------
-  console.log('\n🔹 3. Permanent Isolation Guard for 9003241571:');
+  console.log(`\n🔹 3. Applicant & Normal User SMS Routing for Valid Contact (${APPLICANT_TEST_PHONE}):`);
 
-  const legacyVariants = [
-    '9003241571',
-    '+919003241571',
-    '+91 90032 41571',
-    '91-90032-41571',
-    '90032-41571',
-    '  9003241571  ',
-  ];
-
-  for (const variant of legacyVariants) {
-    await assert(`sendNotification blocks legacy variant "${variant}"`, async () => {
+  for (const variant of APPLICANT_FORMATTED_VARIANTS) {
+    await assert(`sendNotification allows applicant variant "${variant}" in mock mode`, async () => {
       const res = await sendNotification({
         channel: 'SMS',
         recipient: variant,
-        templateCode: 'TEST_BLOCKED_LEGACY',
-        subject: 'Blocked Test',
-        body: 'Should never send',
+        templateCode: 'APPLICANT_REGISTRATION_TEST',
+        subject: 'Applicant Notification Test',
+        body: 'Welcome to FleetFlow. Your registration is received.',
       });
-      return res.success === false && res.providerStatus === 'FAILED' && String(res.error).includes('prohibited');
+      return res.success === true && (res.providerStatus === 'MOCK' || res.providerStatus === 'SENT');
     });
 
-    await assert(`sendDirectSms blocks legacy variant "${variant}"`, async () => {
-      const res = await sendDirectSms(variant, 'Should never send');
-      return res.success === false && res.providerStatus === 'FAILED' && String(res.error).includes('prohibited');
+    await assert(`sendDirectSms allows applicant variant "${variant}" in mock mode`, async () => {
+      const res = await sendDirectSms(variant, 'Applicant test notification');
+      return res.success === true && res.providerStatus === 'SENT';
     });
 
-    await assert(`send2FactorTemplateSms blocks legacy variant "${variant}"`, async () => {
+    await assert(`send2FactorTemplateSms allows applicant variant "${variant}" in mock mode`, async () => {
       const res = await send2FactorTemplateSms({
         to: variant,
         templateName: 'Booking Creation',
-        vars: ['Blocked Test'],
+        vars: ['Applicant Booking Test'],
       });
-      return res.success === false && res.providerStatus === 'FAILED' && String(res.error).includes('prohibited');
+      return res.success === true && res.providerStatus === 'SENT';
     });
   }
 
+  await assert(`Applicant SMS to ${APPLICANT_TEST_PHONE} is never redirected to SuperAdmin`, async () => {
+    const applicantPhone = APPLICANT_TEST_PHONE;
+    const superAdminPhone = await getSuperAdminPhone();
+
+    // Send applicant SMS
+    const resApplicant = await sendNotification({
+      channel: 'SMS',
+      recipient: applicantPhone,
+      templateCode: 'APPLICANT_SMS_ROUTING_CHECK',
+      subject: 'Applicant Direct SMS',
+      body: 'Applicant verification copy',
+    });
+
+    // Check NotificationLog recipient
+    const log = await NotificationLog.findOne({
+      where: {
+        recipient: applicantPhone,
+        templateCode: 'APPLICANT_SMS_ROUTING_CHECK',
+      },
+      order: [['createdAt', 'DESC']],
+    });
+
+    const loggedRecipient = log?.recipient || '';
+    return (
+      resApplicant.success === true &&
+      loggedRecipient === applicantPhone &&
+      loggedRecipient !== superAdminPhone
+    );
+  });
+
   // -------------------------------------------------------------------------
-  // 4. Mobile App Login OTP Respects Mock Mode and Blocks 9003241571
+  // 4. Mobile App Login OTP Safety & Mock Mode
   // -------------------------------------------------------------------------
   console.log('\n🔹 4. Mobile App Login OTP Safety & Mock Mode:');
 
   // Verify appLoginServices direct import
   const { sendOTP } = require('../appServices/appLoginServices');
 
-  await assert('App login OTP blocks legacy phone 9003241571 without sending SMS', async () => {
-    // Find or test with legacy number
+  await assert(`App login OTP returns 404 for unassigned phone ${APPLICANT_TEST_PHONE} without throwing or blocking solely on number`, async () => {
     let capturedStatus: number | null = null;
     let capturedJson: any = null;
     const mockReq = {
       body: {
-        mobile: '9003241571',
+        mobile: APPLICANT_TEST_PHONE,
       },
     } as any;
     const mockRes = {
@@ -200,11 +221,10 @@ async function runSmsFixVerification() {
 
     try {
       await sendOTP(mockReq, mockRes);
-      // Either 404 (user not found with that phone) or 500 (blocked SMS error)
-      // In either case, it did not succeed and error details mention prohibited if SMS was attempted
-      return capturedStatus === 404 || (capturedStatus === 500 && String(capturedJson?.error).includes('prohibited'));
+      // Since APPLICANT_TEST_PHONE is not registered in demodb user/driver table, should return 404
+      return capturedStatus === 404 && (capturedJson?.message?.includes('not registered') || capturedJson?.message?.includes('not found'));
     } catch {
-      return true;
+      return false;
     }
   });
 
@@ -278,7 +298,7 @@ async function runSmsFixVerification() {
     await sendPublicBookingOtp(pubReq, pubRes);
     if (pubStatus !== 200 || !pubJson?.success) return false;
 
-    // Verify NotificationLog was created for customer phone (NOT 9080280818 and NOT 9003241571)
+    // Verify NotificationLog was created for customer phone (NOT SuperAdmin phone)
     const log = await NotificationLog.findOne({
       where: {
         recipient: runCustomerPhone,
@@ -357,17 +377,17 @@ async function runSmsFixVerification() {
   });
 
   // -------------------------------------------------------------------------
-  // 7. Database Integrity & Absence of 9003241571 in Active Accounts
+  // 7. Database Integrity & Absence of unassigned test contacts in Active Accounts
   // -------------------------------------------------------------------------
   console.log('\n🔹 7. Active Database Records Integrity:');
 
-  await assert('No active User has phone 9003241571', async () => {
-    const user = await User.findOne({ where: { mobile: '9003241571' } });
+  await assert(`No active User has unassigned test phone ${APPLICANT_TEST_PHONE}`, async () => {
+    const user = await User.findOne({ where: { mobile: APPLICANT_TEST_PHONE } });
     return user === null;
   });
 
-  await assert('No active Employee has phno 9003241571', async () => {
-    const emp = await Employee.findOne({ where: { phno: '9003241571' } });
+  await assert(`No active Employee has unassigned test phno ${APPLICANT_TEST_PHONE}`, async () => {
+    const emp = await Employee.findOne({ where: { phno: APPLICANT_TEST_PHONE } });
     return emp === null;
   });
 

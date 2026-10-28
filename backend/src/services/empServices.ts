@@ -2454,10 +2454,6 @@ if (shortPickup.length > 27) {
 }
 
     const cleanMobile = String(managerMobile || '').replace(/\D/g, '');
-    if (cleanMobile === '9003241571' || cleanMobile.endsWith('9003241571') || cleanMobile.includes('9003241571')) {
-      console.warn('[Manager SMS: BLOCKED] Transmission to legacy number 9003241571 is prohibited.');
-      return;
-    }
     if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
       console.log(`[Manager SMS: MOCK MODE] Mobile: ${cleanMobile} | Status: MOCK`);
       return;
@@ -2587,10 +2583,6 @@ export const rejectBookingByManager = async (req: any, res: Response) => {
           }
 
           const cleanCancelMobile = String(user?.mobile || '').replace(/\D/g, '');
-          if (cleanCancelMobile === '9003241571' || cleanCancelMobile.endsWith('9003241571') || cleanCancelMobile.includes('9003241571')) {
-            console.warn('[ManagerCancelBooking SMS: BLOCKED] Transmission to legacy number 9003241571 is prohibited.');
-            return;
-          }
           if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
             console.log(`[ManagerCancelBooking SMS: MOCK MODE] Mobile: ${cleanCancelMobile} | Status: MOCK`);
             return;

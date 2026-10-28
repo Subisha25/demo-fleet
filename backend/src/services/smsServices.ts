@@ -132,18 +132,6 @@ export async function send2FactorTemplateSms(options: {
   const apiKey = (process.env.TWO_FACTOR_API_KEY || process.env.TWOFACTOR_API_KEY || '').trim();
   const senderId = (process.env.TWO_FACTOR_SENDER_ID || process.env.TWOFACTOR_SENDER_ID || 'GRCCAB').trim();
 
-  // Strict isolation guard: Never dispatch to obsolete legacy phone number 9003241571
-  const cleanTo = String(options.to || '').replace(/\D/g, '');
-  if (cleanTo === '9003241571' || cleanTo.endsWith('9003241571') || cleanTo.includes('9003241571')) {
-    const msg = 'Blocked: Transmission to legacy phone number (9003241571) is permanently prohibited.';
-    console.warn(`[SMS Service: ISOLATION GUARD] ${msg}`);
-    return {
-      success: false,
-      providerStatus: 'FAILED',
-      error: msg,
-    };
-  }
-
   const phoneCheck = normalizePhoneNumberForSms(options.to);
   if (!phoneCheck.valid) {
     return {
@@ -220,18 +208,6 @@ export async function sendDirectSms(
   providerMessageId?: string;
   error?: string;
 }> {
-  // Strict isolation guard: Never dispatch to obsolete legacy phone number 9003241571
-  const cleanTo = String(to || '').replace(/\D/g, '');
-  if (cleanTo === '9003241571' || cleanTo.endsWith('9003241571') || cleanTo.includes('9003241571')) {
-    const msg = 'Blocked: Transmission to legacy phone number (9003241571) is permanently prohibited.';
-    console.warn(`[SMS Service: ISOLATION GUARD] ${msg}`);
-    return {
-      success: false,
-      providerStatus: 'FAILED',
-      error: msg,
-    };
-  }
-
   const phoneCheck = normalizePhoneNumberForSms(to);
   if (!phoneCheck.valid) {
     return {
@@ -257,18 +233,9 @@ export async function sendDirectSms(
 
   if (twoFactorKey) {
     try {
-      const url = `https://2factor.in/API/V1/${twoFactorKey}/ADDON_SERVICES/SEND/TSMS`;
-      const payload: any = {
-        From: twoFactorSender,
-        To: phoneCheck.normalizedPhone,
-        Msg: message,
-        TemplateName: templateName || process.env.TWOFACTOR_TEMPLATE_NAME || 'Booking Creation',
-        var1: message.substring(0, 30),
-      };
-      const res = await axios.post(url, payload, {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 10000,
-      });
+      const activeTemplate = templateName || process.env.TWOFACTOR_TEMPLATE_NAME || 'Booking Creation';
+      const url = `https://2factor.in/API/R1/?module=TRANS_SMS&apikey=${twoFactorKey}&to=${encodeURIComponent(phoneCheck.normalizedPhone)}&from=${encodeURIComponent(twoFactorSender)}&msg=${encodeURIComponent(message)}&templatename=${encodeURIComponent(activeTemplate)}&var1=${encodeURIComponent(message.substring(0, 30))}`;
+      const res = await axios.get(url, { timeout: 10000 });
       if (res.data?.Status === 'Success') {
         return {
           success: true,
@@ -279,7 +246,7 @@ export async function sendDirectSms(
       return {
         success: false,
         providerStatus: 'FAILED',
-        error: res.data?.Details || '2Factor TSMS returned non-success',
+        error: res.data?.Details || '2Factor TRANS_SMS returned non-success',
       };
     } catch (err: any) {
       return {

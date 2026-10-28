@@ -24,15 +24,6 @@ const send2FactorOTP = async (mobile: string, otp: string) => {
     // Format mobile number (remove +91 if present, extract digits)
     const cleanMobile = mobile.replace(/^\+91/, '').replace(/[^\d]/g, '');
 
-    // Isolation Guard: Never dispatch OTP to legacy phone number 9003241571
-    if (cleanMobile === '9003241571' || cleanMobile.endsWith('9003241571') || cleanMobile.includes('9003241571')) {
-      const msg = 'Blocked: Transmission to legacy phone number (9003241571) is permanently prohibited.';
-      console.warn(`[AppLogin OTP: ISOLATION GUARD] ${msg}`);
-      return {
-        success: false,
-        error: msg
-      };
-    }
 
     // Mock Mode Check: respect NOTIFICATION_MOCK_MODE to prevent real SMS transmission
     const isMock = process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test';

@@ -151,6 +151,90 @@ export class SaaSPlan extends Model {
   isUnlimitedTrips!: boolean;
 
   @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    defaultValue: 1,
+  })
+  maxTaxes!: number;
+
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  isUnlimitedTaxes!: boolean;
+
+  @Column({
+    type: DataType.STRING(20),
+    allowNull: false,
+    defaultValue: 'STANDARD',
+  })
+  themeLevel!: 'STANDARD' | 'PRESETS' | 'CUSTOM';
+
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    defaultValue: 10,
+  })
+  maxPickupAreas!: number;
+
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  isUnlimitedPickupAreas!: boolean;
+
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    defaultValue: 5,
+  })
+  maxPickupCities!: number;
+
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  isUnlimitedPickupCities!: boolean;
+
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    defaultValue: 5,
+  })
+  maxPackages!: number;
+
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  isUnlimitedPackages!: boolean;
+
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: false,
+    defaultValue: 3,
+  })
+  maxPaymentModes!: number;
+
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  })
+  isUnlimitedPaymentModes!: boolean;
+
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: true,
+    defaultValue: null,
+  })
+  annualTripQuota!: number | null;
+
+  @Column({
     type: DataType.JSON,
     allowNull: true,
   })
@@ -162,7 +246,14 @@ export class SaaSPlan extends Model {
   })
   featureEntitlements!: {
     customBranding?: boolean;
+    themeLevel?: 'STANDARD' | 'PRESETS' | 'CUSTOM';
+    themePresets?: string[];
     advancedReports?: boolean;
+    emailTemplates?: boolean;
+    smsTemplates?: boolean;
+    bulkUpload?: boolean;
+    monthlyInvoicing?: boolean;
+    onCallInvoicing?: boolean;
     customDomain?: boolean;
     multiBranch?: boolean;
     dedicatedPolicyEngine?: boolean;

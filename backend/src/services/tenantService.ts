@@ -27,7 +27,7 @@ import { Pickuparea } from '../models/pickuparea';
 import { PaymentMode } from '../models/paymentmode';
 import { VehicleType } from '../models/vehicleType';
 import { VehicleMaster } from '../models/vehicleMaster';
-import { PLAN_LIMITS, PLAN_CATALOG, getOrCreateSubscription } from './quotaService';
+import { PLAN_LIMITS, PLAN_CATALOG, getOrCreateSubscription, getTenantEntitlementsSummary } from './quotaService';
 import { sendNotification } from './notificationService';
 import { generateUniqueFleetSlug, getFleetLoginUrl } from './slugService';
 import { Security } from '../utils/Security';
@@ -544,6 +544,26 @@ export const getCurrentTenantProfile = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error fetching tenant profile:', error);
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+/**
+ * Get dynamic SaaS entitlements summary for the current tenant.
+ */
+export const getCurrentTenantEntitlements = async (req: Request, res: Response) => {
+  try {
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const summary = await getTenantEntitlementsSummary(tenantId);
+
+    return res.status(200).json({
+      success: true,
+      entitlements: summary,
+      data: summary,
+    });
+  } catch (error) {
+    console.error('Error fetching tenant entitlements:', error);
     return res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };
@@ -1107,12 +1127,24 @@ export const createSaaSPlan = async (req: Request, res: Response) => {
       maxDrivers = 15,
       maxCompanies = 3,
       maxUsers = 5,
-      monthlyTripQuota = 1000,
+      monthlyTripQuota = 100,
+      annualTripQuota = null,
+      maxTaxes = 1,
+      themeLevel = 'STANDARD',
+      maxPickupAreas = 10,
+      maxPickupCities = 5,
+      maxPackages = 5,
+      maxPaymentModes = 3,
       isUnlimitedVehicles = false,
       isUnlimitedDrivers = false,
       isUnlimitedCompanies = false,
       isUnlimitedUsers = false,
       isUnlimitedTrips = false,
+      isUnlimitedTaxes = false,
+      isUnlimitedPickupAreas = false,
+      isUnlimitedPickupCities = false,
+      isUnlimitedPackages = false,
+      isUnlimitedPaymentModes = false,
       features = [],
       featureEntitlements = {},
       isActive = true,
@@ -1133,22 +1165,34 @@ export const createSaaSPlan = async (req: Request, res: Response) => {
       planTier: tierKey,
       name: name.trim(),
       description,
-      priceMonthlyINR: Number(priceMonthlyINR) || 0,
-      priceAnnualINR: Number(priceAnnualINR) || 0,
-      priceMonthlyUSD: Number(priceMonthlyUSD) || 0,
+      priceMonthlyINR: Math.max(0, Number(priceMonthlyINR) || 0),
+      priceAnnualINR: Math.max(0, Number(priceAnnualINR) || 0),
+      priceMonthlyUSD: Math.max(0, Number(priceMonthlyUSD) || 0),
       currency,
       billingFrequency,
       billingCycles,
-      maxVehicles: Number(maxVehicles) || 15,
-      maxDrivers: Number(maxDrivers) || 15,
-      maxCompanies: Number(maxCompanies) || 3,
-      maxUsers: Number(maxUsers) || 5,
-      monthlyTripQuota: Number(monthlyTripQuota) || 1000,
+      maxVehicles: isUnlimitedVehicles ? 0 : Math.max(0, Number(maxVehicles) || 15),
+      maxDrivers: isUnlimitedDrivers ? 0 : Math.max(0, Number(maxDrivers) || 15),
+      maxCompanies: isUnlimitedCompanies ? 0 : Math.max(0, Number(maxCompanies) || 3),
+      maxUsers: isUnlimitedUsers ? 0 : Math.max(0, Number(maxUsers) || 5),
+      monthlyTripQuota: isUnlimitedTrips ? 0 : Math.max(0, Number(monthlyTripQuota) || 100),
+      annualTripQuota: annualTripQuota !== null && annualTripQuota !== undefined ? Math.max(0, Number(annualTripQuota)) : null,
+      maxTaxes: isUnlimitedTaxes ? 0 : Math.max(0, Number(maxTaxes) || 1),
+      themeLevel: ['STANDARD', 'PRESETS', 'CUSTOM'].includes(String(themeLevel).toUpperCase()) ? String(themeLevel).toUpperCase() : 'STANDARD',
+      maxPickupAreas: isUnlimitedPickupAreas ? 0 : Math.max(0, Number(maxPickupAreas) || 10),
+      maxPickupCities: isUnlimitedPickupCities ? 0 : Math.max(0, Number(maxPickupCities) || 5),
+      maxPackages: isUnlimitedPackages ? 0 : Math.max(0, Number(maxPackages) || 5),
+      maxPaymentModes: isUnlimitedPaymentModes ? 0 : Math.max(0, Number(maxPaymentModes) || 3),
       isUnlimitedVehicles: Boolean(isUnlimitedVehicles),
       isUnlimitedDrivers: Boolean(isUnlimitedDrivers),
       isUnlimitedCompanies: Boolean(isUnlimitedCompanies),
       isUnlimitedUsers: Boolean(isUnlimitedUsers),
       isUnlimitedTrips: Boolean(isUnlimitedTrips),
+      isUnlimitedTaxes: Boolean(isUnlimitedTaxes),
+      isUnlimitedPickupAreas: Boolean(isUnlimitedPickupAreas),
+      isUnlimitedPickupCities: Boolean(isUnlimitedPickupCities),
+      isUnlimitedPackages: Boolean(isUnlimitedPackages),
+      isUnlimitedPaymentModes: Boolean(isUnlimitedPaymentModes),
       features: Array.isArray(features) ? features : [],
       featureEntitlements: typeof featureEntitlements === 'object' ? featureEntitlements : {},
       isActive: Boolean(isActive),
@@ -1192,11 +1236,23 @@ export const updateSaaSPlan = async (req: Request, res: Response) => {
       maxCompanies,
       maxUsers,
       monthlyTripQuota,
+      annualTripQuota,
+      maxTaxes,
+      themeLevel,
+      maxPickupAreas,
+      maxPickupCities,
+      maxPackages,
+      maxPaymentModes,
       isUnlimitedVehicles,
       isUnlimitedDrivers,
       isUnlimitedCompanies,
       isUnlimitedUsers,
       isUnlimitedTrips,
+      isUnlimitedTaxes,
+      isUnlimitedPickupAreas,
+      isUnlimitedPickupCities,
+      isUnlimitedPackages,
+      isUnlimitedPaymentModes,
       features,
       featureEntitlements,
       isActive,
@@ -1205,22 +1261,34 @@ export const updateSaaSPlan = async (req: Request, res: Response) => {
     await plan.update({
       name: name !== undefined ? name.trim() : plan.name,
       description: description !== undefined ? description : plan.description,
-      priceMonthlyINR: priceMonthlyINR !== undefined ? Number(priceMonthlyINR) : plan.priceMonthlyINR,
-      priceAnnualINR: priceAnnualINR !== undefined ? Number(priceAnnualINR) : plan.priceAnnualINR,
-      priceMonthlyUSD: priceMonthlyUSD !== undefined ? Number(priceMonthlyUSD) : plan.priceMonthlyUSD,
+      priceMonthlyINR: priceMonthlyINR !== undefined ? Math.max(0, Number(priceMonthlyINR)) : plan.priceMonthlyINR,
+      priceAnnualINR: priceAnnualINR !== undefined ? Math.max(0, Number(priceAnnualINR)) : plan.priceAnnualINR,
+      priceMonthlyUSD: priceMonthlyUSD !== undefined ? Math.max(0, Number(priceMonthlyUSD)) : plan.priceMonthlyUSD,
       currency: currency !== undefined ? currency : plan.currency,
       billingFrequency: billingFrequency !== undefined ? billingFrequency : plan.billingFrequency,
       billingCycles: billingCycles !== undefined ? billingCycles : plan.billingCycles,
-      maxVehicles: maxVehicles !== undefined ? Number(maxVehicles) : plan.maxVehicles,
-      maxDrivers: maxDrivers !== undefined ? Number(maxDrivers) : plan.maxDrivers,
-      maxCompanies: maxCompanies !== undefined ? Number(maxCompanies) : plan.maxCompanies,
-      maxUsers: maxUsers !== undefined ? Number(maxUsers) : plan.maxUsers,
-      monthlyTripQuota: monthlyTripQuota !== undefined ? Number(monthlyTripQuota) : plan.monthlyTripQuota,
+      maxVehicles: maxVehicles !== undefined ? Math.max(0, Number(maxVehicles)) : plan.maxVehicles,
+      maxDrivers: maxDrivers !== undefined ? Math.max(0, Number(maxDrivers)) : plan.maxDrivers,
+      maxCompanies: maxCompanies !== undefined ? Math.max(0, Number(maxCompanies)) : plan.maxCompanies,
+      maxUsers: maxUsers !== undefined ? Math.max(0, Number(maxUsers)) : plan.maxUsers,
+      monthlyTripQuota: monthlyTripQuota !== undefined ? Math.max(0, Number(monthlyTripQuota)) : plan.monthlyTripQuota,
+      annualTripQuota: annualTripQuota !== undefined ? (annualTripQuota !== null ? Math.max(0, Number(annualTripQuota)) : null) : plan.annualTripQuota,
+      maxTaxes: maxTaxes !== undefined ? Math.max(0, Number(maxTaxes)) : plan.maxTaxes,
+      themeLevel: themeLevel !== undefined ? (['STANDARD', 'PRESETS', 'CUSTOM'].includes(String(themeLevel).toUpperCase()) ? String(themeLevel).toUpperCase() : plan.themeLevel) : plan.themeLevel,
+      maxPickupAreas: maxPickupAreas !== undefined ? Math.max(0, Number(maxPickupAreas)) : plan.maxPickupAreas,
+      maxPickupCities: maxPickupCities !== undefined ? Math.max(0, Number(maxPickupCities)) : plan.maxPickupCities,
+      maxPackages: maxPackages !== undefined ? Math.max(0, Number(maxPackages)) : plan.maxPackages,
+      maxPaymentModes: maxPaymentModes !== undefined ? Math.max(0, Number(maxPaymentModes)) : plan.maxPaymentModes,
       isUnlimitedVehicles: isUnlimitedVehicles !== undefined ? Boolean(isUnlimitedVehicles) : plan.isUnlimitedVehicles,
       isUnlimitedDrivers: isUnlimitedDrivers !== undefined ? Boolean(isUnlimitedDrivers) : plan.isUnlimitedDrivers,
       isUnlimitedCompanies: isUnlimitedCompanies !== undefined ? Boolean(isUnlimitedCompanies) : plan.isUnlimitedCompanies,
       isUnlimitedUsers: isUnlimitedUsers !== undefined ? Boolean(isUnlimitedUsers) : plan.isUnlimitedUsers,
       isUnlimitedTrips: isUnlimitedTrips !== undefined ? Boolean(isUnlimitedTrips) : plan.isUnlimitedTrips,
+      isUnlimitedTaxes: isUnlimitedTaxes !== undefined ? Boolean(isUnlimitedTaxes) : plan.isUnlimitedTaxes,
+      isUnlimitedPickupAreas: isUnlimitedPickupAreas !== undefined ? Boolean(isUnlimitedPickupAreas) : plan.isUnlimitedPickupAreas,
+      isUnlimitedPickupCities: isUnlimitedPickupCities !== undefined ? Boolean(isUnlimitedPickupCities) : plan.isUnlimitedPickupCities,
+      isUnlimitedPackages: isUnlimitedPackages !== undefined ? Boolean(isUnlimitedPackages) : plan.isUnlimitedPackages,
+      isUnlimitedPaymentModes: isUnlimitedPaymentModes !== undefined ? Boolean(isUnlimitedPaymentModes) : plan.isUnlimitedPaymentModes,
       features: features !== undefined ? features : plan.features,
       featureEntitlements: featureEntitlements !== undefined ? featureEntitlements : plan.featureEntitlements,
       isActive: isActive !== undefined ? Boolean(isActive) : plan.isActive,

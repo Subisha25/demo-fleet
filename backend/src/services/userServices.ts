@@ -1033,13 +1033,6 @@ export const updateUserProfile = async (req: Request, res: Response) => {
     let cleanPhone: string | undefined;
     if (phone !== undefined && phone !== null && String(phone).trim() !== '') {
       cleanPhone = String(phone).replace(/\D/g, '');
-      // Strict permanent isolation: Prohibit 9003241571
-      if (cleanPhone === '9003241571' || cleanPhone.endsWith('9003241571') || cleanPhone.includes('9003241571')) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid phone number: Obsolete legacy contact (9003241571) is permanently prohibited.',
-        });
-      }
       if (cleanPhone.length < 10) {
         return res.status(400).json({
           success: false,

@@ -5,6 +5,7 @@ import {
   getTenantById,
   updateTenantSubscription,
   getCurrentTenantProfile,
+  getCurrentTenantEntitlements,
   updateCurrentTenantBranding,
   getSubscriptionPlans,
   renewTenantSubscription,
@@ -24,6 +25,7 @@ import {
   getPublicFleetBySlug,
   fleetLoginBySlug,
 } from '../services/tenantService';
+import { requireThemeCustomization } from '../middleware/entitlementMiddleware';
 import { uploadFleetLogo } from '../middleware/uploadConfig';
 import { getCompanyPolicy, upsertCompanyPolicy } from '../services/policyService';
 import {
@@ -129,7 +131,8 @@ router.get('/admin/subscription-lifecycle/status', authMiddleware, requireSuperA
 // TENANT PROFILE, DASHBOARD STATS & BRANDING (Authenticated Staff)
 // =============================================================================
 router.get('/current/profile', authMiddleware, getCurrentTenantProfile);
-router.put('/current/branding', authMiddleware, updateCurrentTenantBranding);
+router.get('/current/entitlements', authMiddleware, getCurrentTenantEntitlements);
+router.put('/current/branding', authMiddleware, requireThemeCustomization, updateCurrentTenantBranding);
 router.post('/current/logo', authMiddleware, uploadFleetLogo.single('logo'), uploadCurrentTenantLogo);
 router.put('/current/logo', authMiddleware, uploadFleetLogo.single('logo'), uploadCurrentTenantLogo);
 router.get('/dashboard/stats', authMiddleware, getFleetDashboardOverview);

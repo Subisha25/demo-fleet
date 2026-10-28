@@ -16,6 +16,8 @@ import {
   faFilePdf,
   faCheckCircle,
   faShieldAlt,
+  faCalendarAlt,
+  faCogs,
 } from '@fortawesome/free-solid-svg-icons';
 
 interface SaaSPlanItem {
@@ -38,9 +40,22 @@ interface SaaSPlanItem {
   isUnlimitedCompanies: boolean;
   isUnlimitedUsers: boolean;
   isUnlimitedTrips: boolean;
+  annualTripQuota?: number | null;
+  maxTaxes?: number;
+  maxPickupAreas?: number;
+  maxPickupCities?: number;
+  maxPackages?: number;
+  maxPaymentModes?: number;
+  isUnlimitedTaxes?: boolean;
+  isUnlimitedPickupAreas?: boolean;
+  isUnlimitedPickupCities?: boolean;
+  isUnlimitedPackages?: boolean;
+  isUnlimitedPaymentModes?: boolean;
+  themeLevel?: 'STANDARD' | 'PRESETS' | 'CUSTOM';
   features: string[];
   featureEntitlements: {
     customBranding?: boolean;
+    themeLevel?: 'STANDARD' | 'PRESETS' | 'CUSTOM';
     advancedReports?: boolean;
     customDomain?: boolean;
     multiBranch?: boolean;
@@ -68,11 +83,25 @@ const PlanManagement: React.FC = () => {
   const [formMaxCompanies, setFormMaxCompanies] = useState<number>(5);
   const [formMaxUsers, setFormMaxUsers] = useState<number>(10);
   const [formMonthlyTrips, setFormMonthlyTrips] = useState<number>(2500);
+  const [formAnnualTripQuota, setFormAnnualTripQuota] = useState<number | string>('');
+  const [formMaxTaxes, setFormMaxTaxes] = useState<number>(1);
+  const [formMaxPickupAreas, setFormMaxPickupAreas] = useState<number>(10);
+  const [formMaxPickupCities, setFormMaxPickupCities] = useState<number>(5);
+  const [formMaxPackages, setFormMaxPackages] = useState<number>(5);
+  const [formMaxPaymentModes, setFormMaxPaymentModes] = useState<number>(3);
+  const [formThemeLevel, setFormThemeLevel] = useState<'STANDARD' | 'PRESETS' | 'CUSTOM'>('STANDARD');
+
   const [formUnlimitedVehicles, setFormUnlimitedVehicles] = useState<boolean>(false);
   const [formUnlimitedDrivers, setFormUnlimitedDrivers] = useState<boolean>(false);
   const [formUnlimitedCompanies, setFormUnlimitedCompanies] = useState<boolean>(false);
   const [formUnlimitedUsers, setFormUnlimitedUsers] = useState<boolean>(false);
   const [formUnlimitedTrips, setFormUnlimitedTrips] = useState<boolean>(false);
+  const [formUnlimitedTaxes, setFormUnlimitedTaxes] = useState<boolean>(false);
+  const [formUnlimitedPickupAreas, setFormUnlimitedPickupAreas] = useState<boolean>(false);
+  const [formUnlimitedPickupCities, setFormUnlimitedPickupCities] = useState<boolean>(false);
+  const [formUnlimitedPackages, setFormUnlimitedPackages] = useState<boolean>(false);
+  const [formUnlimitedPaymentModes, setFormUnlimitedPaymentModes] = useState<boolean>(false);
+
   const [formCustomBranding, setFormCustomBranding] = useState<boolean>(true);
   const [formAdvancedReports, setFormAdvancedReports] = useState<boolean>(true);
   const [formPdfTier, setFormPdfTier] = useState<'STANDARD' | 'BRANDED' | 'ADVANCED'>('BRANDED');
@@ -109,11 +138,23 @@ const PlanManagement: React.FC = () => {
     setFormMaxCompanies(5);
     setFormMaxUsers(10);
     setFormMonthlyTrips(2500);
+    setFormAnnualTripQuota('');
+    setFormMaxTaxes(1);
+    setFormMaxPickupAreas(10);
+    setFormMaxPickupCities(5);
+    setFormMaxPackages(5);
+    setFormMaxPaymentModes(3);
+    setFormThemeLevel('STANDARD');
     setFormUnlimitedVehicles(false);
     setFormUnlimitedDrivers(false);
     setFormUnlimitedCompanies(false);
     setFormUnlimitedUsers(false);
     setFormUnlimitedTrips(false);
+    setFormUnlimitedTaxes(false);
+    setFormUnlimitedPickupAreas(false);
+    setFormUnlimitedPickupCities(false);
+    setFormUnlimitedPackages(false);
+    setFormUnlimitedPaymentModes(false);
     setFormCustomBranding(true);
     setFormAdvancedReports(false);
     setFormPdfTier('BRANDED');
@@ -133,11 +174,23 @@ const PlanManagement: React.FC = () => {
     setFormMaxCompanies(p.maxCompanies);
     setFormMaxUsers(p.maxUsers);
     setFormMonthlyTrips(p.monthlyTripQuota);
+    setFormAnnualTripQuota(p.annualTripQuota ?? '');
+    setFormMaxTaxes(p.maxTaxes ?? (p.planTier === 'PRO' ? 2 : 1));
+    setFormMaxPickupAreas(p.maxPickupAreas ?? 10);
+    setFormMaxPickupCities(p.maxPickupCities ?? 5);
+    setFormMaxPackages(p.maxPackages ?? 5);
+    setFormMaxPaymentModes(p.maxPaymentModes ?? 3);
+    setFormThemeLevel(p.themeLevel || (p.planTier === 'ENTERPRISE' ? 'CUSTOM' : p.planTier === 'PRO' ? 'PRESETS' : 'STANDARD'));
     setFormUnlimitedVehicles(p.isUnlimitedVehicles);
     setFormUnlimitedDrivers(p.isUnlimitedDrivers);
     setFormUnlimitedCompanies(p.isUnlimitedCompanies);
     setFormUnlimitedUsers(p.isUnlimitedUsers);
     setFormUnlimitedTrips(p.isUnlimitedTrips);
+    setFormUnlimitedTaxes(Boolean(p.isUnlimitedTaxes));
+    setFormUnlimitedPickupAreas(Boolean(p.isUnlimitedPickupAreas));
+    setFormUnlimitedPickupCities(Boolean(p.isUnlimitedPickupCities));
+    setFormUnlimitedPackages(Boolean(p.isUnlimitedPackages));
+    setFormUnlimitedPaymentModes(Boolean(p.isUnlimitedPaymentModes));
     setFormCustomBranding(Boolean(p.featureEntitlements?.customBranding));
     setFormAdvancedReports(Boolean(p.featureEntitlements?.advancedReports));
     setFormPdfTier(p.featureEntitlements?.pdfCustomizationTier || 'STANDARD');
@@ -170,14 +223,27 @@ const PlanManagement: React.FC = () => {
       maxCompanies: Number(formMaxCompanies),
       maxUsers: Number(formMaxUsers),
       monthlyTripQuota: Number(formMonthlyTrips),
+      annualTripQuota: formAnnualTripQuota !== '' ? Number(formAnnualTripQuota) : null,
+      maxTaxes: Number(formMaxTaxes),
+      maxPickupAreas: Number(formMaxPickupAreas),
+      maxPickupCities: Number(formMaxPickupCities),
+      maxPackages: Number(formMaxPackages),
+      maxPaymentModes: Number(formMaxPaymentModes),
+      themeLevel: formThemeLevel,
       isUnlimitedVehicles: formUnlimitedVehicles,
       isUnlimitedDrivers: formUnlimitedDrivers,
       isUnlimitedCompanies: formUnlimitedCompanies,
       isUnlimitedUsers: formUnlimitedUsers,
       isUnlimitedTrips: formUnlimitedTrips,
+      isUnlimitedTaxes: formUnlimitedTaxes,
+      isUnlimitedPickupAreas: formUnlimitedPickupAreas,
+      isUnlimitedPickupCities: formUnlimitedPickupCities,
+      isUnlimitedPackages: formUnlimitedPackages,
+      isUnlimitedPaymentModes: formUnlimitedPaymentModes,
       features: featuresList,
       featureEntitlements: {
         customBranding: formCustomBranding,
+        themeLevel: formThemeLevel,
         advancedReports: formAdvancedReports,
         pdfCustomizationTier: formPdfTier,
       },
@@ -321,6 +387,34 @@ const PlanManagement: React.FC = () => {
                     Corporate Companies:
                   </span>
                   <strong className="text-slate-900">{p.isUnlimitedCompanies ? 'Unlimited' : p.maxCompanies}</strong>
+                </div>
+
+                <div className="flex items-center justify-between text-slate-700">
+                  <span className="flex items-center gap-2">
+                    <FontAwesomeIcon icon={faCalendarAlt} className="text-slate-400 w-3.5" />
+                    Monthly Bookings:
+                  </span>
+                  <strong className="text-slate-900">{p.isUnlimitedTrips ? 'Unlimited' : `${p.monthlyTripQuota} / mo`}</strong>
+                </div>
+
+                <div className="flex items-center justify-between text-slate-700">
+                  <span className="flex items-center gap-2">
+                    <FontAwesomeIcon icon={faCheckCircle} className="text-slate-400 w-3.5" />
+                    Tax Configurations:
+                  </span>
+                  <strong className="text-slate-900">{p.isUnlimitedTaxes ? 'Unlimited' : (p.maxTaxes ?? (p.planTier === 'PRO' ? 2 : 1))}</strong>
+                </div>
+
+                <div className="flex items-center justify-between text-slate-700">
+                  <span className="flex items-center gap-2">
+                    <FontAwesomeIcon icon={faCogs} className="text-slate-400 w-3.5" />
+                    Theme Customization:
+                  </span>
+                  <strong className={`font-bold ${
+                    p.themeLevel === 'CUSTOM' ? 'text-purple-700' : p.themeLevel === 'PRESETS' ? 'text-teal-700' : 'text-slate-700'
+                  }`}>
+                    {p.themeLevel || (p.planTier === 'ENTERPRISE' ? 'CUSTOM' : p.planTier === 'PRO' ? 'PRESETS' : 'STANDARD')}
+                  </strong>
                 </div>
 
                 <div className="flex items-center justify-between text-slate-700">
@@ -512,7 +606,7 @@ const PlanManagement: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                <div className="grid grid-cols-3 gap-3 pt-2 border-t border-slate-100">
                   <div>
                     <label className="text-slate-600 block mb-1">Max Corporate Users</label>
                     <input
@@ -550,23 +644,139 @@ const PlanManagement: React.FC = () => {
                       Unlimited
                     </label>
                   </div>
+
+                  <div>
+                    <label className="text-slate-600 block mb-1">Tax Config Limit</label>
+                    <input
+                      type="number"
+                      disabled={formUnlimitedTaxes}
+                      value={formMaxTaxes}
+                      onChange={(e) => setFormMaxTaxes(Number(e.target.value))}
+                      className="w-full border border-slate-300 rounded p-1.5"
+                    />
+                    <label className="flex items-center gap-1.5 mt-1 text-[11px] text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={formUnlimitedTaxes}
+                        onChange={(e) => setFormUnlimitedTaxes(e.target.checked)}
+                      />
+                      Unlimited
+                    </label>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Master Data & Geographic Limits</div>
+                  <div className="grid grid-cols-4 gap-3">
+                    <div>
+                      <label className="text-slate-600 block mb-1">Pickup Areas</label>
+                      <input
+                        type="number"
+                        disabled={formUnlimitedPickupAreas}
+                        value={formMaxPickupAreas}
+                        onChange={(e) => setFormMaxPickupAreas(Number(e.target.value))}
+                        className="w-full border border-slate-300 rounded p-1.5 text-xs"
+                      />
+                      <label className="flex items-center gap-1 mt-1 text-[11px] text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={formUnlimitedPickupAreas}
+                          onChange={(e) => setFormUnlimitedPickupAreas(e.target.checked)}
+                        />
+                        Unlimited
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-600 block mb-1">Pickup Cities</label>
+                      <input
+                        type="number"
+                        disabled={formUnlimitedPickupCities}
+                        value={formMaxPickupCities}
+                        onChange={(e) => setFormMaxPickupCities(Number(e.target.value))}
+                        className="w-full border border-slate-300 rounded p-1.5 text-xs"
+                      />
+                      <label className="flex items-center gap-1 mt-1 text-[11px] text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={formUnlimitedPickupCities}
+                          onChange={(e) => setFormUnlimitedPickupCities(e.target.checked)}
+                        />
+                        Unlimited
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-600 block mb-1">Rental Packages</label>
+                      <input
+                        type="number"
+                        disabled={formUnlimitedPackages}
+                        value={formMaxPackages}
+                        onChange={(e) => setFormMaxPackages(Number(e.target.value))}
+                        className="w-full border border-slate-300 rounded p-1.5 text-xs"
+                      />
+                      <label className="flex items-center gap-1 mt-1 text-[11px] text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={formUnlimitedPackages}
+                          onChange={(e) => setFormUnlimitedPackages(e.target.checked)}
+                        />
+                        Unlimited
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-600 block mb-1">Payment Modes</label>
+                      <input
+                        type="number"
+                        disabled={formUnlimitedPaymentModes}
+                        value={formMaxPaymentModes}
+                        onChange={(e) => setFormMaxPaymentModes(Number(e.target.value))}
+                        className="w-full border border-slate-300 rounded p-1.5 text-xs"
+                      />
+                      <label className="flex items-center gap-1 mt-1 text-[11px] text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={formUnlimitedPaymentModes}
+                          onChange={(e) => setFormUnlimitedPaymentModes(e.target.checked)}
+                        />
+                        Unlimited
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Entitlements */}
+              {/* Entitlements & Theming */}
               <div className="grid grid-cols-2 gap-4 border border-slate-200 rounded-lg p-3">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">PDF Branding Customization Tier</label>
-                  <select
-                    value={formPdfTier}
-                    onChange={(e: any) => setFormPdfTier(e.target.value)}
-                    className="w-full border border-slate-300 rounded p-1.5 text-xs"
-                  >
-                    <option value="STANDARD">STANDARD (Fixed system theme)</option>
-                    <option value="BRANDED">BRANDED (Custom logo & header color)</option>
-                    <option value="ADVANCED">ADVANCED (Full font, color & placement customization)</option>
-                  </select>
+                <div className="space-y-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Portal Theme Customization Level</label>
+                    <select
+                      value={formThemeLevel}
+                      onChange={(e: any) => setFormThemeLevel(e.target.value)}
+                      className="w-full border border-slate-300 rounded p-1.5 text-xs font-semibold"
+                    >
+                      <option value="STANDARD">STANDARD (System Default Theme Only - Basic)</option>
+                      <option value="PRESETS">PRESETS (4 Curated Presets: Terracotta, Emerald, Slate, Indigo - Pro)</option>
+                      <option value="CUSTOM">CUSTOM (Full Color Picker, Portal Title & Custom CSS - Enterprise)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">PDF Branding Customization Tier</label>
+                    <select
+                      value={formPdfTier}
+                      onChange={(e: any) => setFormPdfTier(e.target.value)}
+                      className="w-full border border-slate-300 rounded p-1.5 text-xs"
+                    >
+                      <option value="STANDARD">STANDARD (Fixed system theme)</option>
+                      <option value="BRANDED">BRANDED (Custom logo & header color)</option>
+                      <option value="ADVANCED">ADVANCED (Full font, color & placement customization)</option>
+                    </select>
+                  </div>
                 </div>
+
                 <div className="flex flex-col justify-center space-y-2 pt-2">
                   <label className="flex items-center gap-2">
                     <input
@@ -584,6 +794,16 @@ const PlanManagement: React.FC = () => {
                     />
                     <span>Advanced Route & Revenue Reports</span>
                   </label>
+                  <div>
+                    <label className="text-[11px] text-slate-600 block mt-1">Annual Trip Allowance (Optional Cap)</label>
+                    <input
+                      type="number"
+                      value={formAnnualTripQuota}
+                      onChange={(e) => setFormAnnualTripQuota(e.target.value)}
+                      className="w-full border border-slate-300 rounded p-1 text-xs"
+                      placeholder="Leave blank for 12x monthly"
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -372,7 +372,7 @@ export async function runAllInspectionAndPlanTests(): Promise<boolean> {
       const t9Passed =
         basicDef.quotas.vehicles === 15 &&
         proDef.quotas.vehicles === 75 &&
-        entDef.quotas.vehicles >= 250 &&
+        (entDef.quotas.vehicles === -1 || entDef.quotas.vehicles >= 250 || entDef.isUnlimitedVehicles === true) &&
         typeof basicVehicleCheck.allowed === 'boolean' &&
         typeof basicDriverCheck.allowed === 'boolean' &&
         typeof basicUserCheck.allowed === 'boolean';

@@ -13,6 +13,7 @@ import { Booking } from '../models/booking';
 import { ORDER } from '../utils/costants';
 import { ROOT_TENANT_ID } from '../context/tenantContext';
 import { sendNotification } from './notificationService';
+import { checkBookingQuota } from './quotaService';
 
 const PHONE_REGEX = /^[6-9]\d{9}$/;
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -508,6 +509,22 @@ export const createPublicBooking = async (req: Request, res: Response) => {
       return res.status(403).json({
         success: false,
         message: 'The fleet operator is currently inactive.',
+      });
+    }
+
+    // Check plan booking quota for this tenant
+    const quotaCheck = await checkBookingQuota(tenant.tenantId);
+    if (!quotaCheck.allowed) {
+      return res.status(403).json({
+        success: false,
+        error: 'QUOTA_EXCEEDED',
+        code: 'QUOTA_EXCEEDED',
+        resource: 'BOOKINGS',
+        current: quotaCheck.current,
+        max: quotaCheck.max,
+        recommendedPlan: quotaCheck.recommendedPlan,
+        billingPeriod: quotaCheck.billingPeriod,
+        message: quotaCheck.message || 'The fleet operator has reached their booking capacity for the current billing period. Please contact the fleet administrator.',
       });
     }
 

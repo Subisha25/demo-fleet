@@ -33,6 +33,12 @@ export class PackageData extends Model {
   @Column(DataType.STRING)
   packageType!:string
 
+  @Column({
+    type: DataType.UUID,
+    allowNull: true,
+  })
+  tenantId!: string;
+
   @ForeignKey(() => Company)
   @Column({
     type: DataType.UUID,

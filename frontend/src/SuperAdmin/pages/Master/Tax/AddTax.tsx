@@ -72,10 +72,10 @@ export default function AddMasterTax() {
         showToast('Failed to add tax. Please try again.', 'error');
       }
     } catch (error: any) {
-     
-      // showToast('Error adding tax:', 'error');
-
-      // backend la already irundha error
+      if (error.response?.status === 403) {
+        showToast(error.response.data?.message || 'Tax configuration quota reached for your current subscription plan. Upgrade required.', 'error');
+        return;
+      }
       if (error.response?.status === 400 && error.response?.data?.message) {
         if (error.response.data.message.toLowerCase().includes("already")) {
           showToast('This Tax Name already exists in the system.', 'warn');
@@ -83,7 +83,7 @@ export default function AddMasterTax() {
           showToast(error.response.data.message, 'error');
         }
       } else {
-        showToast('A tax with this name is already added.', 'warn');
+        showToast(error.response?.data?.message || 'Failed to add tax. Please check requirements.', 'error');
       }
     }
   };

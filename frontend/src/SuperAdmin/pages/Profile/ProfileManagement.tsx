@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageLayout from '../../../components/PageLayout';
 import axiosInstance from '../../../utils/axiosInstance';
 import config from '../../../config/config';
 import { showToast, AlertContainer } from '../../../components/AlertBox';
+import { useTenant } from '../../../context/TenantContext';
 import {
   User,
   Building,
@@ -22,6 +24,10 @@ import {
   AlertCircle,
   X,
   Camera,
+  Palette,
+  Sparkles,
+  Crown,
+  ArrowRight,
 } from 'lucide-react';
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
@@ -31,10 +37,13 @@ const SAC_REGEX = /^[0-9]{6}$/;
 const BASE_URL = config.baseurl.apibaseurl;
 
 const ProfileManagement: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'PERSONAL' | 'BUSINESS'>('PERSONAL');
+  const navigate = useNavigate();
+  const { refreshTenant } = useTenant();
+  const [activeTab, setActiveTab] = useState<'PERSONAL' | 'BUSINESS' | 'THEME'>('PERSONAL');
   const [loading, setLoading] = useState(true);
   const [savingPersonal, setSavingPersonal] = useState(false);
   const [savingBusiness, setSavingBusiness] = useState(false);
+  const [savingTheme, setSavingTheme] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
 
@@ -83,6 +92,41 @@ const ProfileManagement: React.FC = () => {
   const [logoUrl, setLogoUrl] = useState('');
   const [billingFooterText, setBillingFooterText] = useState('');
 
+  // Theming & SaaS Entitlement state
+  const [themeLevel, setThemeLevel] = useState<'STANDARD' | 'PRESETS' | 'CUSTOM'>('STANDARD');
+  const [tenantPlanTier, setTenantPlanTier] = useState<string>('BASIC');
+  const [primaryColor, setPrimaryColor] = useState<string>('#C04E24');
+  const [secondaryColor, setSecondaryColor] = useState<string>('#1C1A18');
+  const [portalTitle, setPortalTitle] = useState<string>('');
+  const [selectedPreset, setSelectedPreset] = useState<string>('terracotta');
+
+  const THEME_PRESETS: Record<string, { name: string; primary: string; secondary: string; desc: string }> = {
+    terracotta: {
+      name: 'Terracotta Warmth',
+      primary: '#C04E24',
+      secondary: '#1C1A18',
+      desc: 'System default warm earthen terracotta brand',
+    },
+    emerald: {
+      name: 'Emerald Fleet',
+      primary: '#0F766E',
+      secondary: '#134E4A',
+      desc: 'Eco-mobility forest teal & crisp emerald accents',
+    },
+    slate: {
+      name: 'Slate Executive',
+      primary: '#334155',
+      secondary: '#1E293B',
+      desc: 'Corporate VIP & luxury chauffeur dark slate',
+    },
+    indigo: {
+      name: 'Indigo Express',
+      primary: '#4F46E5',
+      secondary: '#312E81',
+      desc: 'Modern tech-forward dispatch & high-contrast indigo',
+    },
+  };
+
   const fetchProfile = async () => {
     try {
       setLoading(true);
@@ -121,6 +165,21 @@ const ProfileManagement: React.FC = () => {
           setPinCode(f.pinCode || '');
           setLogoUrl(f.logoUrl || f.brandingTokens?.logoUrl || '');
           setBillingFooterText(f.billingFooterText || '');
+          setPrimaryColor(f.brandingTokens?.primaryColor || '#C04E24');
+          setSecondaryColor(f.brandingTokens?.secondaryColor || '#1C1A18');
+          setPortalTitle(f.brandingTokens?.portalTitle || f.displayName || f.name || '');
+        }
+
+        // Fetch dynamic tenant entitlements
+        try {
+          const entRes = await axiosInstance.get('/tenants/current/entitlements');
+          if (entRes.data?.success && entRes.data?.entitlements) {
+            const ent = entRes.data.entitlements;
+            setThemeLevel(ent.themeLevel || 'STANDARD');
+            setTenantPlanTier(ent.planTier || 'BASIC');
+          }
+        } catch (e) {
+          console.warn('Could not load tenant entitlements:', e);
         }
       }
     } catch (err: any) {
@@ -133,6 +192,45 @@ const ProfileManagement: React.FC = () => {
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  const handleSelectPreset = (key: string) => {
+    setSelectedPreset(key);
+    const p = THEME_PRESETS[key];
+    if (p) {
+      setPrimaryColor(p.primary);
+      setSecondaryColor(p.secondary);
+    }
+  };
+
+  const handleSaveTheme = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (themeLevel === 'STANDARD') {
+      showToast('Theme customization is locked on Basic plan. Upgrade to Pro for presets or Enterprise for custom branding.', 'warn');
+      return;
+    }
+
+    try {
+      setSavingTheme(true);
+      const payload: any = {
+        primaryColor,
+        secondaryColor,
+        portalTitle,
+        themePreset: selectedPreset,
+      };
+
+      const res = await axiosInstance.put('/tenants/current/branding', payload);
+      if (res.data && res.data.success) {
+        showToast('Portal theme branding updated successfully!', 'success');
+        document.documentElement.style.setProperty('--primary-tenant-color', primaryColor);
+        if (portalTitle) document.title = `${portalTitle} | Transport Portal`;
+        refreshTenant();
+      }
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || 'Failed to save theme settings.', 'error');
+    } finally {
+      setSavingTheme(false);
+    }
+  };
 
   const handleCancelPersonal = () => {
     setPersonalName(initialData.name);
@@ -153,11 +251,6 @@ const ProfileManagement: React.FC = () => {
 
     // Phone validation
     const digitsOnly = personalPhone.replace(/\D/g, '');
-    if (digitsOnly.endsWith('9003241571')) {
-      showToast('The phone number 9003241571 is permanently deprecated and blocked by security policy.', 'error');
-      return;
-    }
-
     if (personalPhone.trim() && (digitsOnly.length < 10 || digitsOnly.length > 12)) {
       showToast('Please enter a valid 10-digit mobile number.', 'error');
       return;
@@ -377,7 +470,7 @@ const ProfileManagement: React.FC = () => {
 
         {/* Tab Selection (Non-SuperAdmin Only) */}
         {!isSuperAdmin && (
-          <div className="bg-white rounded-xl border border-[#E0DAD1] p-2 shadow-sm flex gap-2">
+          <div className="bg-white rounded-xl border border-[#E0DAD1] p-2 shadow-sm flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setActiveTab('PERSONAL')}
@@ -399,6 +492,17 @@ const ProfileManagement: React.FC = () => {
               }`}
             >
               <Building size={14} /> Fleet Business Profile & GSTIN
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('THEME')}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2 ${
+                activeTab === 'THEME'
+                  ? 'bg-[#C04E24] text-white shadow-sm'
+                  : 'text-[#5C5752] hover:bg-slate-50'
+              }`}
+            >
+              <Palette size={14} /> Brand Theming & Color Studio
             </button>
           </div>
         )}
@@ -539,7 +643,7 @@ const ProfileManagement: React.FC = () => {
                     maxLength={13}
                   />
                   <p className="text-[10px] text-slate-500 mt-1">
-                    Configured platform SMS recipient. Old number 9003241571 is strictly rejected.
+                    Configured platform SMS recipient for operational alerts (defaults to 9080280818).
                   </p>
                 </div>
 
@@ -889,6 +993,243 @@ const ProfileManagement: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        )}
+
+        {/* Tab 3: Portal Theme Customization & Brand Studio (Fleet Admin Only) */}
+        {!isSuperAdmin && activeTab === 'THEME' && (
+          <div className="bg-white rounded-xl border border-[#E0DAD1] p-6 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[#FAF8F5] gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-[#1C1A18] uppercase tracking-wider flex items-center gap-2">
+                    <Palette size={16} className="text-[#C04E24]" />
+                    <span>Portal Theming & Brand Studio</span>
+                  </h2>
+                  <span
+                    className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                      themeLevel === 'CUSTOM'
+                        ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                        : themeLevel === 'PRESETS'
+                        ? 'bg-teal-100 text-teal-800 border border-teal-300'
+                        : 'bg-amber-100 text-amber-800 border border-amber-300'
+                    }`}
+                  >
+                    {themeLevel === 'CUSTOM'
+                      ? 'Enterprise Studio (Full Custom)'
+                      : themeLevel === 'PRESETS'
+                      ? 'Pro Studio (Curated Presets)'
+                      : 'Basic (Standard Theme)'}
+                  </span>
+                </div>
+                <p className="text-xs text-[#7A7570] mt-1">
+                  Customize the dynamic color palette, portal header accents, and portal title displayed across your fleet.
+                </p>
+              </div>
+
+              {themeLevel === 'STANDARD' && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/billing/current')}
+                  className="px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1.5 self-start"
+                >
+                  <Crown size={14} />
+                  <span>Upgrade to Unlock Presets / Custom Theme</span>
+                  <ArrowRight size={13} />
+                </button>
+              )}
+            </div>
+
+            {/* Basic Plan Limit Banner */}
+            {themeLevel === 'STANDARD' && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 text-amber-900 text-xs">
+                <Lock size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold text-amber-950">
+                    Standard Theme Locked for Basic Plan
+                  </p>
+                  <p className="text-amber-800/90 leading-relaxed">
+                    Your current SaaS subscription uses the standard system theme (Terracotta Warmth). Theme customizer and color presets are unlocked on <strong>Pro</strong> (4 brand presets) and <strong>Enterprise</strong> (full live color studio & token editor).
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Presets Gallery (Available on PRO and ENTERPRISE) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider">
+                  Curated Brand Color Presets
+                </label>
+                {themeLevel === 'STANDARD' && (
+                  <span className="text-[11px] font-semibold text-amber-700 bg-amber-100/60 px-2 py-0.5 rounded">
+                    Preview only on Basic
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {Object.entries(THEME_PRESETS).map(([key, p]) => {
+                  const isSelected = selectedPreset === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      disabled={themeLevel === 'STANDARD'}
+                      onClick={() => handleSelectPreset(key)}
+                      className={`p-3.5 rounded-xl border text-left transition relative flex flex-col justify-between ${
+                        isSelected
+                          ? 'border-[#C04E24] bg-orange-50/40 ring-2 ring-[#C04E24]/20'
+                          : 'border-[#E0DAD1] bg-white hover:border-slate-300'
+                      } ${themeLevel === 'STANDARD' ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span
+                          className="w-5 h-5 rounded-full border border-black/10 shadow-sm"
+                          style={{ backgroundColor: p.primary }}
+                        />
+                        <span
+                          className="w-5 h-5 rounded-full border border-black/10 shadow-sm -ml-2"
+                          style={{ backgroundColor: p.secondary }}
+                        />
+                        <span className="text-xs font-bold text-[#1C1A18] ml-1">{p.name}</span>
+                      </div>
+                      <p className="text-[11px] text-[#7A7570] leading-snug">{p.desc}</p>
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-[#C04E24] text-white flex items-center justify-center text-[9px] font-bold">
+                          ✓
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Color Pickers (ENTERPRISE ONLY) */}
+            <div className="pt-4 border-t border-[#FAF8F5] space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-[#1C1A18] uppercase tracking-wider flex items-center gap-2">
+                    <Sparkles size={14} className="text-purple-600" />
+                    <span>Enterprise Custom Color & Token Editor</span>
+                  </h3>
+                  <p className="text-[11px] text-[#7A7570] mt-0.5">
+                    Fine-tune exact brand hex colors and custom portal titles.
+                  </p>
+                </div>
+                {themeLevel !== 'CUSTOM' && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">
+                    Enterprise Exclusive
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#1C1A18] mb-1.5">
+                    Primary Brand Color
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      disabled={themeLevel !== 'CUSTOM'}
+                      value={primaryColor}
+                      onChange={(e) => setPrimaryColor(e.target.value)}
+                      className="w-10 h-10 rounded border border-[#D5CFC9] p-0.5 cursor-pointer disabled:cursor-not-allowed"
+                    />
+                    <input
+                      type="text"
+                      disabled={themeLevel !== 'CUSTOM'}
+                      value={primaryColor}
+                      onChange={(e) => setPrimaryColor(e.target.value)}
+                      className="w-full border border-[#D5CFC9] px-3 py-2 rounded-lg text-xs font-mono uppercase text-[#1C1A18] disabled:bg-slate-50 disabled:text-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1C1A18] mb-1.5">
+                    Secondary Accent Color
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      disabled={themeLevel !== 'CUSTOM'}
+                      value={secondaryColor}
+                      onChange={(e) => setSecondaryColor(e.target.value)}
+                      className="w-10 h-10 rounded border border-[#D5CFC9] p-0.5 cursor-pointer disabled:cursor-not-allowed"
+                    />
+                    <input
+                      type="text"
+                      disabled={themeLevel !== 'CUSTOM'}
+                      value={secondaryColor}
+                      onChange={(e) => setSecondaryColor(e.target.value)}
+                      className="w-full border border-[#D5CFC9] px-3 py-2 rounded-lg text-xs font-mono uppercase text-[#1C1A18] disabled:bg-slate-50 disabled:text-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1C1A18] mb-1.5">
+                    Portal Window Title
+                  </label>
+                  <input
+                    type="text"
+                    disabled={themeLevel === 'STANDARD'}
+                    value={portalTitle}
+                    onChange={(e) => setPortalTitle(e.target.value)}
+                    placeholder="e.g. Apex Express Fleet Operations"
+                    className="w-full border border-[#D5CFC9] px-3 py-2 rounded-lg text-xs text-[#1C1A18] disabled:bg-slate-50 disabled:text-slate-400"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Live Theme Preview Bar */}
+            <div
+              className="rounded-xl p-4 text-white shadow-sm flex items-center justify-between"
+              style={{
+                background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center font-black text-sm">
+                  FF
+                </div>
+                <div>
+                  <div className="text-xs font-bold tracking-tight">{portalTitle || displayName || 'FleetFlow Portal'}</div>
+                  <div className="text-[10px] text-white/80">Active Dynamic Brand Swatch</div>
+                </div>
+              </div>
+              <div className="text-right text-[11px] font-mono opacity-90">
+                {primaryColor} / {secondaryColor}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="pt-4 border-t border-[#FAF8F5] flex items-center justify-end gap-3">
+              {themeLevel !== 'STANDARD' ? (
+                <button
+                  type="button"
+                  onClick={handleSaveTheme}
+                  disabled={savingTheme}
+                  className="px-6 py-2.5 bg-[#C04E24] hover:bg-[#A43D1A] text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Save size={13} />
+                  <span>{savingTheme ? 'Applying Theme...' : 'Save & Apply Theme'}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate('/billing/current')}
+                  className="px-6 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1.5"
+                >
+                  <Crown size={13} />
+                  <span>Upgrade to Enable Brand Styling</span>
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

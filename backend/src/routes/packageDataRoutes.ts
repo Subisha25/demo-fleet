@@ -1,17 +1,16 @@
 import express from 'express';
 import {createPackageData,getAllPackageData,getPackageDataById,updatePackageData,deletePackageData,copyPackageData } from '../services/packageDataServices';
 import { authMiddleware } from '../middleware/authMiddleware';
+import { requirePackageQuota, requirePaidForModification } from '../middleware/entitlementMiddleware';
 const router = express.Router();
 
+router.post('/createPackageData', authMiddleware, requirePackageQuota, createPackageData);
+router.get('/getAllPackageData', authMiddleware, getAllPackageData);
+router.get('/getPackageDataById/:id', authMiddleware, getPackageDataById);
+router.put('/updatePackageData/:id', authMiddleware, requirePaidForModification, updatePackageData);
+router.delete('/deletePackageData/:id', authMiddleware, requirePaidForModification, deletePackageData);
 
-router.post('/createPackageData',createPackageData);
-//router.post('/copyPackageData',copyPackageData)
-router.get('/getAllPackageData',getAllPackageData);
-router.get('/getPackageDataById/:id',getPackageDataById);
-router.put('/updatePackageData/:id',updatePackageData);
-router.delete('/deletePackageData/:id',deletePackageData);
-
-router.post('/copyPackageData',copyPackageData);
+router.post('/copyPackageData', authMiddleware, requirePackageQuota, copyPackageData);
 
 
 
