@@ -45,6 +45,7 @@ import { NotificationLog } from '../models/notificationLog';
 import { SaaSPlan } from '../models/saasPlan';
 import { SmsTemplate } from '../models/smsTemplate';
 import { TenantInitialAllowance } from '../models/tenantInitialAllowance';
+import { TenantSmsConfig } from '../models/tenantSmsConfig';
 
 const sequelize = new Sequelize({
   dialect: config.database.dialect as Dialect,
@@ -57,8 +58,10 @@ const sequelize = new Sequelize({
     PackageData,Configuration,ClosePending,EmailConfiguration,BookingSequence,PaymentSequence, InvoiceSequence,
      MonthlyInvoice, MonthlyInvoiceItems, MonthlyBookingSequence,MapCount,OnCallInvoice,OnCallInvoiceItems,
      Tenant, TenantSubscription, TenantUsageMeter, CompanyPolicy,
-     TenantRegistrationRequest, TenantActivationToken, TenantInitialAllowance, SubscriptionInvoice, NotificationLog, SaaSPlan, SmsTemplate],
+     TenantRegistrationRequest, TenantActivationToken, TenantInitialAllowance, SubscriptionInvoice, NotificationLog, SaaSPlan, SmsTemplate,
+     TenantSmsConfig],
   logging: false,
 });
+
 
 export default sequelize;

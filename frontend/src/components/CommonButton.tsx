@@ -12,19 +12,19 @@ interface CommonButtonProps {
 }
 
 const variantClasses: Record<string, string> = {
-  primary: 'bg-[#C04E24] hover:bg-[#A43D1A] text-white shadow-sm focus:ring-2 focus:ring-[#E9B195] focus:outline-none',
-  secondary: 'bg-white hover:bg-[#FAF8F5] text-[#1C1A18] border border-[#E0DAD1] shadow-sm focus:ring-2 focus:ring-[#E0DAD1] focus:outline-none',
-  navy: 'bg-[#1C1A18] hover:bg-[#262320] text-white shadow-sm focus:ring-2 focus:ring-[#45403C] focus:outline-none',
-  darkblue: 'bg-[#1C1A18] hover:bg-[#262320] text-white shadow-sm focus:ring-2 focus:ring-[#45403C] focus:outline-none',
+  primary: 'bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white shadow-sm focus:ring-2 focus:ring-purple-400 focus:outline-none',
+  secondary: 'bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 shadow-sm focus:ring-2 focus:ring-purple-400 focus:outline-none',
+  navy: 'bg-[#0B0B0F] hover:bg-[#1A1A24] text-white shadow-sm focus:ring-2 focus:ring-purple-500 focus:outline-none',
+  darkblue: 'bg-[#0B0B0F] hover:bg-[#1A1A24] text-white shadow-sm focus:ring-2 focus:ring-purple-500 focus:outline-none',
   danger: 'bg-rose-600 hover:bg-rose-700 text-white shadow-sm focus:ring-2 focus:ring-rose-400 focus:outline-none',
   success: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm focus:ring-2 focus:ring-emerald-400 focus:outline-none',
-  custom: 'bg-[#C04E24] hover:bg-[#A43D1A] text-white shadow-sm focus:ring-2 focus:ring-[#E9B195] focus:outline-none',
-  clear: 'bg-[#EDE9E3] hover:bg-[#E0DAD1] text-[#1C1A18] shadow-sm',
-  info: 'bg-[#C04E24] hover:bg-[#A43D1A] text-white shadow-sm focus:ring-2 focus:ring-[#E9B195] focus:outline-none',
+  custom: 'bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white shadow-sm focus:ring-2 focus:ring-purple-400 focus:outline-none',
+  clear: 'bg-slate-100 hover:bg-slate-200 text-slate-800 shadow-sm',
+  info: 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none',
   edit: 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm focus:ring-2 focus:ring-amber-400 focus:outline-none',
-  default: 'bg-[#FAF8F5] hover:bg-[#EDE9E3] text-[#1C1A18] border border-[#E0DAD1] shadow-sm',
-  outline: 'bg-transparent border border-[#C04E24] text-[#C04E24] hover:bg-[#FDF6F0] shadow-sm focus:ring-2 focus:ring-[#E9B195] focus:outline-none',
-  search: 'bg-[#C04E24] hover:bg-[#A43D1A] text-white shadow-sm',
+  default: 'bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 shadow-sm',
+  outline: 'bg-transparent border border-purple-600 text-purple-700 hover:bg-purple-50 shadow-sm focus:ring-2 focus:ring-purple-400 focus:outline-none',
+  search: 'bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white shadow-sm',
 };
 
 const CommonButton: React.FC<CommonButtonProps> = ({

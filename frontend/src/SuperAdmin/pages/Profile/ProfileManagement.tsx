@@ -222,7 +222,7 @@ const ProfileManagement: React.FC = () => {
       if (res.data && res.data.success) {
         showToast('Portal theme branding updated successfully!', 'success');
         document.documentElement.style.setProperty('--primary-tenant-color', primaryColor);
-        if (portalTitle) document.title = `${portalTitle} | Transport Portal`;
+        if (portalTitle) document.title = `${portalTitle} — FleetFlow`;
         refreshTenant();
       }
     } catch (err: any) {

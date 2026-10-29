@@ -64,15 +64,15 @@ export default function ServicesPage() {
   return (
     <PublicLayout>
       {/* Header Banner */}
-      <section className="bg-gradient-to-b from-[#FAF8F5] to-[#F5EFEB] py-16 md:py-24 border-b border-[#E0DAD1]">
+      <section className="bg-gradient-to-b from-[#F7F7FB] via-white to-[#F7F7FB] py-16 md:py-24 border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-4">
-          <span className="text-xs font-bold uppercase tracking-widest text-[#C04E24]">
+          <span className="inline-block px-3 py-1 rounded-full bg-[#5B3DF5]/10 text-[#5B3DF5] text-xs font-bold uppercase tracking-wider">
             Mobility Services
           </span>
-          <h1 className="text-4xl sm:text-5xl font-black text-[#1C1A18] tracking-tight">
+          <h1 className="text-4xl sm:text-5xl font-black text-[#17171D] tracking-tight">
             Comprehensive Corporate Transport & Fleet Solutions
           </h1>
-          <p className="text-lg text-[#5A554E] max-w-3xl mx-auto leading-relaxed">
+          <p className="text-lg text-[#686875] max-w-3xl mx-auto leading-relaxed">
             Delivering punctual, safe, and fully audited commercial transportation services backed by
             intelligent digital trip sheets and real-time operational telemetry.
           </p>
@@ -80,12 +80,12 @@ export default function ServicesPage() {
       </section>
 
       {/* Services List */}
-      <section className="py-20 bg-[#FAF8F5]">
+      <section className="py-20 bg-[#F7F7FB]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
           {services.map((srv, idx) => (
             <div
               key={idx}
-              className={`bg-[#FFFFFF] rounded-3xl overflow-hidden border border-[#E0DAD1] shadow-sm hover:shadow-md transition-all grid grid-cols-1 lg:grid-cols-2 ${
+              className={`bg-white rounded-3xl overflow-hidden border border-gray-200/80 shadow-sm hover:shadow-md transition-all grid grid-cols-1 lg:grid-cols-2 ${
                 idx % 2 === 1 ? "lg:grid-flow-dense" : ""
               }`}
             >
@@ -95,23 +95,23 @@ export default function ServicesPage() {
                 }`}
               >
                 <div className="space-y-4">
-                  <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded bg-[#C04E24]/10 text-[#C04E24]">
+                  <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded bg-[#5B3DF5]/10 text-[#5B3DF5]">
                     {srv.badge}
                   </span>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-[#1C1A18] tracking-tight">
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-[#17171D] tracking-tight">
                     {srv.title}
                   </h2>
-                  <p className="text-sm sm:text-base text-[#5A554E] leading-relaxed">
+                  <p className="text-sm sm:text-base text-[#686875] leading-relaxed">
                     {srv.desc}
                   </p>
                   <div className="pt-2">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#1C1A18] mb-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#17171D] mb-3">
                       Key Capabilities Included:
                     </h3>
                     <ul className="space-y-2">
                       {srv.features.map((feat, fIdx) => (
-                        <li key={fIdx} className="flex items-center gap-2.5 text-xs sm:text-sm text-[#2B2927]">
-                          <svg className="w-4 h-4 text-[#C04E24] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <li key={fIdx} className="flex items-center gap-2.5 text-xs sm:text-sm text-[#17171D]">
+                          <svg className="w-4 h-4 text-[#5B3DF5] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                           </svg>
                           <span>{feat}</span>
@@ -121,16 +121,16 @@ export default function ServicesPage() {
                   </div>
                 </div>
 
-                <div className="pt-4 flex items-center gap-4">
+                <div className="pt-4 flex flex-wrap items-center gap-4">
                   <button
                     onClick={() => navigate("/register-fleet")}
-                    className="px-6 py-2.5 text-xs sm:text-sm font-bold text-white bg-[#C04E24] hover:bg-[#A83F1A] rounded-xl shadow-sm transition-all"
+                    className="px-6 py-2.5 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 rounded-xl shadow-sm transition-all"
                   >
                     Onboard Fleet for this Service
                   </button>
                   <Link
                     to="/contact"
-                    className="text-xs sm:text-sm font-bold text-[#1C1A18] hover:text-[#C04E24] transition-colors"
+                    className="text-xs sm:text-sm font-bold text-[#17171D] hover:text-[#5B3DF5] transition-colors"
                   >
                     Inquire Transport Desk →
                   </Link>
@@ -138,14 +138,14 @@ export default function ServicesPage() {
               </div>
 
               <div
-                className={`bg-[#F7F2EC] flex items-center justify-center p-8 overflow-hidden ${
-                  idx % 2 === 1 ? "lg:col-start-1" : ""
+                className={`bg-[#F7F7FB] flex items-center justify-center p-8 overflow-hidden border-t lg:border-t-0 ${
+                  idx % 2 === 1 ? "lg:col-start-1 lg:border-r border-gray-100" : "lg:border-l border-gray-100"
                 }`}
               >
                 <img
                   src={srv.image}
                   alt={srv.title}
-                  className="max-h-72 w-auto object-contain filter drop-shadow-lg transform hover:scale-105 transition-transform duration-300"
+                  className="max-h-72 w-auto object-contain filter drop-shadow-md transform hover:scale-105 transition-transform duration-300"
                 />
               </div>
             </div>

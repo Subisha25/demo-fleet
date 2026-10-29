@@ -40,6 +40,7 @@ import closePendingRoutes from "./routes/closependingRoutes";
 import invoiceRoutes from "./routes/invoiceRoutes";
 import emailConfRoutes from "./routes/emailConfRoutes";
 import smsTemplateRoutes from "./routes/smsTemplateRoutes";
+import smsConfigRoutes from "./routes/smsConfigRoutes";
 import paymentRoutes from "./routes/paymentRoutes";
 import redirectRoute from './routes/redirectRoute';
 import onCallRoutes from './routes/onCallRoutes';
@@ -193,6 +194,8 @@ app.use('/api/downloadPdf',downloadPdf );
 
 app.use('/api/emailConfRoutes',emailConfRoutes );
 app.use('/api/smsTemplateRoutes', smsTemplateRoutes);
+app.use('/api/sms/config', smsConfigRoutes);
+app.use('/api/tenants/sms-config', smsConfigRoutes);
 app.use('/api/sms', smsTemplateRoutes);
 
 app.use('/api/paymentRoutes',paymentRoutes);

@@ -21,7 +21,7 @@ import { sendNotification } from "../utils/sendNotification";
 import { sendEmailFromTemplate } from "../services/emailConfServices";
 import { fetchAllEmailConfs } from "../services/emailConfServices";
 import config from '../config/config';
-import { sendTransactionalSms, dispatchAuditedSms } from './smsServices';
+import { sendTransactionalSms, dispatchAuditedSms, sanitizeDltLocationString } from './smsServices';
 import {normalizeManagerEmails } from '../utils/email';
 import { sendSmsNotifications } from '../utils/smsNotifications';
 
@@ -2441,37 +2441,25 @@ async function sendSMSForDanManager(
     const senderId = process.env.TWO_FACTOR_SENDER_ID;
 
     if (!apiKey || !senderId) return;
-let shortDropPoint = booking.dropPoint || "";
-let shortPickup = booking.pickupArea || "";
+    const shortDropPoint = sanitizeDltLocationString(booking.dropPoint || '');
+    const shortPickup = sanitizeDltLocationString(booking.pickupArea || '');
 
-// If length > 25, take only text before first comma
-if (shortDropPoint.length > 27) {
-  shortDropPoint = shortDropPoint.split(",")[0];
-}
-
-if (shortPickup.length > 27) {
-  shortPickup = shortPickup.split(",")[0];
-}
-
-    const cleanMobile = String(managerMobile || '').replace(/\D/g, '');
-    if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
-      console.log(`[Manager SMS: MOCK MODE] Mobile: ${cleanMobile} | Status: MOCK`);
-      return;
-    }
-
-    const smsUrl = `https://2factor.in/API/R1/?module=TRANS_SMS&apikey=${apiKey}&to=${managerMobile}&from=${senderId}&templatename=${encodeURIComponent(
-      "ManageAlert"
-    )}&var1=${encodeURIComponent(booking.managerName || "Manager")}
-&var2=${encodeURIComponent(booking.bookingCode)}
-&var3=${encodeURIComponent(bookingUser?.username || "")}
-&var4=${encodeURIComponent(userPhone || "")}
-&var5=${encodeURIComponent(shortPickup)}
-&var6=${encodeURIComponent(shortDropPoint)}`;
-
-    const response = await fetch(smsUrl);
-    const result = await response.json();
-
-    console.log("Manager SMS sent:", result);
+    await dispatchAuditedSms({
+      recipient: String(managerMobile),
+      templateCode: 'MANAGER_BOOKING_CONFIRMATION',
+      templateName: 'ManageAlert',
+      vars: [
+        booking.managerName || 'Manager',
+        booking.bookingCode || '',
+        bookingUser?.username || '',
+        userPhone || '',
+        shortPickup,
+        shortDropPoint,
+      ],
+      message: `Grace Cabs Alert: Booking ${booking.bookingCode} for ${bookingUser?.username || 'Customer'}. Pickup: ${shortPickup}, Drop: ${shortDropPoint}.`,
+      referenceEntity: 'BOOKING',
+      referenceId: String(booking.bookingId || booking.id || ''),
+    });
 
   } catch (err: any) {
     console.error("Manager SMS error:", err.message);
@@ -2567,40 +2555,23 @@ export const rejectBookingByManager = async (req: any, res: Response) => {
               const apiKey =  process.env.TWO_FACTOR_API_KEY;
         const senderId =  process.env.TWO_FACTOR_SENDER_ID;
         const templateName = "ManagerCancelBooking";
-        if (!apiKey || !senderId) {
-          console.error(" SMS API configuration missing in environment variables");
-        } else {
-           let shortDropPoint = booking.dropPoint || "";
-          let shortPickup = booking.pickupArea || "";
+        const shortDropPoint = sanitizeDltLocationString(booking.dropPoint || '');
+        const shortPickup = sanitizeDltLocationString(booking.pickupArea || '');
 
-          // If length > 25, take only text before first comma
-          if (shortDropPoint.length > 27) {
-            shortDropPoint = shortDropPoint.split(",")[0];
-          }
-
-          if (shortPickup.length > 27) {
-            shortPickup = shortPickup.split(",")[0];
-          }
-
-          const cleanCancelMobile = String(user?.mobile || '').replace(/\D/g, '');
-          if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
-            console.log(`[ManagerCancelBooking SMS: MOCK MODE] Mobile: ${cleanCancelMobile} | Status: MOCK`);
-            return;
-          }
-
-          // Build SMS URL with parameters
-          const smsUrl = `https://2factor.in/API/R1/?module=TRANS_SMS&apikey=${apiKey}&to=${user?.mobile}&from=${senderId}&templatename=${encodeURIComponent(templateName)}&var1=${encodeURIComponent(user?.username|| '',)}&var2=${encodeURIComponent(booking?.bookingCode || '',)}&var3=${encodeURIComponent(shortPickup || '',)}&var4=${encodeURIComponent(shortDropPoint || '',)}`;
- 
-          // Send SMS using fetch
-          const smsResponse = await fetch(smsUrl);
- 
-          if (!smsResponse.ok) {
-            throw new Error(`SMS API request failed with status: ${smsResponse.status}`);
-          }
- 
-          const smsResult = await smsResponse.json();
-          console.log(" SMS sent successfully:", smsResult);
-        }
+        await dispatchAuditedSms({
+          recipient: String(user.mobile),
+          templateCode: 'MANAGER_CANCEL_BOOKING',
+          templateName: 'ManagerCancelBooking',
+          vars: [
+            user.username || '',
+            booking.bookingCode || '',
+            shortPickup,
+            shortDropPoint,
+          ],
+          message: `Grace Cabs: Booking ${booking.bookingCode} cancelled by manager. Pickup: ${shortPickup}, Drop: ${shortDropPoint}.`,
+          referenceEntity: 'BOOKING',
+          referenceId: String(booking.bookingId || booking.id || ''),
+        });
       } else {
         console.log(" User mobile number not found");
       }

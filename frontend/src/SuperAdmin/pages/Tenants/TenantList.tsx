@@ -337,17 +337,17 @@ const TenantList: React.FC = () => {
           <CommonButton
             text="+ Provision Fleet Tenant"
             onClick={() => navigate('/tenants/add')}
-            className="bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg shadow-sm"
+            className="bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white font-semibold text-xs px-3.5 py-2 rounded-lg shadow-sm"
           />
           <CommonButton
             text="SaaS Plans"
             onClick={() => navigate('/tenants/plans')}
-            className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg shadow-sm"
+            className="border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold text-xs px-3.5 py-2 rounded-lg shadow-sm"
           />
           <CommonButton
             text="Corporate Policies"
             onClick={() => navigate('/tenants/policies')}
-            className="bg-[#0f1c3f] hover:bg-[#1b2d5b] text-white font-semibold text-xs px-3.5 py-2 rounded-lg shadow-sm"
+            className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs px-3.5 py-2 rounded-lg shadow-sm"
           />
         </div>
       </div>
@@ -368,7 +368,7 @@ const TenantList: React.FC = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="border border-slate-300 rounded-lg p-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="border border-slate-300 rounded-lg p-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-purple-600"
             >
               <option value="ALL">All Statuses</option>
               <option value="ACTIVE">ACTIVE</option>
@@ -383,7 +383,7 @@ const TenantList: React.FC = () => {
             <select
               value={planFilter}
               onChange={(e) => setPlanFilter(e.target.value)}
-              className="border border-slate-300 rounded-lg p-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="border border-slate-300 rounded-lg p-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-purple-600"
             >
               <option value="ALL">All Plans</option>
               <option value="BASIC">BASIC</option>
@@ -488,7 +488,7 @@ const TenantList: React.FC = () => {
                 </button>
                 <button
                   onClick={handleSaveSubscription}
-                  className="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold shadow-sm"
+                  className="px-4 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white rounded-lg font-bold shadow-sm"
                 >
                   Save Changes
                 </button>

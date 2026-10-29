@@ -164,7 +164,7 @@ useEffect(() => {
           setShowCalendar(true);
           setSelectingDateType("from");
         }}
-        className="hover:text-blue-600 text-sm font-medium"
+        className="hover:text-purple-600 text-sm font-medium"
       >
         From: {fromDate ? formatDate(fromDate) : "Select"}
       </span>
@@ -174,13 +174,13 @@ useEffect(() => {
           setShowCalendar(true);
           setSelectingDateType("to");
         }}
-        className="hover:text-blue-600 text-sm font-medium"
+        className="hover:text-purple-600 text-sm font-medium"
       >
         To: {toDate ? formatDate(toDate) : "Select"}
       </span>
       <FontAwesomeIcon
         icon={faCalendarAlt}
-        className="absolute right-3 top-2.5 text-gray-500 hover:text-blue-600"
+        className="absolute right-3 top-2.5 text-gray-500 hover:text-purple-600"
         onClick={() => {
           setShowCalendar(true);
           setSelectingDateType("from");
@@ -237,7 +237,7 @@ useEffect(() => {
   }}
             required={required}
             disabled={disabled}
-            className={`w-full border border-gray-300 rounded px-4 py-2 focus:ring-orange-500 ${icon ? 'pl-10' : ''} ${error ? 'border-red-500' : ''}`}
+            className={`w-full border border-gray-300 rounded px-4 py-2 focus:ring-2 focus:ring-purple-600 focus:border-purple-600 outline-none ${icon ? 'pl-10' : ''} ${error ? 'border-red-500' : ''}`}
           >
             <option value="">-- Select --</option>
             {renderOptions()}
@@ -254,7 +254,7 @@ useEffect(() => {
             placeholder={placeholder}
             required={required}
             disabled={disabled}
-            className={`w-full border border-gray-300 rounded px-4 py-2 h-20 focus:ring-orange-500 ${icon ? 'pl-10' : ''} ${error ? 'border-red-500' : ''}`}
+            className={`w-full border border-gray-300 rounded px-4 py-2 h-20 focus:ring-2 focus:ring-purple-600 focus:border-purple-600 outline-none ${icon ? 'pl-10' : ''} ${error ? 'border-red-500' : ''}`}
           />
         </div>
       ) : type === "checkbox" ? (
@@ -295,7 +295,7 @@ useEffect(() => {
    onKeyDown={(e) => {
     if (e.key === "Enter") onEnterPress?.(); // 🔥 Enter press triggers callback
   }}
-  className={`w-full border border-gray-300 rounded px-4 py-2 focus:ring-orange-500 ${icon ? 'pl-10' : ''} ${error ? 'border-red-500' : ''} ${type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''}`}
+  className={`w-full border border-gray-300 rounded px-4 py-2 focus:ring-2 focus:ring-purple-600 focus:border-purple-600 outline-none ${icon ? 'pl-10' : ''} ${error ? 'border-red-500' : ''} ${type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''}`}
 />
         </div>
       )}

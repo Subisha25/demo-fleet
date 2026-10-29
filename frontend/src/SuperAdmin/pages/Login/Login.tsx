@@ -162,21 +162,21 @@ const handleForgetPassword = async () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5]">
+    <div className="min-h-screen bg-[#F8F8FC]">
      <SimpleHeader/>
 
       {/* Login Form */}
       <div className="flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
-          {/* Card with subtle warm shadow */}
-          <div className="bg-white rounded-2xl shadow-xl border border-[#E0DAD1] overflow-hidden">
-            {/* Charcoal & Terracotta Header */}
-            <div className="bg-[#1C1A18] border-b-4 border-[#C04E24] px-8 py-8 text-center">
-              <div className="w-16 h-16 bg-[#C04E24]/20 border border-[#C04E24]/40 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <Lock className="text-[#DE8A66]" size={30} />
+          {/* Card with subtle clean shadow */}
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+            {/* Black & Purple Header */}
+            <div className="bg-[#0B0B0F] border-b-4 border-purple-600 px-8 py-8 text-center">
+              <div className="w-16 h-16 bg-purple-600/20 border border-purple-500/40 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <Lock className="text-purple-400" size={30} />
               </div>
               <h2 className="text-2xl font-bold text-white mb-2">Welcome Back</h2>
-              <p className="text-[#EDE9E3] text-sm">Sign in to your enterprise fleet portal</p>
+              <p className="text-slate-300 text-sm">Sign in to your enterprise fleet portal</p>
             </div>
 
 
@@ -189,13 +189,13 @@ const handleForgetPassword = async () => {
 
               {/* Email Field */}
               <div className="mb-5">
-                <label className="block text-sm font-semibold text-[#1C1A18] mb-2">Email Address</label>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">Email Address</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7A7570]" size={20} />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                   <input
                     type="email"
-                    className={`w-full pl-11 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C04E24]/20 transition-all ${
-                      errors.email ? 'border-red-400 bg-red-50' : 'border-[#E0DAD1] bg-white focus:border-[#C04E24]'
+                    className={`w-full pl-11 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-600/20 transition-all ${
+                      errors.email ? 'border-red-400 bg-red-50' : 'border-slate-300 bg-white focus:border-purple-600'
                     }`}
                     value={email}
                     placeholder='Enter your email'
@@ -210,13 +210,13 @@ const handleForgetPassword = async () => {
 
               {/* Password Field */}
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-[#1C1A18] mb-2">Password</label>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7A7570]" size={20} />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    className={`w-full pl-11 pr-12 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C04E24]/20 transition-all ${
-                      errors.password ? 'border-rose-400 bg-rose-50' : 'border-[#E0DAD1] bg-white focus:border-[#C04E24]'
+                    className={`w-full pl-11 pr-12 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-600/20 transition-all ${
+                      errors.password ? 'border-rose-400 bg-rose-50' : 'border-slate-300 bg-white focus:border-purple-600'
                     }`}
                     value={password}
                     placeholder='Enter your password'
@@ -228,7 +228,7 @@ const handleForgetPassword = async () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7A7570] hover:text-[#C04E24] transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 transition-colors"
                   >
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
@@ -239,7 +239,7 @@ const handleForgetPassword = async () => {
               {/* Login Button */}
               <button
                 type="submit"
-                className="w-full bg-[#C04E24] hover:bg-[#A43D1A] text-white py-3.5 px-4 rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white py-3.5 px-4 rounded-xl font-bold shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
               >
                 Sign In to Enterprise Fleet
               </button>
@@ -259,7 +259,7 @@ const handleForgetPassword = async () => {
                     setErrors({});
                     setShowForgetModal(true);
                   }}
-                  className="text-sm text-[#C04E24] hover:text-[#A43D1A] font-semibold hover:underline transition-colors"
+                  className="text-sm text-purple-600 hover:text-purple-700 font-semibold hover:underline transition-colors"
                 >
                   Forgot your password?
                 </button>
@@ -268,7 +268,7 @@ const handleForgetPassword = async () => {
           </div>
 
           {/* Footer text */}
-          <p className="text-center text-sm text-[#7A7570] mt-6">
+          <p className="text-center text-sm text-slate-500 mt-6">
             Protected by FleetFlow industry-standard encryption
           </p>
         </div>
@@ -277,11 +277,11 @@ const handleForgetPassword = async () => {
       {/* Forget Password Modal */}
    {showForgetModal && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-    <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-[#E0DAD1] animate-in fade-in zoom-in duration-200">
+    <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
       {/* Modal Header */}
-      <div className="bg-[#1C1A18] border-b-4 border-[#C04E24] px-6 py-6">
+      <div className="bg-[#0B0B0F] border-b-4 border-purple-600 px-6 py-6">
         <h3 className="text-xl font-bold text-white">Reset Your Password</h3>
-        <p className="text-[#EDE9E3] text-xs mt-1">Follow the steps to reset your password securely</p>
+        <p className="text-slate-300 text-xs mt-1">Follow the steps to reset your password securely</p>
       </div>
 
       <div className="p-6">
@@ -299,14 +299,14 @@ const handleForgetPassword = async () => {
         {/* Step 1: Enter Email */}
         {step === 1 && (
           <>
-            <label className="block text-sm font-semibold text-[#1C1A18] mb-2">Email Address</label>
+            <label className="block text-sm font-semibold text-slate-800 mb-2">Email Address</label>
             <div className="relative mb-6">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7A7570]" size={18} />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border-2 border-[#E0DAD1] rounded-lg focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20"
+                className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-300 rounded-lg focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
                 placeholder="your@email.com"
               />
             </div>
@@ -314,7 +314,7 @@ const handleForgetPassword = async () => {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowForgetModal(false)}
-                className="flex-1 px-4 py-2.5 bg-[#EDE9E3] text-[#1C1A18] rounded-lg hover:bg-[#E0DAD1] font-medium transition-colors"
+                className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-medium transition-colors"
               >
                 Cancel
               </button>
@@ -323,8 +323,8 @@ const handleForgetPassword = async () => {
                 disabled={!email}
                 className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
                   !email
-                    ? 'bg-[#EDE9E3] text-[#7A7570] cursor-not-allowed'
-                    : 'bg-[#C04E24] hover:bg-[#A43D1A] text-white shadow hover:shadow-md'
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white shadow hover:shadow-md'
                 }`}
               >
                 Send OTP
@@ -336,19 +336,19 @@ const handleForgetPassword = async () => {
         {/* Step 2: Verify OTP */}
         {step === 2 && (
           <>
-            <label className="block text-sm font-semibold text-[#1C1A18] mb-2">Enter OTP</label>
+            <label className="block text-sm font-semibold text-slate-800 mb-2">Enter OTP</label>
             <input
               type="text"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
-              className="w-full mb-6 pl-3 pr-4 py-2.5 border-2 border-[#E0DAD1] rounded-lg focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20"
+              className="w-full mb-6 pl-3 pr-4 py-2.5 border-2 border-slate-300 rounded-lg focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
               placeholder="Enter 6-digit OTP"
             />
 
             <div className="flex gap-3">
               <button
                 onClick={() => setStep(1)}
-                className="flex-1 px-4 py-2.5 bg-[#EDE9E3] text-[#1C1A18] rounded-lg hover:bg-[#E0DAD1] font-medium transition-colors"
+                className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-medium transition-colors"
               >
                 Back
               </button>
@@ -357,8 +357,8 @@ const handleForgetPassword = async () => {
                 disabled={!otp}
                 className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
                   !otp
-                    ? 'bg-[#EDE9E3] text-[#7A7570] cursor-not-allowed'
-                    : 'bg-[#C04E24] hover:bg-[#A43D1A] text-white shadow hover:shadow-md'
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white shadow hover:shadow-md'
                 }`}
               >
                 Verify OTP
@@ -370,20 +370,20 @@ const handleForgetPassword = async () => {
         {/* Step 3: New Password */}
         {step === 3 && (
           <>
-            <label className="block text-sm font-semibold text-[#1C1A18] mb-2">New Password</label>
+            <label className="block text-sm font-semibold text-slate-800 mb-2">New Password</label>
             <div className="relative mb-6">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7A7570]" size={18} />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full pl-10 pr-12 py-2.5 border-2 border-[#E0DAD1] rounded-lg focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20"
+                className="w-full pl-10 pr-12 py-2.5 border-2 border-slate-300 rounded-lg focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
                 placeholder="Enter new password"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7A7570] hover:text-[#C04E24]"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -392,7 +392,7 @@ const handleForgetPassword = async () => {
             <div className="flex gap-3">
               <button
                 onClick={() => setStep(2)}
-                className="flex-1 px-4 py-2.5 bg-[#EDE9E3] text-[#1C1A18] rounded-lg hover:bg-[#E0DAD1] font-medium transition-colors"
+                className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-medium transition-colors"
               >
                 Back
               </button>
@@ -401,8 +401,8 @@ const handleForgetPassword = async () => {
                 disabled={!newPassword}
                 className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all ${
                   !newPassword
-                    ? 'bg-[#EDE9E3] text-[#7A7570] cursor-not-allowed'
-                    : 'bg-[#C04E24] hover:bg-[#A43D1A] text-white shadow hover:shadow-md'
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white shadow hover:shadow-md'
                 }`}
               >
                 Update Password

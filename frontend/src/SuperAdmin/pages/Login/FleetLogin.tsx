@@ -198,29 +198,29 @@ export default function FleetLogin() {
   const fullAddress = [fleet.registeredAddress, fleet.city, fleet.state, fleet.pinCode].filter(Boolean).join(', ');
 
   return (
-    <div className="min-h-screen bg-[#FAF8F5] flex flex-col justify-between p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-[#F8F8FC] flex flex-col justify-between p-4 sm:p-6 lg:p-8">
       {/* Top Header with Back Link & attribution */}
       <header className="max-w-5xl mx-auto w-full flex items-center justify-between pb-4">
         <Link
           to="/"
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#5C5752] hover:text-[#C04E24] transition"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-purple-600 transition"
         >
           <ArrowLeft size={14} /> FleetFlow Platform
         </Link>
-        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#E0DAD1]/40 text-[#5C5752] border border-[#E0DAD1] uppercase tracking-wider">
+        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 uppercase tracking-wider">
           Dedicated Fleet Portal
         </span>
       </header>
 
       {/* Main Login Card */}
       <main className="max-w-md mx-auto w-full my-auto">
-        <div className="bg-white rounded-3xl border border-[#E0DAD1] shadow-2xl p-7 sm:p-9 relative overflow-hidden">
-          {/* Subtle Top Color Bar customized by Fleet */}
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl p-7 sm:p-9 relative overflow-hidden">
+          {/* Subtle Top Color Bar */}
           <div
-            className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#C04E24] to-[#DE8A66]"
+            className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-indigo-600 to-purple-700"
             style={{
               background: fleet.primaryColor
-                ? `linear-gradient(90deg, ${fleet.primaryColor}, ${fleet.secondaryColor || '#C04E24'})`
+                ? `linear-gradient(90deg, ${fleet.primaryColor}, ${fleet.secondaryColor || '#7c3aed'})`
                 : undefined,
             }}
           />
@@ -242,16 +242,16 @@ export default function FleetLogin() {
               </div>
             )}
 
-            <h1 className="text-xl sm:text-2xl font-extrabold text-[#1C1A18] tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
               {fleet.displayName || fleet.name}
             </h1>
-            <p className="text-xs font-semibold text-[#843217] mt-0.5">
+            <p className="text-xs font-semibold text-purple-700 mt-0.5">
               {fleet.portalTitle || `${fleet.displayName || fleet.name} Dispatch Portal`}
             </p>
 
             {fullAddress && (
-              <div className="flex items-center justify-center gap-1 text-[11px] text-[#7A7570] mt-2 px-3 py-1 bg-[#FAF8F5] rounded-full border border-[#E0DAD1]/60 max-w-sm mx-auto truncate">
-                <MapPin size={11} className="text-[#C04E24] flex-shrink-0" />
+              <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 mt-2 px-3 py-1 bg-slate-50 rounded-full border border-slate-200 max-w-sm mx-auto truncate">
+                <MapPin size={11} className="text-purple-600 flex-shrink-0" />
                 <span className="truncate">{fullAddress}</span>
               </div>
             )}
@@ -268,11 +268,11 @@ export default function FleetLogin() {
           {/* Login Form */}
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1.5">
+              <label className="block text-xs font-bold uppercase text-slate-700 mb-1.5">
                 Account Email / Username
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#7A7570]">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <Mail size={16} />
                 </div>
                 <input
@@ -286,7 +286,7 @@ export default function FleetLogin() {
                   className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm outline-none transition ${
                     fieldErrors.email
                       ? 'border-red-400 focus:ring-2 focus:ring-red-200 bg-red-50/20'
-                      : 'border-[#E0DAD1] focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] bg-white'
+                      : 'border-slate-300 focus:ring-2 focus:ring-purple-600/20 focus:border-purple-600 bg-white'
                   }`}
                   disabled={submitting}
                 />
@@ -298,18 +298,18 @@ export default function FleetLogin() {
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold uppercase text-[#1C1A18]">
+                <label className="block text-xs font-bold uppercase text-slate-700">
                   Password
                 </label>
                 <Link
                   to="/forgetpasword"
-                  className="text-xs font-bold text-[#C04E24] hover:text-[#A43D1A] transition"
+                  className="text-xs font-bold text-purple-600 hover:text-purple-700 transition"
                 >
                   Forgot Password?
                 </Link>
               </div>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#7A7570]">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <Lock size={16} />
                 </div>
                 <input
@@ -323,14 +323,14 @@ export default function FleetLogin() {
                   className={`w-full pl-10 pr-10 py-2.5 rounded-xl border text-sm outline-none transition ${
                     fieldErrors.password
                       ? 'border-red-400 focus:ring-2 focus:ring-red-200 bg-red-50/20'
-                      : 'border-[#E0DAD1] focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] bg-white'
+                      : 'border-slate-300 focus:ring-2 focus:ring-purple-600/20 focus:border-purple-600 bg-white'
                   }`}
                   disabled={submitting}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#7A7570] hover:text-[#1C1A18] transition"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-700 transition"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -343,9 +343,11 @@ export default function FleetLogin() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full mt-2 py-3 px-4 rounded-xl text-white font-bold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full mt-2 py-3 px-4 rounded-xl text-white font-bold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800"
               style={{
-                backgroundColor: fleet.primaryColor || '#C04E24',
+                background: fleet.primaryColor
+                  ? `linear-gradient(90deg, ${fleet.primaryColor}, ${fleet.secondaryColor || '#7c3aed'})`
+                  : undefined,
               }}
             >
               {submitting ? (
@@ -363,7 +365,7 @@ export default function FleetLogin() {
           </form>
 
           {/* Fleet Security Note */}
-          <div className="mt-6 pt-5 border-t border-[#E0DAD1] text-center text-xs text-[#7A7570]">
+          <div className="mt-6 pt-5 border-t border-slate-200 text-center text-xs text-slate-500">
             <p>
               Authorized personnel only. Sessions are encrypted and tenant-isolated.
             </p>
@@ -372,13 +374,13 @@ export default function FleetLogin() {
       </main>
 
       {/* Secondary FleetFlow Platform Attribution */}
-      <footer className="text-center py-4 text-xs text-[#7A7570] max-w-4xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-[#E0DAD1]/60">
+      <footer className="text-center py-4 text-xs text-slate-500 max-w-4xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-slate-200">
         <div className="flex items-center gap-2">
-          <span className="font-extrabold text-[#1C1A18] tracking-tight">FleetFlow</span>
+          <span className="font-extrabold text-slate-900 tracking-tight">FleetFlow</span>
           <span>&bull;</span>
           <span>Approved Mobility Platform</span>
         </div>
-        <div className="text-[11px] text-[#7A7570]">
+        <div className="text-[11px] text-slate-500">
           Powered by FleetFlow &bull; All Rights Reserved
         </div>
       </footer>

@@ -54,6 +54,7 @@ import EditEmail from './SuperAdmin/pages/Configuration/EditEmail';
 import EditMainTemplate from './SuperAdmin/pages/Configuration/EditMainTemplate';
 import SmsConfiguration from './SuperAdmin/pages/Configuration/SmsConfiguration';
 import EditSms from './SuperAdmin/pages/Configuration/EditSms';
+import SmsIntegrationSettings from './SuperAdmin/pages/Configuration/SmsIntegrationSettings';
 
 // Payment Mode
 import AddPaymentMode from './SuperAdmin/pages/PaymentMode/AddPaymentMode';
@@ -268,6 +269,9 @@ const Layout = () => {
           <Route path="/configuration/sms" element={<SmsConfiguration />} />
           <Route path="/sms/configurations" element={<SmsConfiguration />} />
           <Route path="/sms/configurations/edit/:id" element={<EditSms />} />
+          <Route path="/configuration/sms-integration" element={<SmsIntegrationSettings />} />
+          <Route path="/settings/sms" element={<SmsIntegrationSettings />} />
+          <Route path="/sms/integration" element={<SmsIntegrationSettings />} />
           {/* Payment Mode Routes */}
           <Route path="/paymentmode/add" element={<AddPaymentMode />} />
           <Route path="/paymentmode/list" element={<ListPaymentMode />} />

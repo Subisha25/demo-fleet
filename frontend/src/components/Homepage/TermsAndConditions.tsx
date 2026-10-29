@@ -15,7 +15,7 @@ const TermsAndConditions: React.FC = () => {
         <nav className="text-sm text-[#7A7570] mb-3">
           <Link
             to="/"
-            className="text-[#C04E24] font-medium hover:text-[#A83F1A] transition-colors duration-200"
+            className="text-[#5B3DF5] font-medium hover:text-[#4326C6] transition-colors duration-200"
           >
             Home
           </Link>{' '}
@@ -49,7 +49,7 @@ const TermsAndConditions: React.FC = () => {
 
         {/* Definitions Section */}
         <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="text-2xl font-bold text-teal-600 mb-4">Definitions</h3>
+          <h3 className="text-2xl font-bold text-[#5B3DF5] mb-4">Definitions</h3>
           <p className="text-gray-700 mb-4">
             In this document, the following definitions are to be used and so interpreted, except for when the context implies other meanings:
           </p>
@@ -72,7 +72,7 @@ const TermsAndConditions: React.FC = () => {
 
         {/* Responsibilities Section */}
         <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="text-2xl font-bold text-teal-600 mb-4">Responsibilities</h3>
+          <h3 className="text-2xl font-bold text-[#5B3DF5] mb-4">Responsibilities</h3>
           <div className="space-y-4 text-gray-700">
             <p>
               The Hirer is responsible and will be held accountable for the proper behavior of all the passengers in his Party. The Hirer is responsible and will be held accountable for any damages caused to either the inside or the outside of the Car by the Client or a member of the Party, regardless of how these were caused, as long as the aforementioned damages aren't the result of the normal operating of the vehicle.
@@ -94,7 +94,7 @@ const TermsAndConditions: React.FC = () => {
 
         {/* General Conduct Section */}
         <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="text-2xl font-bold text-teal-600 mb-4">General Conduct</h3>
+          <h3 className="text-2xl font-bold text-[#5B3DF5] mb-4">General Conduct</h3>
           <div className="space-y-4 text-gray-700">
             <p>
               Consumption of food is not allowed inside the Vehicle, unless specific agreements have been made prior to the Booking and consigned in writing.
@@ -110,7 +110,7 @@ const TermsAndConditions: React.FC = () => {
 
         {/* Safety Requirements Section */}
         <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="text-2xl font-bold text-teal-600 mb-4">Safety Requirements</h3>
+          <h3 className="text-2xl font-bold text-[#5B3DF5] mb-4">Safety Requirements</h3>
           <div className="space-y-4 text-gray-700">
             <p>
               The Company has a strict no-smoking policy inside all Vehicles. Failure to comply with this requirement may lead to the immediate cancellation of the Contract, without a refund.
@@ -135,7 +135,7 @@ const TermsAndConditions: React.FC = () => {
 
         {/* Limitation of Liability Section */}
         <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="text-2xl font-bold text-teal-600 mb-4">Limitation of Liability</h3>
+          <h3 className="text-2xl font-bold text-[#5B3DF5] mb-4">Limitation of Liability</h3>
           <div className="space-y-4 text-gray-700">
             <p>
               The Hirer agrees not to hold the Company accountable for any losses directly or indirectly correlated with failure to meet the Hirer's deadlines.
@@ -158,7 +158,7 @@ const TermsAndConditions: React.FC = () => {
 
 {/* App Usage & Responsibilities Section */}
 <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
-  <h3 className="text-2xl font-bold text-teal-600 mb-4">App Usage & Responsibilities</h3>
+  <h3 className="text-2xl font-bold text-[#5B3DF5] mb-4">App Usage & Responsibilities</h3>
   <div className="space-y-4 text-gray-700">
     <p>
       In addition to the above terms, the Company provides a mobile application("cab booking app") through which Users, Vendors, and Drivers may manage their respective activities. Users who log in through the App can create bookings or orders directly. These bookings will appear in the User’s account, and Users can also view the status of their bookings at any time.
@@ -183,7 +183,7 @@ const TermsAndConditions: React.FC = () => {
 </section>
         {/* Final Considerations Section */}
         <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="text-2xl font-bold text-teal-600 mb-4">Final Considerations</h3>
+          <h3 className="text-2xl font-bold text-[#5B3DF5] mb-4">Final Considerations</h3>
           <div className="space-y-4 text-gray-700">
             <p>
               Should, at any point, be any of these terms and conditions be rendered invalid then this agreement will by no means be considered invalid. All other terms and conditions in this document shall remain in force.

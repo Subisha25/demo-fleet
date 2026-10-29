@@ -42,6 +42,8 @@ import { SubscriptionInvoice } from './subscriptionInvoice';
 import { NotificationLog } from './notificationLog';
 import { SaaSPlan } from './saasPlan';
 import { SmsTemplate } from './smsTemplate';
+import { TenantSmsConfig } from './tenantSmsConfig';
+import { encryptSmsApiKey, maskApiKey } from '../utils/cryptoUtils';
 
 const connectDB = async () => {
   try {
@@ -56,7 +58,8 @@ const connectDB = async () => {
     await TenantActivationToken.sync();
     await SubscriptionInvoice.sync();
     await NotificationLog.sync();
-    await SaaSPlan.sync({ alter: true });
+    try { await SaaSPlan.sync(); } catch (pErr) {}
+    try { await TenantSmsConfig.sync(); } catch (smsErr) {}
 
     // Seed canonical SaaS plans if saas_plans is empty
     try {
@@ -217,6 +220,25 @@ const connectDB = async () => {
         });
         console.log('Default root tenant (Grace Cabs) verified.');
       }
+
+      // Ensure root tenant SMS configuration exists with approved credentials
+      const rootSmsConfig = await TenantSmsConfig.findOne({ where: { tenantId: rootId } });
+      if (!rootSmsConfig) {
+        const rootKey = (process.env.TWO_FACTOR_API_KEY || process.env.TWOFACTOR_API_KEY || '').trim();
+        const rootSender = (process.env.TWO_FACTOR_SENDER_ID || process.env.TWOFACTOR_SENDER_ID || 'GRCCAB').trim();
+        await TenantSmsConfig.create({
+          tenantId: rootId,
+          provider: '2FACTOR',
+          encryptedApiKey: rootKey ? encryptSmsApiKey(rootKey) : null,
+          apiKeyMasked: rootKey ? maskApiKey(rootKey) : null,
+          senderId: rootSender || 'GRCCAB',
+          otpRoute: 'OTP1',
+          status: rootKey ? 'ACTIVE' : 'UNCONFIGURED',
+          isVerified: !!rootKey,
+          isEnabled: true,
+        });
+        console.log('Default root tenant SMS configuration verified.');
+      }
     } catch (seedErr) {
       console.warn('Root tenant initialization notice:', seedErr);
     }
@@ -231,5 +253,7 @@ export { sequelize, connectDB, Employee, Company, Drivers,Vehicle,Vendor,User, B
   VehicleType, Tax, Pickuparea, Pickupcity, VehicleMaster,OTP,PaymentMode,Payment,orderSummery,Package,PackageData,Configuration,
   ClosePending, BookingSequence, PaymentSequence, InvoiceSequence, ShortLink, MonthlyBookingSequence, MapCount, OnCallInvoice,
   OnCallInvoiceItems, MonthlyInvoice, MonthlyInvoiceItems, Tenant, TenantSubscription, TenantUsageMeter, CompanyPolicy,
-  TenantRegistrationRequest, TenantActivationToken, TenantInitialAllowance, SubscriptionInvoice, NotificationLog, SaaSPlan, SmsTemplate
+  TenantRegistrationRequest, TenantActivationToken, TenantInitialAllowance, SubscriptionInvoice, NotificationLog, SaaSPlan, SmsTemplate,
+  TenantSmsConfig
 };
+

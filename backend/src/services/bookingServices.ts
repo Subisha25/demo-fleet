@@ -31,7 +31,7 @@ import { UniqueConstraintError } from "sequelize";
 import fs from 'fs';
 import { assertTenantOwnership, withTenant, isTenantError } from '../utils/tenantGuard';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
-import { dispatchAuditedSms } from './smsServices';
+import { dispatchAuditedSms, sanitizeDltLocationString } from './smsServices';
 import { getFleetDocumentBranding } from './fleetBrandingService';
 
 const logoPath = path.join(__dirname, "..", "images", "logo.png");
@@ -736,8 +736,8 @@ export const cancelBooking = async (req: any, res: Response) => {
           vars: [
             user.username || '',
             booking.bookingCode || '',
-            booking.pickupArea || '',
-            booking.dropPoint || '',
+            sanitizeDltLocationString(booking.pickupArea || ''),
+            sanitizeDltLocationString(booking.dropPoint || ''),
           ],
           message: `Grace Cabs: Your booking ${booking.bookingCode || ''} has been cancelled. Pickup: ${booking.pickupArea || ''}, Drop: ${booking.dropPoint || ''}.`,
           referenceEntity: 'BOOKING',

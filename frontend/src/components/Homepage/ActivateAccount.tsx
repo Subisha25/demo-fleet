@@ -103,10 +103,10 @@ export default function ActivateAccount() {
   return (
     <PublicLayout>
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6 my-8">
-        <div className="bg-white rounded-3xl shadow-xl border border-[#E0DAD1] max-w-lg w-full overflow-hidden">
+        <div className="bg-white rounded-3xl shadow-xl border border-[#E5E7EB] max-w-lg w-full overflow-hidden">
           {/* Header Banner */}
-          <div className="bg-[#1C1A18] border-b-4 border-[#C04E24] text-white p-6 sm:p-8 text-center">
-            <div className="w-16 h-16 bg-[#C04E24]/20 border border-[#C04E24]/40 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="bg-[#17171D] border-b-4 border-[#5B3DF5] text-white p-6 sm:p-8 text-center">
+            <div className="w-16 h-16 bg-[#5B3DF5]/20 border border-[#5B3DF5]/40 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-[#DE8A66]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
@@ -117,7 +117,7 @@ export default function ActivateAccount() {
               </svg>
             </div>
             <h1 className="text-2xl font-extrabold tracking-tight">Activate Operator Account</h1>
-            <p className="text-xs sm:text-sm text-[#EDE9E3] mt-1">
+            <p className="text-xs sm:text-sm text-[#E2E8F0] mt-1">
               Secure single-use onboarding for verified FleetFlow fleet operators.
             </p>
           </div>
@@ -126,7 +126,7 @@ export default function ActivateAccount() {
             {/* Loading / Verifying State */}
             {verifying && (
               <div className="text-center py-12">
-                <div className="w-12 h-12 border-4 border-[#C04E24] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <div className="w-12 h-12 border-4 border-[#5B3DF5] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                 <p className="text-[#5C5752] font-medium text-sm">Verifying cryptographic activation token...</p>
               </div>
             )}
@@ -139,20 +139,20 @@ export default function ActivateAccount() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-bold text-[#1C1A18] mb-2">Activation Link Invalid</h3>
+                <h3 className="text-lg font-bold text-[#17171D] mb-2">Activation Link Invalid</h3>
                 <p className="text-sm text-[#5C5752] mb-6 bg-rose-50 p-4 rounded-xl border border-rose-200 text-left">
                   {verificationError}
                 </p>
                 <div className="flex flex-col gap-3">
                   <button
                     onClick={() => navigate("/register-fleet")}
-                    className="w-full py-3 bg-[#C04E24] hover:bg-[#A43D1A] text-white rounded-xl text-sm font-bold shadow-sm transition-colors"
+                    className="w-full py-3 bg-[#5B3DF5] hover:bg-[#4326C6] text-white rounded-xl text-sm font-bold shadow-sm transition-colors"
                   >
                     Submit New Registration
                   </button>
                   <button
                     onClick={() => navigate("/")}
-                    className="w-full py-2.5 text-[#5C5752] text-sm font-medium hover:text-[#1C1A18]"
+                    className="w-full py-2.5 text-[#5C5752] text-sm font-medium hover:text-[#17171D]"
                   >
                     Return to Homepage
                   </button>
@@ -168,18 +168,18 @@ export default function ActivateAccount() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <h3 className="text-2xl font-bold text-[#1C1A18] mb-2">Account Ready!</h3>
+                <h3 className="text-2xl font-bold text-[#17171D] mb-2">Account Ready!</h3>
                 <p className="text-sm text-[#5C5752] mb-6">
                   Your administrator password has been set securely. Your tenant workspace is provisioned and ready for your first operational dispatch.
                 </p>
-                <div className="bg-[#FAF8F5] p-4 rounded-xl border border-[#E0DAD1] text-left text-xs text-[#1C1A18] space-y-1 mb-6">
+                <div className="bg-[#F7F7FB] p-4 rounded-xl border border-[#E5E7EB] text-left text-xs text-[#17171D] space-y-1 mb-6">
                   <div><strong>Fleet Name:</strong> {tenantInfo?.fleetName}</div>
                   <div><strong>Business Code:</strong> {tenantInfo?.businessCode}</div>
                   <div><strong>Login Email:</strong> {tenantInfo?.email}</div>
                 </div>
                 <button
                   onClick={() => navigate("/login")}
-                  className="w-full py-3.5 bg-[#C04E24] hover:bg-[#A43D1A] text-white rounded-xl text-sm font-bold shadow-lg transition-all"
+                  className="w-full py-3.5 bg-[#5B3DF5] hover:bg-[#4326C6] text-white rounded-xl text-sm font-bold shadow-lg transition-all"
                 >
                   Proceed to Operator Login
                 </button>
@@ -190,22 +190,22 @@ export default function ActivateAccount() {
             {!verifying && !verificationError && !activationSuccess && tenantInfo && (
               <form onSubmit={handleSubmit} className="space-y-5">
                 {/* Operator Profile Preview */}
-                <div className="bg-[#FAF8F5] p-4 rounded-2xl border border-[#E0DAD1]">
+                <div className="bg-[#F7F7FB] p-4 rounded-2xl border border-[#E5E7EB]">
                   <div className="text-xs font-bold text-[#7A7570] uppercase tracking-wider mb-2">
                     Verified Fleet Application
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <span className="text-[#5C5752]">Fleet Name:</span>
-                      <p className="font-semibold text-[#1C1A18]">{tenantInfo.fleetName}</p>
+                      <p className="font-semibold text-[#17171D]">{tenantInfo.fleetName}</p>
                     </div>
                     <div>
                       <span className="text-[#5C5752]">Business Code:</span>
-                      <p className="font-mono font-bold text-[#C04E24]">{tenantInfo.businessCode}</p>
+                      <p className="font-mono font-bold text-[#5B3DF5]">{tenantInfo.businessCode}</p>
                     </div>
                     <div>
                       <span className="text-[#5C5752]">Administrator:</span>
-                      <p className="font-semibold text-[#1C1A18]">{tenantInfo.adminName}</p>
+                      <p className="font-semibold text-[#17171D]">{tenantInfo.adminName}</p>
                     </div>
                     <div>
                       <span className="text-[#5C5752]">Selected Plan:</span>
@@ -221,7 +221,7 @@ export default function ActivateAccount() {
                 )}
 
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-1.5">
                     Registered Administrator Email *
                   </label>
                   <input
@@ -230,12 +230,12 @@ export default function ActivateAccount() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter registered applicant email"
-                    className="w-full px-4 py-3 rounded-xl border border-[#E0DAD1] focus:outline-none focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] text-sm bg-white"
+                    className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] focus:outline-none focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] text-sm bg-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-1.5">
                     Create Master Password *
                   </label>
                   <input
@@ -244,12 +244,12 @@ export default function ActivateAccount() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Minimum 8 characters"
-                    className="w-full px-4 py-3 rounded-xl border border-[#E0DAD1] focus:outline-none focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] text-sm bg-white"
+                    className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] focus:outline-none focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] text-sm bg-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-1.5">
                     Confirm Password *
                   </label>
                   <input
@@ -258,18 +258,18 @@ export default function ActivateAccount() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Re-enter your password"
-                    className="w-full px-4 py-3 rounded-xl border border-[#E0DAD1] focus:outline-none focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] text-sm bg-white"
+                    className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] focus:outline-none focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] text-sm bg-white"
                   />
                 </div>
 
-                <div className="text-[11px] text-[#5C5752] leading-relaxed bg-[#FAF8F5] p-3 rounded-lg border border-[#E0DAD1]">
-                  <span className="font-semibold text-[#C04E24]">Security Notice:</span> This single-use activation token expires in 24 hours. Your password will be salted and hashed with bcrypt.
+                <div className="text-[11px] text-[#5C5752] leading-relaxed bg-[#F7F7FB] p-3 rounded-lg border border-[#E5E7EB]">
+                  <span className="font-semibold text-[#5B3DF5]">Security Notice:</span> This single-use activation token expires in 24 hours. Your password will be salted and hashed with bcrypt.
                 </div>
 
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full py-3.5 bg-[#C04E24] hover:bg-[#A43D1A] text-white rounded-xl text-sm font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-3.5 bg-[#5B3DF5] hover:bg-[#4326C6] text-white rounded-xl text-sm font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {submitting ? (
                     <>

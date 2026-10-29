@@ -11,68 +11,48 @@ import { Op } from 'sequelize';
 import axios from 'axios';
 import { combineTableNames } from 'sequelize/lib/utils';
 import { ROOT_TENANT_ID } from '../context/tenantContext';
+import { send2FactorOTP as sendProviderOTP } from '../services/smsServices';
+import { NotificationLog } from '../models/notificationLog';
  
 const { ROLES } = USERS;
  
 // 2Factor API Configuration from environment variables
 const TWOFACTOR_API_KEY = config.twofactor?.apiKey || process.env.TWOFACTOR_API_KEY;
-const TWOFACTOR_TEMPLATE_NAME = config.twofactor?.templateName || process.env.TWOFACTOR_TEMPLATE_NAME;
+const TWOFACTOR_TEMPLATE_NAME = config.twofactor?.templateName || process.env.TWOFACTOR_TEMPLATE_NAME || 'OTP1';
  
-// Helper function to send OTP via 2Factor
+// Helper function to send OTP via 2Factor with auditing and mock safety
 const send2FactorOTP = async (mobile: string, otp: string) => {
+  const result = await sendProviderOTP(mobile, otp, TWOFACTOR_TEMPLATE_NAME);
+
+  // Write audit log to demodb.notification_logs
   try {
-    // Format mobile number (remove +91 if present, extract digits)
-    const cleanMobile = mobile.replace(/^\+91/, '').replace(/[^\d]/g, '');
-
-
-    // Mock Mode Check: respect NOTIFICATION_MOCK_MODE to prevent real SMS transmission
     const isMock = process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test';
-    if (isMock) {
-      console.log(`[AppLogin OTP: MOCK MODE] Mobile: ${cleanMobile} | OTP: ${otp} | Template: ${TWOFACTOR_TEMPLATE_NAME} | Status: MOCK (No external API call)`);
-      return {
-        success: true,
-        sessionId: `mock_session_${Date.now()}`,
-        message: '2Factor OTP sent successfully (MOCK)'
-      };
-    }
-
-    if (!TWOFACTOR_API_KEY) {
-      return {
-        success: false,
-        error: '2Factor API key not configured'
-      };
-    }
-   
-    // 2Factor API URL format:
-    // https://2factor.in/API/V1/{api_key}/SMS/{phone_number}/{otp}/{template_name}
-    const apiUrl = `https://2factor.in/API/V1/${TWOFACTOR_API_KEY}/SMS/${cleanMobile}/${otp}/${TWOFACTOR_TEMPLATE_NAME}`;
-   
-    const response = await axios.get(apiUrl, {
-      timeout: 10000 // 10 second timeout
+    await NotificationLog.create({
+      channel: 'SMS',
+      recipient: mobile,
+      templateCode: 'APP_LOGIN_OTP',
+      providerStatus: isMock ? 'MOCK' : result.providerStatus,
+      providerMessageId: result.providerMessageId || null,
+      errorDetails: result.error || null,
+      retryCount: 0,
+      maxRetries: 3,
+      metadata: { template: TWOFACTOR_TEMPLATE_NAME },
     });
- 
-    console.log('2Factor API Response:', response.data);
- 
-    // Check if the API call was successful
-    if (response.data.Status === 'Success') {
-      return {
-        success: true,
-        sessionId: response.data.Details,
-        message: '2Factor OTP sent successfully'
-      };
-    } else {
-      return {
-        success: false,
-        error: response.data.Details || 'Failed to send OTP'
-      };
-    }
-  } catch (error: any) {
-    console.error('2Factor SMS error:', error.response?.data || error.message);
+  } catch (logErr) {
+    console.warn('[AppLogin OTP] Failed to write notification log:', logErr);
+  }
+
+  if (result.success) {
     return {
-      success: false,
-      error: error.response?.data?.Details || error.message || 'Failed to send OTP'
+      success: true,
+      sessionId: result.providerMessageId,
+      message: '2Factor OTP sent successfully'
     };
   }
+  return {
+    success: false,
+    error: result.error || 'Failed to send OTP'
+  };
 };
  
 // Helper function to find user by mobile and return user data with type

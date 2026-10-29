@@ -1,26 +1,33 @@
 {
-  "short_name": "Grace Cabs",
-  "name": "Grace Cabs Private Limited",
-  "description": "Corporate Transportation, Car Rental, Fleet Management and Chauffeur Services.",
+  "short_name": "FleetFlow",
+  "name": "FleetFlow Mobility Cloud Platform",
+  "description": "Enterprise multi-tenant fleet operations, corporate cab billing, live driver dispatch, and digital trip sheet management.",
   "icons": [
     {
-      "src": "favicon1.jpeg",
-      "sizes": "64x64 32x32 24x24 16x16",
+      "src": "favicon.ico",
+      "sizes": "48x48 32x32 16x16",
       "type": "image/x-icon"
     },
     {
-      "src": "favicon1.jpeg",
-      "type": "image/png",
-      "sizes": "192x192"
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
     },
     {
-      "src": "favicon1.jpeg",
+      "src": "logo192.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#5B3DF5",
+  "background_color": "#0B0B0F"
 }

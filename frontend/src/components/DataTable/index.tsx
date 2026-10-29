@@ -132,7 +132,7 @@ export const DataTable = <T extends object>({
                 }
                 className="px-4 py-8 text-center text-slate-500 font-medium"
               >
-                <FontAwesomeIcon icon={faSpinner} spin className="mr-2 text-teal-600" />
+                <FontAwesomeIcon icon={faSpinner} spin className="mr-2 text-purple-600" />
                 Loading records...
               </td>
             </tr>
@@ -253,7 +253,7 @@ export const DataTable = <T extends object>({
                       {onInvoice && (invoiceVisible ? invoiceVisible(row) : true) && (
                         <button
                           onClick={() => onInvoice(row)}
-                          className="inline-flex items-center text-teal-700 hover:text-teal-900 bg-teal-50 hover:bg-teal-100 font-semibold px-2 py-1 rounded border border-teal-200 transition text-xs"
+                          className="inline-flex items-center text-[#5B3DF5] hover:text-[#4326C6] bg-[#5B3DF5]/10 hover:bg-[#5B3DF5]/20 font-semibold px-2 py-1 rounded border border-[#5B3DF5]/30 transition text-xs"
                         >
                           {invoiceIcon || <FontAwesomeIcon icon={faCopy} className="mr-1 text-xs" />}
                           {typeof invoiceLabel === "function" ? invoiceLabel(row) : invoiceLabel}
@@ -331,7 +331,7 @@ export const DataTable = <T extends object>({
                   onClick={() => setCurrentPage(page)}
                   className={`w-7 h-7 flex items-center justify-center rounded text-xs font-semibold transition ${
                     currentPage === page
-                      ? "text-white bg-teal-600 border border-teal-600 shadow-sm"
+                      ? "text-white bg-gradient-to-r from-indigo-600 to-purple-700 border border-indigo-600 shadow-sm"
                       : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
                   }`}
                 >

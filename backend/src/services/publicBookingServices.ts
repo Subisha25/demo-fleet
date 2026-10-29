@@ -80,6 +80,7 @@ export const sendPublicBookingOtp = async (req: Request, res: Response) => {
         recipient: cleanPhone,
         templateCode: 'PUBLIC_BOOKING_OTP',
         body: `Your FleetFlow ride verification code is ${rawOtp}. Valid for 5 minutes.`,
+        metadata: { otp: rawOtp },
       });
     } catch (smsErr) {
       console.warn('[PublicBooking OTP] SMS dispatch notice:', smsErr);

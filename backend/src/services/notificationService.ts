@@ -3,12 +3,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { Op } from 'sequelize';
 import { NotificationLog } from '../models/notificationLog';
 import { Employee } from '../models/employee';
-import { ROOT_TENANT_ID } from '../context/tenantContext';
+import { ROOT_TENANT_ID, getTenantContext } from '../context/tenantContext';
 import config from '../config/config';
 import {
   normalizePhoneNumberForSms,
   send2FactorTemplateSms,
   sendDirectSms,
+  send2FactorOTP,
 } from './smsServices';
 
 export type NotificationChannel = 'EMAIL' | 'SMS';
@@ -400,22 +401,37 @@ export async function sendNotification(options: SendNotificationOptions): Promis
           providerStatus = 'FAILED';
           errorDetails = phoneCheck.error || 'Invalid phone number format';
         } else {
-          if (smsTemplateName && smsVars && smsVars.length > 0) {
+          const resolvedTenantId = tenantId || getTenantContext()?.tenantId || undefined;
+          if (templateCode.includes('OTP')) {
+            const otpCode = metadata?.otp || body?.match(/\b\d{4,6}\b/)?.[0] || '123456';
+            const otpRes = await send2FactorOTP(phoneCheck.normalizedPhone, otpCode, 'OTP1', resolvedTenantId);
+            providerStatus = otpRes.providerStatus;
+            providerMessageId = otpRes.providerMessageId || null;
+            errorDetails = otpRes.error || null;
+          } else if (smsTemplateName && smsVars && smsVars.length > 0) {
             const smsRes = await send2FactorTemplateSms({
               to: phoneCheck.normalizedPhone,
               templateName: smsTemplateName,
               vars: smsVars,
+              tenantId: resolvedTenantId,
             });
             providerStatus = smsRes.providerStatus;
             providerMessageId = smsRes.providerMessageId || null;
             errorDetails = smsRes.error || null;
           } else {
-            const smsRes = await sendDirectSms(phoneCheck.normalizedPhone, body || `FleetFlow Alert: ${templateCode}`);
+            const smsRes = await sendDirectSms(
+              phoneCheck.normalizedPhone,
+              body || `FleetFlow Alert: ${templateCode}`,
+              smsTemplateName,
+              undefined,
+              resolvedTenantId
+            );
             providerStatus = smsRes.providerStatus;
             providerMessageId = smsRes.providerMessageId || null;
             errorDetails = smsRes.error || null;
           }
         }
+
       }
     } catch (err: any) {
       providerStatus = 'FAILED';

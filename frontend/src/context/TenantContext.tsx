@@ -59,9 +59,9 @@ const DEFAULT_ROOT_TENANT: TenantInfo = {
   planTier: 'ENTERPRISE',
   contactEmail: 'subisha2002.m@gmail.com',
   brandingTokens: {
-    primaryColor: '#0F766E',
-    secondaryColor: '#1C1A18',
-    portalTitle: 'FleetFlow Mobility SaaS',
+    primaryColor: '#5B3DF5',
+    secondaryColor: '#0B0B0F',
+    portalTitle: 'FleetFlow Mobility Platform',
   },
   subscription: {
     planTier: 'ENTERPRISE',
@@ -83,9 +83,9 @@ const ALL_FLEETS_TENANT: TenantInfo = {
   planTier: 'ENTERPRISE',
   contactEmail: 'subisha2002.m@gmail.com',
   brandingTokens: {
-    primaryColor: '#C04E24',
-    secondaryColor: '#1C1A18',
-    portalTitle: 'All Fleets Platform Dashboard',
+    primaryColor: '#5B3DF5',
+    secondaryColor: '#0B0B0F',
+    portalTitle: 'FleetFlow Global Platform',
   },
 };
 
@@ -110,11 +110,15 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [fleetChangeVersion, setFleetChangeVersion] = useState<number>(0);
 
   const applyBranding = (tenant: TenantInfo) => {
-    const primary = tenant.brandingTokens?.primaryColor || '#C04E24';
+    const primary = tenant.brandingTokens?.primaryColor || '#5B3DF5';
     const title = tenant.brandingTokens?.portalTitle || tenant.name;
     document.documentElement.style.setProperty('--primary-tenant-color', primary);
-    if (title) {
-      document.title = `${title} | Transport Portal`;
+    if (tenant.tenantId === 'all' || !tenant.tenantId || tenant.tenantId === 'e7b8a1c0-0000-0000-0000-000000000001') {
+      document.title = 'FleetFlow | Enterprise Cloud Mobility & Fleet Operations Platform';
+    } else if (title && title !== 'FleetFlow') {
+      document.title = `${title} — FleetFlow`;
+    } else {
+      document.title = 'FleetFlow | Enterprise Cloud Mobility & Fleet Operations Platform';
     }
   };
 

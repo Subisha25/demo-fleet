@@ -13,7 +13,7 @@ const CancelReservation: React.FC = () => {
         <nav className="text-sm text-gray-600 mb-3">
           <Link
             to="/"
-            className="text-[#C04E24] font-medium hover:text-[#A83F1A] transition-colors duration-200"
+            className="text-[#5B3DF5] font-medium hover:text-[#4326C6] transition-colors duration-200"
           >
             Home
           </Link>{' '}

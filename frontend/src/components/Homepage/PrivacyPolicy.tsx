@@ -17,7 +17,7 @@ const PrivacyPolicy: React.FC = () => {
         <nav className="text-sm text-[#7A7570] mb-3">
           <Link
             to="/"
-            className="text-[#C04E24] font-medium hover:text-[#A83F1A] transition-colors duration-200"
+            className="text-[#5B3DF5] font-medium hover:text-[#4326C6] transition-colors duration-200"
           >
             Home
           </Link>{' '}
@@ -49,7 +49,7 @@ const PrivacyPolicy: React.FC = () => {
 
         {/* Info Protection Section */}
         <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="text-2xl font-bold text-teal-600 mb-4">Information Protection</h3>
+          <h3 className="text-2xl font-bold text-[#5B3DF5] mb-4">Information Protection</h3>
           <div className="space-y-4 text-gray-700 leading-relaxed">
             <p>
               FleetFlow will not sell, trade, or disclose any information derived from the registration or use of
@@ -65,7 +65,7 @@ const PrivacyPolicy: React.FC = () => {
 
         {/* Security Measures Section */}
         <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="text-2xl font-bold text-teal-600 mb-4">Security Measures</h3>
+          <h3 className="text-2xl font-bold text-[#5B3DF5] mb-4">Security Measures</h3>
           <div className="space-y-4 text-gray-700 leading-relaxed">
             <p>
               FleetFlow will continue to enhance our security procedures as new technology becomes available.
@@ -82,7 +82,7 @@ const PrivacyPolicy: React.FC = () => {
         {/* ------------------------------------------------------------- */}
 
         <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="text-2xl font-bold text-teal-600 mb-4">
+          <h3 className="text-2xl font-bold text-[#5B3DF5] mb-4">
             <strong>FleetFlow Mobility Platform</strong> — Full Privacy Policy
           </h3>
 
@@ -101,7 +101,7 @@ const PrivacyPolicy: React.FC = () => {
             </p>
 
             {/* 1. INFORMATION WE COLLECT */}
-            <h4 className="text-xl font-semibold text-teal-700">1. Information We Collect</h4>
+            <h4 className="text-xl font-semibold text-[#5B3DF5]">1. Information We Collect</h4>
 
             <p className="font-semibold">A. Personal Information You Provide</p>
             <ul className="list-disc ml-6 space-y-2">
@@ -121,7 +121,7 @@ const PrivacyPolicy: React.FC = () => {
             </ul>
 
             {/* 2. HOW WE USE INFO */}
-            <h4 className="text-xl font-semibold text-teal-700">2. How We Use Your Information</h4>
+            <h4 className="text-xl font-semibold text-[#5B3DF5]">2. How We Use Your Information</h4>
 
             <ul className="list-disc ml-6 space-y-2">
               <li>To process bookings through the <strong>Cab Booking App</strong>, assign vendors/drivers, and track trips.</li>
@@ -133,7 +133,7 @@ const PrivacyPolicy: React.FC = () => {
             </ul>
 
             {/* 3. SHARING */}
-            <h4 className="text-xl font-semibold text-teal-700">3. Sharing of Information</h4>
+            <h4 className="text-xl font-semibold text-[#5B3DF5]">3. Sharing of Information</h4>
 
             <ul className="list-disc ml-6 space-y-2">
               <li><strong>With Vendors/Drivers:</strong> Name, phone number, pickup/drop details.</li>
@@ -143,7 +143,7 @@ const PrivacyPolicy: React.FC = () => {
             </ul>
 
             {/* 4. SECURITY */}
-            <h4 className="text-xl font-semibold text-teal-700">4. Information Protection & Security</h4>
+            <h4 className="text-xl font-semibold text-[#5B3DF5]">4. Information Protection & Security</h4>
 
             <ul className="list-disc ml-6 space-y-2">
               <li>We use appropriate security measures to protect your data.</li>
@@ -152,7 +152,7 @@ const PrivacyPolicy: React.FC = () => {
             </ul>
 
             {/* 5. CONTACT */}
-            <h4 className="text-xl font-semibold text-teal-700">5. Contact Us</h4>
+            <h4 className="text-xl font-semibold text-[#5B3DF5]">5. Contact Us</h4>
 
             <p>If you have concerns or questions:</p>
             <ul className="list-disc ml-6 space-y-2">

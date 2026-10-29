@@ -232,7 +232,7 @@ export default function FleetRegistration() {
       <div className="py-12 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full">
         {successData ? (
           /* SUCCESS SCREEN */
-          <div className="bg-white rounded-2xl shadow-xl border border-[#E0DAD1] p-8 md:p-12 text-center max-w-2xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-xl border border-[#E5E7EB] p-8 md:p-12 text-center max-w-2xl mx-auto">
             <div className="w-20 h-20 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
               <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
@@ -243,26 +243,26 @@ export default function FleetRegistration() {
               Application Under Review
             </span>
 
-            <h1 className="text-3xl font-extrabold text-[#1C1A18] tracking-tight mb-2">
+            <h1 className="text-3xl font-extrabold text-[#17171D] tracking-tight mb-2">
               Registration Received!
             </h1>
             <p className="text-[#5C5752] mb-6 text-sm md:text-base">
-              Thank you for registering <strong className="text-[#1C1A18]">{successData.fleetName}</strong> (Code: <span className="font-mono text-[#C04E24] font-bold">{successData.businessCode}</span>). Our compliance team is verifying your details.
+              Thank you for registering <strong className="text-[#17171D]">{successData.fleetName}</strong> (Code: <span className="font-mono text-[#5B3DF5] font-bold">{successData.businessCode}</span>). Our compliance team is verifying your details.
             </p>
 
-            <div className="bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl p-5 mb-8 text-left">
+            <div className="bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl p-5 mb-8 text-left">
               <div className="text-xs uppercase font-bold text-[#7A7570] tracking-wider mb-2">Application Summary</div>
-              <div className="flex justify-between py-1 text-sm border-b border-[#E0DAD1]">
+              <div className="flex justify-between py-1 text-sm border-b border-[#E5E7EB]">
                 <span className="text-[#5C5752]">Application Reference</span>
-                <span className="font-mono font-bold text-[#1C1A18] text-xs">{successData.requestId}</span>
+                <span className="font-mono font-bold text-[#17171D] text-xs">{successData.requestId}</span>
               </div>
-              <div className="flex justify-between py-1 text-sm border-b border-[#E0DAD1]">
+              <div className="flex justify-between py-1 text-sm border-b border-[#E5E7EB]">
                 <span className="text-[#5C5752]">Requested Plan</span>
-                <span className="font-semibold text-[#1C1A18]">{formData.requestedPlanTier} ({formData.billingCycle})</span>
+                <span className="font-semibold text-[#17171D]">{formData.requestedPlanTier} ({formData.billingCycle})</span>
               </div>
               <div className="flex justify-between py-1 text-sm">
                 <span className="text-[#5C5752]">Administrator Email</span>
-                <span className="font-semibold text-[#1C1A18]">{formData.contactEmail}</span>
+                <span className="font-semibold text-[#17171D]">{formData.contactEmail}</span>
               </div>
             </div>
 
@@ -278,13 +278,13 @@ export default function FleetRegistration() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={() => navigate('/')}
-                className="px-6 py-3 rounded-lg font-semibold text-sm bg-[#EDE9E3] hover:bg-[#E0DAD1] text-[#1C1A18] transition-colors"
+                className="px-6 py-3 rounded-lg font-semibold text-sm bg-[#E2E8F0] hover:bg-[#E5E7EB] text-[#17171D] transition-colors"
               >
                 Return to Home
               </button>
               <button
                 onClick={() => navigate('/login')}
-                className="px-6 py-3 rounded-lg font-semibold text-sm bg-[#C04E24] hover:bg-[#A43D1A] text-white shadow transition-colors"
+                className="px-6 py-3 rounded-lg font-semibold text-sm bg-[#5B3DF5] hover:bg-[#A43D1A] text-white shadow transition-colors"
               >
                 Operator Login Portal
               </button>
@@ -292,16 +292,16 @@ export default function FleetRegistration() {
           </div>
         ) : (
           /* REGISTRATION FORM */
-          <div className="bg-white rounded-2xl shadow-xl border border-[#E0DAD1] overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl border border-[#E5E7EB] overflow-hidden">
             {/* Header Banner */}
-            <div className="bg-[#1C1A18] border-b-4 border-[#C04E24] p-8 text-white text-center sm:text-left">
-              <span className="px-3 py-1 bg-[#C04E24]/20 text-[#DE8A66] border border-[#C04E24]/40 text-xs font-semibold rounded-full uppercase tracking-wider inline-block mb-3">
+            <div className="bg-[#17171D] border-b-4 border-[#5B3DF5] p-8 text-white text-center sm:text-left">
+              <span className="px-3 py-1 bg-[#5B3DF5]/20 text-[#DE8A66] border border-[#5B3DF5]/40 text-xs font-semibold rounded-full uppercase tracking-wider inline-block mb-3">
                 Fleet Self-Service Onboarding
               </span>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
                 Launch Your Transport Fleet on FleetFlow SaaS
               </h1>
-              <p className="mt-2 text-[#EDE9E3] text-sm sm:text-base max-w-2xl">
+              <p className="mt-2 text-[#E2E8F0] text-sm sm:text-base max-w-2xl">
                 Get full corporate billing, live vehicle tracking, dynamic route card consolidation, and enterprise compliance ready in minutes.
               </p>
             </div>
@@ -318,12 +318,12 @@ export default function FleetRegistration() {
 
               {/* Section 1: Business Identity */}
               <div>
-                <h2 className="text-base font-bold uppercase tracking-wider text-[#7A7570] mb-4 pb-2 border-b border-[#FAF8F5]">
+                <h2 className="text-base font-bold uppercase tracking-wider text-[#7A7570] mb-4 pb-2 border-b border-[#F7F7FB]">
                   1. Fleet & Organization Identity
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Fleet Display Name *
                     </label>
                     <input
@@ -333,12 +333,12 @@ export default function FleetRegistration() {
                       placeholder="e.g. Apex Express"
                       value={formData.fleetName}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Legal Registered Entity Name
                     </label>
                     <input
@@ -347,12 +347,12 @@ export default function FleetRegistration() {
                       placeholder="e.g. Apex Mobility Solutions Pvt. Ltd."
                       value={formData.legalName}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Short Business Code (2–8 Chars) *
                     </label>
                     <div className="relative">
@@ -364,7 +364,7 @@ export default function FleetRegistration() {
                         placeholder="e.g. APX, BLU"
                         value={formData.businessCode}
                         onChange={handleChange}
-                        className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.businessCode ? 'border-red-500' : 'border-[#E0DAD1]'} font-mono font-bold text-sm tracking-wider uppercase focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white`}
+                        className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.businessCode ? 'border-red-500' : 'border-[#E5E7EB]'} font-mono font-bold text-sm tracking-wider uppercase focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                       />
                       <span className="absolute right-3 top-2.5 text-xs text-[#7A7570] font-mono">
                         {formData.businessCode.length}/8
@@ -377,12 +377,12 @@ export default function FleetRegistration() {
 
               {/* Section 2: Fleet Legal Identity (For Invoices & PDFs) */}
               <div>
-                <h2 className="text-base font-bold uppercase tracking-wider text-[#7A7570] mb-4 pb-2 border-b border-[#FAF8F5]">
+                <h2 className="text-base font-bold uppercase tracking-wider text-[#7A7570] mb-4 pb-2 border-b border-[#F7F7FB]">
                   2. Tax & Legal Details (For Issued Invoices & Trip Sheets)
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Fleet GSTIN (15 Chars)
                     </label>
                     <input
@@ -392,13 +392,13 @@ export default function FleetRegistration() {
                       placeholder="e.g. 33AAACA1111A1Z1"
                       value={formData.gstin}
                       onChange={handleChange}
-                      className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.gstin ? 'border-red-500' : 'border-[#E0DAD1]'} font-mono uppercase text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white`}
+                      className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.gstin ? 'border-red-500' : 'border-[#E5E7EB]'} font-mono uppercase text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
                     {fieldErrors.gstin && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.gstin}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Fleet PAN Number (10 Chars)
                     </label>
                     <input
@@ -408,13 +408,13 @@ export default function FleetRegistration() {
                       placeholder="e.g. AAACA1111A"
                       value={formData.panNumber}
                       onChange={handleChange}
-                      className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.panNumber ? 'border-red-500' : 'border-[#E0DAD1]'} font-mono uppercase text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white`}
+                      className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.panNumber ? 'border-red-500' : 'border-[#E5E7EB]'} font-mono uppercase text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
                     {fieldErrors.panNumber && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.panNumber}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       SAC Code (Passenger Transport)
                     </label>
                     <input
@@ -424,14 +424,14 @@ export default function FleetRegistration() {
                       placeholder="996609"
                       value={formData.sacCode}
                       onChange={handleChange}
-                      className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.sacCode ? 'border-red-500' : 'border-[#E0DAD1]'} font-mono text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white`}
+                      className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.sacCode ? 'border-red-500' : 'border-[#E5E7EB]'} font-mono text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
                     {fieldErrors.sacCode && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.sacCode}</p>}
                   </div>
                 </div>
 
                 <div className="mt-4">
-                  <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                  <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                     Registered Office Address (Invoice Footer)
                   </label>
                   <textarea
@@ -440,29 +440,29 @@ export default function FleetRegistration() {
                     placeholder="e.g. 101 Corporate Towers, Anna Salai, Guindy, Chennai - 600032"
                     value={formData.registeredAddress}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
+                    className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
                   />
                 </div>
 
 
 
                 {/* Fleet Logo Upload */}
-                <div className="mt-4 p-4 bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl flex flex-col sm:flex-row items-center gap-4">
+                <div className="mt-4 p-4 bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl flex flex-col sm:flex-row items-center gap-4">
                   <div className="flex-1">
-                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Upload Fleet Logo (PNG, JPG, SVG, max 2MB)
                     </label>
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/webp,image/svg+xml"
                       onChange={handleLogoFile}
-                      className="text-xs text-[#5C5752] file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#C04E24]/10 file:text-[#C04E24] hover:file:bg-[#C04E24]/20 cursor-pointer"
+                      className="text-xs text-[#5C5752] file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#5B3DF5]/10 file:text-[#5B3DF5] hover:file:bg-[#5B3DF5]/20 cursor-pointer"
                     />
                     <p className="text-[10px] text-[#7A7570] mt-1">Logo will appear on your generated invoices, trip sheets, and portal header.</p>
                   </div>
                   {logoPreview && (
                     <div className="flex items-center gap-2">
-                      <img src={logoPreview} alt="Logo Preview" className="h-12 w-auto max-w-[120px] object-contain border border-[#E0DAD1] rounded p-1 bg-white" />
+                      <img src={logoPreview} alt="Logo Preview" className="h-12 w-auto max-w-[120px] object-contain border border-[#E5E7EB] rounded p-1 bg-white" />
                       <button
                         type="button"
                         onClick={handleRemoveLogo}
@@ -477,12 +477,12 @@ export default function FleetRegistration() {
 
               {/* Section 3: Primary Administrator */}
               <div>
-                <h2 className="text-base font-bold uppercase tracking-wider text-[#7A7570] mb-4 pb-2 border-b border-[#FAF8F5]">
+                <h2 className="text-base font-bold uppercase tracking-wider text-[#7A7570] mb-4 pb-2 border-b border-[#F7F7FB]">
                   3. Primary Administrator & Operations Contact
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Owner / Admin Full Name *
                     </label>
                     <input
@@ -492,12 +492,12 @@ export default function FleetRegistration() {
                       placeholder="e.g. Rajesh Kumar"
                       value={formData.ownerName}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Official Contact Email *
                     </label>
                     <input
@@ -507,12 +507,12 @@ export default function FleetRegistration() {
                       placeholder="admin@yourcompany.com"
                       value={formData.contactEmail}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Official Contact Phone *
                     </label>
                     <input
@@ -522,14 +522,14 @@ export default function FleetRegistration() {
                       placeholder="+91 98765 43210"
                       value={formData.contactPhone}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-4">
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Primary Operating City *
                     </label>
                     <input
@@ -539,12 +539,12 @@ export default function FleetRegistration() {
                       placeholder="e.g. Chennai"
                       value={formData.city}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Operating State *
                     </label>
                     <input
@@ -554,12 +554,12 @@ export default function FleetRegistration() {
                       placeholder="e.g. Tamil Nadu"
                       value={formData.state}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#1C1A18] mb-1">
+                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       PIN Code
                     </label>
                     <input
@@ -569,7 +569,7 @@ export default function FleetRegistration() {
                       placeholder="600032"
                       value={formData.pinCode}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E0DAD1] text-sm focus:ring-2 focus:ring-[#C04E24]/20 focus:border-[#C04E24] outline-none bg-white"
+                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
                     />
                   </div>
                 </div>
@@ -577,20 +577,20 @@ export default function FleetRegistration() {
 
               {/* Section 4: Subscription Plan Selection */}
               <div>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-2 border-b border-[#FAF8F5]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-2 border-b border-[#F7F7FB]">
                   <h2 className="text-base font-bold uppercase tracking-wider text-[#7A7570]">
                     4. Choose Your Mobility Plan
                   </h2>
 
                   {/* Billing Frequency Toggle */}
-                  <div className="inline-flex items-center p-1 bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl">
+                  <div className="inline-flex items-center p-1 bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl">
                     <button
                       type="button"
                       onClick={() => setFormData((prev) => ({ ...prev, billingCycle: 'MONTHLY' }))}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                         formData.billingCycle === 'MONTHLY'
-                          ? 'bg-[#1C1A18] text-white shadow-sm'
-                          : 'text-[#5C5752] hover:text-[#1C1A18]'
+                          ? 'bg-[#17171D] text-white shadow-sm'
+                          : 'text-[#5C5752] hover:text-[#17171D]'
                       }`}
                     >
                       Monthly
@@ -600,12 +600,12 @@ export default function FleetRegistration() {
                       onClick={() => setFormData((prev) => ({ ...prev, billingCycle: 'ANNUAL' }))}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
                         formData.billingCycle === 'ANNUAL'
-                          ? 'bg-[#1C1A18] text-white shadow-sm'
-                          : 'text-[#5C5752] hover:text-[#1C1A18]'
+                          ? 'bg-[#17171D] text-white shadow-sm'
+                          : 'text-[#5C5752] hover:text-[#17171D]'
                       }`}
                     >
                       <span>Annual</span>
-                      <span className="text-[10px] px-1.5 py-0.2 bg-[#C04E24] text-white rounded-full">Save ~15%</span>
+                      <span className="text-[10px] px-1.5 py-0.2 bg-[#5B3DF5] text-white rounded-full">Save ~15%</span>
                     </button>
                   </div>
                 </div>
@@ -628,43 +628,43 @@ export default function FleetRegistration() {
                         }
                         className={`cursor-pointer rounded-xl p-5 border-2 transition-all relative ${
                           isSelected
-                            ? 'border-[#C04E24] bg-[#FDF6F0] shadow-md ring-2 ring-[#F3D0BD]'
-                            : 'border-[#E0DAD1] hover:border-[#C04E24]/50 bg-white'
+                            ? 'border-[#5B3DF5] bg-[#FDF6F0] shadow-md ring-2 ring-[#F3D0BD]'
+                            : 'border-[#E5E7EB] hover:border-[#5B3DF5]/50 bg-white'
                         }`}
                       >
                         {tier === 'PRO' && (
-                          <span className="absolute -top-3 right-4 px-2.5 py-0.5 bg-[#C04E24] text-white text-[10px] font-bold uppercase rounded-full">
+                          <span className="absolute -top-3 right-4 px-2.5 py-0.5 bg-[#5B3DF5] text-white text-[10px] font-bold uppercase rounded-full">
                             Most Popular
                           </span>
                         )}
 
                         <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-bold text-[#1C1A18] text-base">{plan.name}</h3>
+                          <h3 className="font-bold text-[#17171D] text-base">{plan.name}</h3>
                           <input
                             type="radio"
                             name="planRadio"
                             checked={isSelected}
                             onChange={() => {}}
-                            className="accent-[#C04E24] w-4 h-4"
+                            className="accent-[#5B3DF5] w-4 h-4"
                           />
                         </div>
 
-                        <div className="text-2xl font-extrabold text-[#C04E24] mb-1">
+                        <div className="text-2xl font-extrabold text-[#5B3DF5] mb-1">
                           ₹{price.toLocaleString('en-IN')}
                           <span className="text-xs font-normal text-[#7A7570]">
                             /{formData.billingCycle === 'ANNUAL' ? 'year' : 'month'}
                           </span>
                         </div>
 
-                        <ul className="text-xs text-[#5C5752] space-y-1.5 mt-3 pt-3 border-t border-[#E0DAD1]">
+                        <ul className="text-xs text-[#5C5752] space-y-1.5 mt-3 pt-3 border-t border-[#E5E7EB]">
                           <li className="flex items-center gap-1.5">
-                            <span className="text-[#C04E24] font-bold">✓</span> {plan.vehicles}
+                            <span className="text-[#5B3DF5] font-bold">✓</span> {plan.vehicles}
                           </li>
                           <li className="flex items-center gap-1.5">
-                            <span className="text-[#C04E24] font-bold">✓</span> {plan.drivers}
+                            <span className="text-[#5B3DF5] font-bold">✓</span> {plan.drivers}
                           </li>
                           <li className="flex items-center gap-1.5">
-                            <span className="text-[#C04E24] font-bold">✓</span> {plan.clients}
+                            <span className="text-[#5B3DF5] font-bold">✓</span> {plan.clients}
                           </li>
                         </ul>
                       </div>
@@ -681,15 +681,15 @@ export default function FleetRegistration() {
                     name="termsConsent"
                     checked={formData.termsConsent}
                     onChange={handleChange}
-                    className="mt-1 w-4 h-4 rounded border-[#E0DAD1] text-[#C04E24] focus:ring-[#C04E24]"
+                    className="mt-1 w-4 h-4 rounded border-[#E5E7EB] text-[#5B3DF5] focus:ring-[#5B3DF5]"
                   />
                   <span className="text-xs text-[#5C5752] leading-relaxed">
                     I confirm that I am authorized to represent this fleet and agree to the{' '}
-                    <a href="/terms" target="_blank" className="text-[#C04E24] underline font-medium">
+                    <a href="/terms" target="_blank" className="text-[#5B3DF5] underline font-medium">
                       Terms and Conditions
                     </a>{' '}
                     and{' '}
-                    <a href="/privacy-policy" target="_blank" className="text-[#C04E24] underline font-medium">
+                    <a href="/privacy-policy" target="_blank" className="text-[#5B3DF5] underline font-medium">
                       Privacy Policy
                     </a>
                     . I understand that my application will be reviewed by SuperAdmin before account activation.
@@ -698,14 +698,14 @@ export default function FleetRegistration() {
               </div>
 
               {/* Submit Button */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[#E0DAD1]">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[#E5E7EB]">
                 <div className="text-xs text-[#7A7570] text-center sm:text-left">
                   🔒 Enterprise grade 256-bit SSL encrypted application submission.
                 </div>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full sm:w-auto px-8 py-3.5 rounded-xl font-bold text-sm bg-[#C04E24] hover:bg-[#A43D1A] text-white shadow-lg transition-all transform active:scale-95 disabled:opacity-50"
+                  className="w-full sm:w-auto px-8 py-3.5 rounded-xl font-bold text-sm bg-[#5B3DF5] hover:bg-[#A43D1A] text-white shadow-lg transition-all transform active:scale-95 disabled:opacity-50"
                 >
                   {loading ? 'Submitting Application...' : 'Submit Fleet Application →'}
                 </button>

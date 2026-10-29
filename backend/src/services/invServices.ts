@@ -22,6 +22,7 @@ import puppeteer from "puppeteer";
 import { assertTenantOwnership, isTenantError } from "../utils/tenantGuard";
 import { getTenantContext, ROOT_TENANT_ID } from "../context/tenantContext";
 import { getFleetDocumentBranding } from "./fleetBrandingService";
+import { dispatchAuditedSms } from "./smsServices";
 
 export const createInvoice = async (req: any, res: Response) => {
   try {
@@ -1378,40 +1379,21 @@ export const cancelInvoice = async (req: any, res: Response) => {
         const mobileNumber = user.mobile;
 
         try {
-          // Normalize phone number
-          const cleanMobile = String(mobileNumber || '').replace(/\D/g, '');
-
-          // Safety mock mode check
-          if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
-            console.log(`[InvoiceCancel SMS: MOCK MODE] Mobile: ${cleanMobile} | Template: Invoice Cancel | Status: MOCK`);
-            return;
-          }
-
-          // 2Factor API configuration from environment variables
-          const apiKey = process.env.TWO_FACTOR_API_KEY;
-          const senderId = process.env.TWO_FACTOR_SENDER_ID;
-          const templateName = "Invoice Cancel";
-
-          if (!apiKey || !senderId) {
-            throw new Error("SMS API configuration missing in environment variables");
-          }
-
-          // Build SMS URL with parameters
-          const smsUrl = `https://2factor.in/API/R1/?module=TRANS_SMS&apikey=${apiKey}&to=${mobileNumber}&from=${senderId}&templatename=${encodeURIComponent(templateName)}&var1=${encodeURIComponent(user.username || '')}&var2=${encodeURIComponent(booking?.bookingCode || '')}&var3=${encodeURIComponent(invoice?.invoiceNumber || '')}`;
-
-          // Send SMS using fetch
-          const smsResponse = await fetch(smsUrl);
-
-          if (!smsResponse.ok) {
-            throw new Error(`SMS API request failed with status: ${smsResponse.status}`);
-          }
-
-          const smsResult = await smsResponse.json();
-
-          console.log(" SMS sent successfully:", smsResult);
+          await dispatchAuditedSms({
+            recipient: String(mobileNumber),
+            templateCode: 'INVOICE_CANCEL',
+            templateName: 'Invoice Cancel',
+            vars: [
+              user.username || '',
+              booking?.bookingCode || '',
+              invoice?.invoiceNumber || '',
+            ],
+            message: `Grace Cabs: Invoice ${invoice?.invoiceNumber || ''} for booking ${booking?.bookingCode || ''} has been cancelled.`,
+            referenceEntity: 'INVOICE',
+            referenceId: String(invoice?.invoiceId || invoice?.id || ''),
+          });
         } catch (smsError: any) {
           console.error(" SMS send error:", smsError.message);
-
         }
       } else {
         console.log(" User mobile number not found");

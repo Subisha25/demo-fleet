@@ -123,7 +123,7 @@ const Configuration: React.FC = () => {
         <h2 className="text-3xl font-bold text-gray-800 mb-6">Master Configuration</h2>
 
         {/* Info Section */}
-        <h3 className="text-lg font-semibold mb-4 text-[#025A64] underline">
+        <h3 className="text-lg font-semibold mb-4 text-purple-700">
           <div className="flex items-center gap-x-2">
             <FontAwesomeIcon icon={faCircleInfo} />
             <span>Configuration Info</span>
@@ -140,7 +140,7 @@ const Configuration: React.FC = () => {
           </div>
 
           {/* SMTP Info */}
-          <h3 className="text-lg font-semibold text-[#025A64] underline">
+          <h3 className="text-lg font-semibold text-purple-700">
             <div className="flex items-center gap-x-2">
               <FontAwesomeIcon icon={faCircleInfo} />
               <span>SMTP Info</span>

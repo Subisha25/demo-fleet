@@ -93,15 +93,15 @@ export default function PortfolioPage() {
   return (
     <PublicLayout>
       {/* Header Banner */}
-      <section className="bg-gradient-to-b from-[#FAF8F5] to-[#F5EFEB] py-16 md:py-24 border-b border-[#E0DAD1]">
+      <section className="bg-gradient-to-b from-[#F7F7FB] via-white to-[#F7F7FB] py-16 md:py-24 border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-4">
-          <span className="text-xs font-bold uppercase tracking-widest text-[#C04E24]">
+          <span className="inline-block px-3 py-1 rounded-full bg-[#5B3DF5]/10 text-[#5B3DF5] text-xs font-bold uppercase tracking-wider">
             Fleet Portfolio
           </span>
-          <h1 className="text-4xl sm:text-5xl font-black text-[#1C1A18] tracking-tight">
+          <h1 className="text-4xl sm:text-5xl font-black text-[#17171D] tracking-tight">
             Commercial Fleet Portfolio & Specifications
           </h1>
-          <p className="text-lg text-[#5A554E] max-w-3xl mx-auto leading-relaxed">
+          <p className="text-lg text-[#686875] max-w-3xl mx-auto leading-relaxed">
             Every vehicle in the FleetFlow mobility network undergoes mandatory periodic fitness audits,
             carries active comprehensive commercial insurance, and operates with verified chauffeurs.
           </p>
@@ -114,8 +114,8 @@ export default function PortfolioPage() {
                 onClick={() => setFilter(cat)}
                 className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
                   filter === cat
-                    ? "bg-[#C04E24] text-white shadow-sm"
-                    : "bg-white text-[#5A554E] border border-[#E0DAD1] hover:border-[#1C1A18]/40"
+                    ? "bg-[#5B3DF5] text-white shadow-sm"
+                    : "bg-white text-[#686875] border border-gray-200 hover:border-[#17171D]/40"
                 }`}
               >
                 {cat === "ALL" ? "All Categories" : cat + "s"}
@@ -126,43 +126,43 @@ export default function PortfolioPage() {
       </section>
 
       {/* Fleet Grid */}
-      <section className="py-20 bg-[#FAF8F5]">
+      <section className="py-20 bg-[#F7F7FB]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredFleet.map((veh) => (
               <div
                 key={veh.id}
-                className="bg-white rounded-3xl overflow-hidden border border-[#E0DAD1] shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+                className="bg-white rounded-3xl overflow-hidden border border-gray-200/80 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
               >
                 <div>
-                  <div className="relative p-8 flex items-center justify-center bg-[#F7F2EC] h-56">
+                  <div className="relative p-8 flex items-center justify-center bg-white border-b border-gray-100 h-56">
                     <img
                       src={veh.image}
                       alt={veh.name}
                       className="max-h-40 max-w-full object-contain filter drop-shadow-md transform hover:scale-105 transition-transform duration-300"
                     />
-                    <span className="absolute top-4 right-4 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded bg-[#1C1A18] text-white">
+                    <span className="absolute top-4 right-4 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded bg-[#17171D] text-white">
                       {veh.tag}
                     </span>
                   </div>
 
                   <div className="p-6 space-y-4">
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#C04E24]">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#5B3DF5]">
                         {veh.type}
                       </span>
-                      <h3 className="text-xl font-bold text-[#1C1A18] mt-0.5">{veh.name}</h3>
+                      <h3 className="text-xl font-bold text-[#17171D] mt-0.5">{veh.name}</h3>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-[#5A554E] py-2 border-y border-[#E0DAD1]/60">
+                    <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-[#686875] py-2 border-y border-gray-100">
                       <div className="flex items-center gap-1.5">
-                        <svg className="w-4 h-4 text-[#C04E24]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4 text-[#5B3DF5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                         <span>{veh.passengers} Passengers</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <svg className="w-4 h-4 text-[#C04E24]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4 text-[#5B3DF5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                         </svg>
                         <span>{veh.luggage}</span>
@@ -170,10 +170,10 @@ export default function PortfolioPage() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-[#7A7570]">Vehicle Specs</div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-[#686875]">Vehicle Specs</div>
                       <div className="flex flex-wrap gap-1.5">
                         {veh.features.map((f, i) => (
-                          <span key={i} className="text-[11px] font-medium px-2 py-0.5 rounded bg-[#FAF8F5] border border-[#E0DAD1] text-[#2B2927]">
+                          <span key={i} className="text-[11px] font-medium px-2 py-0.5 rounded bg-gray-50 border border-gray-200 text-[#17171D]">
                             {f}
                           </span>
                         ))}
@@ -185,7 +185,7 @@ export default function PortfolioPage() {
                 <div className="p-6 pt-0">
                   <button
                     onClick={() => navigate("/register-fleet")}
-                    className="w-full py-2.5 text-xs font-bold text-white bg-[#C04E24] hover:bg-[#A83F1A] rounded-xl transition-all"
+                    className="w-full py-2.5 text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 rounded-xl transition-all shadow-sm"
                   >
                     Deploy into Your Fleet
                   </button>

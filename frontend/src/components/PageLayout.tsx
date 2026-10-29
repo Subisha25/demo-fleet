@@ -22,8 +22,8 @@ const PageLayout: React.FC<PageLayoutProps> = ({
     const pathnames = location.pathname.split("/").filter((x) => x);
 
     return (
-      <nav aria-label="Breadcrumb" className="flex items-center space-x-1.5 text-xs text-[#7A7570] font-medium mb-3">
-        <Link key="home" to="/dashboard" className="text-[#C04E24] hover:text-[#A43D1A] transition font-semibold">
+      <nav aria-label="Breadcrumb" className="flex items-center space-x-1.5 text-xs text-gray-500 font-medium mb-3">
+        <Link key="home" to="/dashboard" className="text-[#5B3DF5] hover:text-[#4326C6] transition font-semibold">
           Home
         </Link>
         {pathnames.map((value, index) => {
@@ -32,8 +32,8 @@ const PageLayout: React.FC<PageLayoutProps> = ({
 
           return (
             <React.Fragment key={index}>
-              <span className="text-[#C8BFB3]">/</span>
-              <span className={`capitalize ${isLast ? "text-[#1C1A18] font-bold" : "text-[#7A7570]"}`}>
+              <span className="text-gray-300">/</span>
+              <span className={`capitalize ${isLast ? "text-gray-900 font-bold" : "text-gray-500"}`}>
                 {label}
               </span>
             </React.Fragment>
@@ -44,18 +44,18 @@ const PageLayout: React.FC<PageLayoutProps> = ({
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[#FAF8F5] p-4 sm:p-6 lg:p-8 flex justify-center items-start">
-      <div className="w-full max-w-7xl bg-white rounded-xl border border-[#E0DAD1] shadow-sm p-5 sm:p-7">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 mb-4 border-b border-[#F5F2EB]">
+    <div className="min-h-[calc(100vh-4rem)] bg-[#F7F7FB] p-4 sm:p-6 lg:p-8 flex justify-center items-start">
+      <div className="w-full max-w-7xl bg-white rounded-xl border border-gray-200 shadow-sm p-5 sm:p-7">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 mb-4 border-b border-gray-100">
           <div>
             {generateBreadcrumb()}
             {title && (
-              <h1 className="text-xl sm:text-2xl font-bold text-[#1C1A18] tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
                 {title}
               </h1>
             )}
             {subtitle && (
-              <p className="text-xs sm:text-sm text-[#5C5752] mt-0.5">
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
                 {subtitle}
               </p>
             )}
@@ -69,4 +69,3 @@ const PageLayout: React.FC<PageLayoutProps> = ({
 };
 
 export default PageLayout;
-

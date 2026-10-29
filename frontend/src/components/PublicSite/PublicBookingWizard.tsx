@@ -260,33 +260,33 @@ export default function PublicBookingWizard() {
     <PublicLayout>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Fleet / Platform Branded Banner */}
-        <div className="mb-8 text-center sm:text-left bg-white border border-[#E0DAD1] rounded-2xl p-6 sm:p-8 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-[#C04E24]/5 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
+        <div className="mb-8 text-center sm:text-left bg-white border border-[#E5E7EB] rounded-2xl p-6 sm:p-8 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-[#5B3DF5]/5 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10">
             <div className="flex items-center gap-4">
               {slug && fleetInfo?.logoUrl ? (
                 <img
                   src={fleetInfo.logoUrl}
                   alt={fleetInfo.name}
-                  className="w-16 h-16 object-contain rounded-xl border border-[#E0DAD1] bg-[#FAF8F5] p-1"
+                  className="w-16 h-16 object-contain rounded-xl border border-[#E5E7EB] bg-[#F7F7FB] p-1"
                 />
               ) : (
-                <div className="w-14 h-14 rounded-2xl bg-[#C04E24] text-white flex items-center justify-center font-black text-2xl shadow-sm">
+                <div className="w-14 h-14 rounded-2xl bg-[#5B3DF5] text-white flex items-center justify-center font-black text-2xl shadow-sm">
                   🚖
                 </div>
               )}
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1C1A18] tracking-tight">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-[#17171D] tracking-tight">
                     {slug && fleetInfo?.name ? `${fleetInfo.name} Rides` : "Book a Cab Online"}
                   </h1>
                   {slug && (
-                    <span className="px-2.5 py-0.5 text-xs font-bold bg-[#C04E24]/10 text-[#C04E24] rounded-full border border-[#C04E24]/20">
+                    <span className="px-2.5 py-0.5 text-xs font-bold bg-[#5B3DF5]/10 text-[#5B3DF5] rounded-full border border-[#5B3DF5]/20">
                       Fleet Direct
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-[#7A7570] mt-1">
+                <p className="text-sm text-[#686875] mt-1">
                   {slug && fleetInfo?.name
                     ? `Official booking portal for ${fleetInfo.name} — Powered by FleetFlow Platform`
                     : "Transparent Per-KM Commercial Cabs — Instant Fleet Dispatch"}
@@ -296,16 +296,16 @@ export default function PublicBookingWizard() {
 
             {/* Quick Step Indicator */}
             {step < 5 && (
-              <div className="flex items-center gap-2 bg-[#FAF8F5] px-4 py-2 rounded-xl border border-[#E0DAD1]">
-                <span className="text-xs font-bold text-[#7A7570] uppercase tracking-wider">Step</span>
-                <span className="text-sm font-extrabold text-[#C04E24]">{step} of 4</span>
+              <div className="flex items-center gap-2 bg-[#F7F7FB] px-4 py-2 rounded-xl border border-[#E5E7EB]">
+                <span className="text-xs font-bold text-[#686875] uppercase tracking-wider">Step</span>
+                <span className="text-sm font-extrabold text-[#5B3DF5]">{step} of 4</span>
               </div>
             )}
           </div>
 
           {/* Stepper Dots */}
           {step < 5 && (
-            <div className="grid grid-cols-4 gap-2 mt-6 pt-6 border-t border-[#E0DAD1]/60 text-center">
+            <div className="grid grid-cols-4 gap-2 mt-6 pt-6 border-t border-[#E5E7EB]/60 text-center">
               {[
                 { s: 1, label: "1. Phone OTP" },
                 { s: 2, label: "2. Seats" },
@@ -315,12 +315,12 @@ export default function PublicBookingWizard() {
                 <div key={item.s} className="flex flex-col items-center gap-1">
                   <div
                     className={`h-1.5 w-full rounded-full transition-all ${
-                      step >= item.s ? "bg-[#C04E24]" : "bg-[#E0DAD1]"
+                      step >= item.s ? "bg-[#5B3DF5]" : "bg-[#E5E7EB]"
                     }`}
                   />
                   <span
                     className={`text-[11px] font-bold ${
-                      step >= item.s ? "text-[#C04E24]" : "text-[#7A7570]"
+                      step >= item.s ? "text-[#5B3DF5]" : "text-[#686875]"
                     }`}
                   >
                     {item.label}
@@ -351,13 +351,13 @@ export default function PublicBookingWizard() {
 
         {/* ================= STEP 1: PHONE & OTP ================= */}
         {step === 1 && (
-          <div className="bg-white border border-[#E0DAD1] rounded-2xl p-6 sm:p-10 shadow-sm max-w-xl mx-auto">
+          <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 sm:p-10 shadow-sm max-w-xl mx-auto">
             <div className="text-center mb-6">
-              <div className="w-12 h-12 bg-[#C04E24]/10 text-[#C04E24] rounded-full flex items-center justify-center mx-auto text-xl font-bold mb-3">
+              <div className="w-12 h-12 bg-[#5B3DF5]/10 text-[#5B3DF5] rounded-full flex items-center justify-center mx-auto text-xl font-bold mb-3">
                 📱
               </div>
-              <h2 className="text-xl font-extrabold text-[#1C1A18]">Verify Mobile Number</h2>
-              <p className="text-sm text-[#7A7570] mt-1">
+              <h2 className="text-xl font-extrabold text-[#17171D]">Verify Mobile Number</h2>
+              <p className="text-sm text-[#686875] mt-1">
                 We protect your booking against unauthorized spam. Enter your 10-digit mobile number to verify.
               </p>
             </div>
@@ -365,11 +365,11 @@ export default function PublicBookingWizard() {
             {!otpSent ? (
               <form onSubmit={handleSendOtp} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-2">
                     Mobile Number <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-[#7A7570]">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-[#686875]">
                       +91
                     </span>
                     <input
@@ -378,7 +378,7 @@ export default function PublicBookingWizard() {
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="9876543210"
                       maxLength={10}
-                      className="w-full pl-14 pr-4 py-3 bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl text-base font-medium text-[#1C1A18] focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20 transition-all tracking-wider"
+                      className="w-full pl-14 pr-4 py-3 bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl text-base font-medium text-[#17171D] focus:outline-none focus:border-[#5B3DF5] focus:ring-2 focus:ring-[#5B3DF5]/20 transition-all tracking-wider"
                       required
                     />
                   </div>
@@ -387,7 +387,7 @@ export default function PublicBookingWizard() {
                 <button
                   type="submit"
                   disabled={otpLoading || phone.length < 10}
-                  className="w-full py-3.5 bg-[#C04E24] hover:bg-[#A83F1A] text-white font-bold rounded-xl shadow-sm hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full py-3.5 bg-[#5B3DF5] hover:bg-[#4326C6] text-white font-bold rounded-xl shadow-sm hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {otpLoading ? (
                     <>
@@ -401,10 +401,10 @@ export default function PublicBookingWizard() {
               </form>
             ) : (
               <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <div className="p-3 bg-[#FAF8F5] rounded-xl border border-[#E0DAD1] flex items-center justify-between">
+                <div className="p-3 bg-[#F7F7FB] rounded-xl border border-[#E5E7EB] flex items-center justify-between">
                   <div className="text-sm">
-                    <span className="text-[#7A7570]">Sending to: </span>
-                    <span className="font-bold text-[#1C1A18]">+91 {phone}</span>
+                    <span className="text-[#686875]">Sending to: </span>
+                    <span className="font-bold text-[#17171D]">+91 {phone}</span>
                   </div>
                   <button
                     type="button"
@@ -412,14 +412,14 @@ export default function PublicBookingWizard() {
                       setOtpSent(false);
                       setOtp("");
                     }}
-                    className="text-xs font-bold text-[#C04E24] hover:underline"
+                    className="text-xs font-bold text-[#5B3DF5] hover:underline"
                   >
                     Change Number
                   </button>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-2">
                     Enter 6-Digit OTP <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -428,12 +428,12 @@ export default function PublicBookingWizard() {
                     onChange={(e) => setOtp(e.target.value)}
                     placeholder="123456"
                     maxLength={6}
-                    className="w-full px-4 py-3 bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl text-center text-xl font-bold tracking-[0.5em] text-[#1C1A18] focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20 transition-all"
+                    className="w-full px-4 py-3 bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl text-center text-xl font-bold tracking-[0.5em] text-[#17171D] focus:outline-none focus:border-[#5B3DF5] focus:ring-2 focus:ring-[#5B3DF5]/20 transition-all"
                     required
                   />
                   {mockOtpHint && (
-                    <p className="text-xs text-[#7A7570] mt-1.5 text-center">
-                      Mock code auto-detected: <span className="font-mono font-bold text-[#C04E24]">{mockOtpHint}</span>
+                    <p className="text-xs text-[#686875] mt-1.5 text-center">
+                      Mock code auto-detected: <span className="font-mono font-bold text-[#5B3DF5]">{mockOtpHint}</span>
                     </p>
                   )}
                 </div>
@@ -441,7 +441,7 @@ export default function PublicBookingWizard() {
                 <button
                   type="submit"
                   disabled={otpLoading || otp.length !== 6}
-                  className="w-full py-3.5 bg-[#C04E24] hover:bg-[#A83F1A] text-white font-bold rounded-xl shadow-sm hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full py-3.5 bg-[#5B3DF5] hover:bg-[#4326C6] text-white font-bold rounded-xl shadow-sm hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {otpLoading ? (
                     <>
@@ -458,7 +458,7 @@ export default function PublicBookingWizard() {
                     type="button"
                     onClick={handleSendOtp}
                     disabled={otpLoading}
-                    className="text-xs font-semibold text-[#7A7570] hover:text-[#C04E24]"
+                    className="text-xs font-semibold text-[#686875] hover:text-[#5B3DF5]"
                   >
                     Didn't receive code? Resend OTP
                   </button>
@@ -470,13 +470,13 @@ export default function PublicBookingWizard() {
 
         {/* ================= STEP 2: REQUIRED SEAT CAPACITY ================= */}
         {step === 2 && (
-          <div className="bg-white border border-[#E0DAD1] rounded-2xl p-6 sm:p-10 shadow-sm max-w-2xl mx-auto">
+          <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 sm:p-10 shadow-sm max-w-2xl mx-auto">
             <div className="text-center mb-8">
-              <div className="w-12 h-12 bg-[#C04E24]/10 text-[#C04E24] rounded-full flex items-center justify-center mx-auto text-xl font-bold mb-3">
+              <div className="w-12 h-12 bg-[#5B3DF5]/10 text-[#5B3DF5] rounded-full flex items-center justify-center mx-auto text-xl font-bold mb-3">
                 👥
               </div>
-              <h2 className="text-xl font-extrabold text-[#1C1A18]">How many seats do you need?</h2>
-              <p className="text-sm text-[#7A7570] mt-1">
+              <h2 className="text-xl font-extrabold text-[#17171D]">How many seats do you need?</h2>
+              <p className="text-sm text-[#686875] mt-1">
                 Select your passenger count. We will show vehicles configured to accommodate your party comfortably.
               </p>
             </div>
@@ -492,36 +492,36 @@ export default function PublicBookingWizard() {
                   key={opt.seats}
                   type="button"
                   onClick={() => handleSelectCapacity(opt.seats)}
-                  className={`p-5 rounded-2xl border text-center transition-all flex flex-col items-center justify-between gap-3 group hover:border-[#C04E24] hover:shadow-md ${
+                  className={`p-5 rounded-2xl border text-center transition-all flex flex-col items-center justify-between gap-3 group hover:border-[#5B3DF5] hover:shadow-md ${
                     seatCapacity === opt.seats
-                      ? "border-[#C04E24] bg-[#C04E24]/5 ring-2 ring-[#C04E24]/20"
-                      : "border-[#E0DAD1] bg-[#FAF8F5]"
+                      ? "border-[#5B3DF5] bg-[#5B3DF5]/5 ring-2 ring-[#5B3DF5]/20"
+                      : "border-[#E5E7EB] bg-[#F7F7FB]"
                   }`}
                 >
                   <span className="text-3xl">{opt.icon}</span>
                   <div>
-                    <div className="text-base font-extrabold text-[#1C1A18] group-hover:text-[#C04E24]">
+                    <div className="text-base font-extrabold text-[#17171D] group-hover:text-[#5B3DF5]">
                       {opt.title}
                     </div>
-                    <div className="text-xs text-[#7A7570] mt-0.5">{opt.subtitle}</div>
+                    <div className="text-xs text-[#686875] mt-0.5">{opt.subtitle}</div>
                   </div>
-                  <span className="text-xs font-bold text-[#C04E24] opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="text-xs font-bold text-[#5B3DF5] opacity-0 group-hover:opacity-100 transition-opacity">
                     Select &rarr;
                   </span>
                 </button>
               ))}
             </div>
 
-            <div className="pt-4 border-t border-[#E0DAD1]/60 flex items-center justify-between">
+            <div className="pt-4 border-t border-[#E5E7EB]/60 flex items-center justify-between">
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="text-xs font-bold text-[#7A7570] hover:text-[#1C1A18]"
+                className="text-xs font-bold text-[#686875] hover:text-[#17171D]"
               >
                 &larr; Back to Phone Verification
               </button>
-              <div className="text-xs text-[#7A7570]">
-                Verified mobile: <span className="font-bold text-[#1C1A18]">+91 {phone}</span>
+              <div className="text-xs text-[#686875]">
+                Verified mobile: <span className="font-bold text-[#17171D]">+91 {phone}</span>
               </div>
             </div>
           </div>
@@ -532,10 +532,10 @@ export default function PublicBookingWizard() {
           <div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
               <div>
-                <h2 className="text-xl font-extrabold text-[#1C1A18]">
+                <h2 className="text-xl font-extrabold text-[#17171D]">
                   Available {seatCapacity}+ Seater Packages
                 </h2>
-                <p className="text-sm text-[#7A7570]">
+                <p className="text-sm text-[#686875]">
                   {packages.length} eligible option(s) found. Transparent per-kilometre billing with verified fleet operators.
                 </p>
               </div>
@@ -544,7 +544,7 @@ export default function PublicBookingWizard() {
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="px-3.5 py-1.5 text-xs font-bold text-[#1C1A18] bg-white border border-[#E0DAD1] rounded-xl hover:border-[#1C1A18]"
+                  className="px-3.5 py-1.5 text-xs font-bold text-[#17171D] bg-white border border-[#E5E7EB] rounded-xl hover:border-[#17171D]"
                 >
                   Change Capacity ({seatCapacity} Seats)
                 </button>
@@ -552,15 +552,15 @@ export default function PublicBookingWizard() {
             </div>
 
             {packagesLoading ? (
-              <div className="bg-white border border-[#E0DAD1] rounded-2xl p-16 text-center shadow-sm">
-                <div className="w-8 h-8 border-3 border-[#C04E24] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-sm font-bold text-[#1C1A18]">Loading available vehicles & rates...</p>
+              <div className="bg-white border border-[#E5E7EB] rounded-2xl p-16 text-center shadow-sm">
+                <div className="w-8 h-8 border-3 border-[#5B3DF5] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-sm font-bold text-[#17171D]">Loading available vehicles & rates...</p>
               </div>
             ) : packages.length === 0 ? (
-              <div className="bg-white border border-[#E0DAD1] rounded-2xl p-12 text-center shadow-sm max-w-xl mx-auto">
+              <div className="bg-white border border-[#E5E7EB] rounded-2xl p-12 text-center shadow-sm max-w-xl mx-auto">
                 <div className="text-4xl mb-3">🚗💨</div>
-                <h3 className="text-lg font-bold text-[#1C1A18]">No Packages Available for {seatCapacity} Seats</h3>
-                <p className="text-sm text-[#7A7570] mt-1 mb-6">
+                <h3 className="text-lg font-bold text-[#17171D]">No Packages Available for {seatCapacity} Seats</h3>
+                <p className="text-sm text-[#686875] mt-1 mb-6">
                   {slug
                     ? `This fleet currently has no active Per-KM packages configured for ${seatCapacity} seats.`
                     : `No active fleets currently offer ${seatCapacity}-seater public Per-KM packages.`}
@@ -568,7 +568,7 @@ export default function PublicBookingWizard() {
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="px-6 py-2.5 bg-[#C04E24] text-white font-bold text-sm rounded-xl hover:bg-[#A83F1A]"
+                  className="px-6 py-2.5 bg-[#5B3DF5] text-white font-bold text-sm rounded-xl hover:bg-[#4326C6]"
                 >
                   Choose Different Seat Capacity
                 </button>
@@ -578,11 +578,11 @@ export default function PublicBookingWizard() {
                 {packages.map((pkg) => (
                   <div
                     key={pkg.packageDataId}
-                    className="bg-white border border-[#E0DAD1] hover:border-[#C04E24] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
+                    className="bg-white border border-[#E5E7EB] hover:border-[#5B3DF5] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
                   >
                     <div>
                       {/* Vehicle Image Header */}
-                      <div className="h-44 bg-[#FAF8F5] relative flex items-center justify-center p-4 border-b border-[#E0DAD1]/60">
+                      <div className="h-44 bg-[#F7F7FB] relative flex items-center justify-center p-4 border-b border-[#E5E7EB]/60">
                         <img
                           src={pkg.vehicleImg}
                           alt={pkg.vehicleModelName}
@@ -591,7 +591,7 @@ export default function PublicBookingWizard() {
                           }}
                           className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
                         />
-                        <span className="absolute top-3 right-3 px-2.5 py-1 text-xs font-black bg-white/95 backdrop-blur-sm text-[#1C1A18] rounded-lg border border-[#E0DAD1] shadow-xs">
+                        <span className="absolute top-3 right-3 px-2.5 py-1 text-xs font-black bg-white/95 backdrop-blur-sm text-[#17171D] rounded-lg border border-[#E5E7EB] shadow-xs">
                           {pkg.seatCapacity} Seats
                         </span>
                       </div>
@@ -608,24 +608,24 @@ export default function PublicBookingWizard() {
                             }}
                             className="w-5 h-5 object-contain rounded"
                           />
-                          <span className="text-xs font-bold text-[#7A7570] truncate">
+                          <span className="text-xs font-bold text-[#686875] truncate">
                             {pkg.fleetName} &bull; {pkg.companyName}
                           </span>
                         </div>
 
-                        <h3 className="text-lg font-extrabold text-[#1C1A18] group-hover:text-[#C04E24] transition-colors leading-snug">
+                        <h3 className="text-lg font-extrabold text-[#17171D] group-hover:text-[#5B3DF5] transition-colors leading-snug">
                           {pkg.vehicleModelName}
                         </h3>
-                        <p className="text-xs font-semibold text-[#7A7570] mt-0.5 mb-4">
+                        <p className="text-xs font-semibold text-[#686875] mt-0.5 mb-4">
                           {pkg.packageName} ({pkg.vehicleType})
                         </p>
 
-                        <div className="bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl p-3 flex items-baseline justify-between mb-3">
+                        <div className="bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl p-3 flex items-baseline justify-between mb-3">
                           <div>
-                            <span className="text-xs text-[#7A7570] font-semibold">Rate</span>
-                            <div className="text-2xl font-black text-[#C04E24] tracking-tight">
+                            <span className="text-xs text-[#686875] font-semibold">Rate</span>
+                            <div className="text-2xl font-black text-[#5B3DF5] tracking-tight">
                               ₹{pkg.amountPerKm}
-                              <span className="text-xs font-bold text-[#7A7570]"> / km</span>
+                              <span className="text-xs font-bold text-[#686875]"> / km</span>
                             </div>
                           </div>
                           <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
@@ -633,7 +633,7 @@ export default function PublicBookingWizard() {
                           </span>
                         </div>
 
-                        <p className="text-xs text-[#7A7570] line-clamp-2">{pkg.description}</p>
+                        <p className="text-xs text-[#686875] line-clamp-2">{pkg.description}</p>
                       </div>
                     </div>
 
@@ -641,7 +641,7 @@ export default function PublicBookingWizard() {
                       <button
                         type="button"
                         onClick={() => handleChoosePackage(pkg)}
-                        className="w-full py-3 bg-[#1C1A18] hover:bg-[#C04E24] text-white text-sm font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 group-hover:shadow"
+                        className="w-full py-3 bg-[#17171D] hover:bg-[#5B3DF5] text-white text-sm font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 group-hover:shadow"
                       >
                         <span>Select Ride</span>
                         <span>&rarr;</span>
@@ -657,25 +657,25 @@ export default function PublicBookingWizard() {
         {/* ================= STEP 4: CUSTOMER DETAILS FORM ================= */}
         {step === 4 && selectedPackage && (
           <div className="max-w-3xl mx-auto">
-            <div className="bg-white border border-[#E0DAD1] rounded-2xl p-6 sm:p-10 shadow-sm">
-              <div className="flex items-center justify-between pb-6 mb-6 border-b border-[#E0DAD1]">
+            <div className="bg-white border border-[#E5E7EB] rounded-2xl p-6 sm:p-10 shadow-sm">
+              <div className="flex items-center justify-between pb-6 mb-6 border-b border-[#E5E7EB]">
                 <div>
-                  <h2 className="text-xl font-extrabold text-[#1C1A18]">Trip & Passenger Details</h2>
-                  <p className="text-sm text-[#7A7570] mt-0.5">
+                  <h2 className="text-xl font-extrabold text-[#17171D]">Trip & Passenger Details</h2>
+                  <p className="text-sm text-[#686875] mt-0.5">
                     Review your chosen vehicle and specify pickup & drop coordinates.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setStep(3)}
-                  className="text-xs font-bold text-[#C04E24] hover:underline"
+                  className="text-xs font-bold text-[#5B3DF5] hover:underline"
                 >
                   Change Package
                 </button>
               </div>
 
               {/* Selected Package Snapshot Summary Card */}
-              <div className="bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <img
                     src={selectedPackage.vehicleImg}
@@ -683,22 +683,22 @@ export default function PublicBookingWizard() {
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = "/images/default_car.png";
                     }}
-                    className="w-16 h-12 object-contain bg-white rounded-lg border border-[#E0DAD1] p-1"
+                    className="w-16 h-12 object-contain bg-white rounded-lg border border-[#E5E7EB] p-1"
                   />
                   <div>
-                    <div className="text-sm font-extrabold text-[#1C1A18]">
+                    <div className="text-sm font-extrabold text-[#17171D]">
                       {selectedPackage.vehicleModelName}
                     </div>
-                    <div className="text-xs text-[#7A7570]">
+                    <div className="text-xs text-[#686875]">
                       {selectedPackage.fleetName} &bull; {selectedPackage.seatCapacity} Seats
                     </div>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <div className="text-xs text-[#7A7570]">Agreed Rate Snapshot</div>
-                  <div className="text-xl font-black text-[#C04E24]">
-                    ₹{selectedPackage.amountPerKm} <span className="text-xs font-bold text-[#7A7570]">/ km</span>
+                  <div className="text-xs text-[#686875]">Agreed Rate Snapshot</div>
+                  <div className="text-xl font-black text-[#5B3DF5]">
+                    ₹{selectedPackage.amountPerKm} <span className="text-xs font-bold text-[#686875]">/ km</span>
                   </div>
                 </div>
               </div>
@@ -707,7 +707,7 @@ export default function PublicBookingWizard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Customer Full Name */}
                   <div>
-                    <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-2">
                       Full Name <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -715,14 +715,14 @@ export default function PublicBookingWizard() {
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       placeholder="e.g. Ramesh Kumar"
-                      className="w-full px-4 py-3 bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl text-sm font-medium text-[#1C1A18] focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20 transition-all"
+                      className="w-full px-4 py-3 bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl text-sm font-medium text-[#17171D] focus:outline-none focus:border-[#5B3DF5] focus:ring-2 focus:ring-[#5B3DF5]/20 transition-all"
                       required
                     />
                   </div>
 
                   {/* Customer Email */}
                   <div>
-                    <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-2">
                       Email Address <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -730,7 +730,7 @@ export default function PublicBookingWizard() {
                       value={customerEmail}
                       onChange={(e) => setCustomerEmail(e.target.value)}
                       placeholder="ramesh@example.com"
-                      className="w-full px-4 py-3 bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl text-sm font-medium text-[#1C1A18] focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20 transition-all"
+                      className="w-full px-4 py-3 bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl text-sm font-medium text-[#17171D] focus:outline-none focus:border-[#5B3DF5] focus:ring-2 focus:ring-[#5B3DF5]/20 transition-all"
                       required
                     />
                   </div>
@@ -738,7 +738,7 @@ export default function PublicBookingWizard() {
 
                 {/* Verified Mobile Number (read-only) */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-2">
                     Verified Mobile Number
                   </label>
                   <div className="flex items-center justify-between px-4 py-3 bg-emerald-50/50 border border-emerald-200 rounded-xl">
@@ -752,7 +752,7 @@ export default function PublicBookingWizard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Pickup Point */}
                   <div>
-                    <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-2">
                       Pickup Location <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -760,14 +760,14 @@ export default function PublicBookingWizard() {
                       value={pickupPoint}
                       onChange={(e) => setPickupPoint(e.target.value)}
                       placeholder="e.g. T. Nagar, Chennai"
-                      className="w-full px-4 py-3 bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl text-sm font-medium text-[#1C1A18] focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20 transition-all"
+                      className="w-full px-4 py-3 bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl text-sm font-medium text-[#17171D] focus:outline-none focus:border-[#5B3DF5] focus:ring-2 focus:ring-[#5B3DF5]/20 transition-all"
                       required
                     />
                   </div>
 
                   {/* Drop Point */}
                   <div>
-                    <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-2">
                       Drop Location <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -775,7 +775,7 @@ export default function PublicBookingWizard() {
                       value={dropPoint}
                       onChange={(e) => setDropPoint(e.target.value)}
                       placeholder="e.g. Chennai International Airport (MAA)"
-                      className="w-full px-4 py-3 bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl text-sm font-medium text-[#1C1A18] focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20 transition-all"
+                      className="w-full px-4 py-3 bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl text-sm font-medium text-[#17171D] focus:outline-none focus:border-[#5B3DF5] focus:ring-2 focus:ring-[#5B3DF5]/20 transition-all"
                       required
                     />
                   </div>
@@ -784,7 +784,7 @@ export default function PublicBookingWizard() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Pickup Date */}
                   <div>
-                    <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-2">
                       Pickup Date
                     </label>
                     <input
@@ -792,27 +792,27 @@ export default function PublicBookingWizard() {
                       value={pickupDate}
                       onChange={(e) => setPickupDate(e.target.value)}
                       min={new Date().toISOString().split("T")[0]}
-                      className="w-full px-4 py-3 bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl text-sm font-medium text-[#1C1A18] focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20 transition-all"
+                      className="w-full px-4 py-3 bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl text-sm font-medium text-[#17171D] focus:outline-none focus:border-[#5B3DF5] focus:ring-2 focus:ring-[#5B3DF5]/20 transition-all"
                     />
                   </div>
 
                   {/* Pickup Time */}
                   <div>
-                    <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-2">
                       Pickup Time
                     </label>
                     <input
                       type="time"
                       value={pickupTime}
                       onChange={(e) => setPickupTime(e.target.value)}
-                      className="w-full px-4 py-3 bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl text-sm font-medium text-[#1C1A18] focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20 transition-all"
+                      className="w-full px-4 py-3 bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl text-sm font-medium text-[#17171D] focus:outline-none focus:border-[#5B3DF5] focus:ring-2 focus:ring-[#5B3DF5]/20 transition-all"
                     />
                   </div>
                 </div>
 
                 {/* Additional Notes */}
                 <div>
-                  <label className="block text-xs font-bold text-[#1C1A18] uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-2">
                     Special Instructions / Luggage Notes (Optional)
                   </label>
                   <textarea
@@ -820,20 +820,20 @@ export default function PublicBookingWizard() {
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="e.g. 2 large suitcases, flight arriving at Terminal 2"
-                    className="w-full px-4 py-3 bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl text-sm font-medium text-[#1C1A18] focus:outline-none focus:border-[#C04E24] focus:ring-2 focus:ring-[#C04E24]/20 transition-all"
+                    className="w-full px-4 py-3 bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl text-sm font-medium text-[#17171D] focus:outline-none focus:border-[#5B3DF5] focus:ring-2 focus:ring-[#5B3DF5]/20 transition-all"
                   />
                 </div>
 
-                <div className="pt-4 border-t border-[#E0DAD1]/60 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="text-xs text-[#7A7570] text-center sm:text-left">
+                <div className="pt-4 border-t border-[#E5E7EB]/60 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-xs text-[#686875] text-center sm:text-left">
                     By clicking Confirm, your ride is dispatched directly to{" "}
-                    <span className="font-bold text-[#1C1A18]">{selectedPackage.fleetName}</span>.
+                    <span className="font-bold text-[#17171D]">{selectedPackage.fleetName}</span>.
                   </div>
 
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full sm:w-auto px-8 py-3.5 bg-[#C04E24] hover:bg-[#A83F1A] text-white font-extrabold rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full sm:w-auto px-8 py-3.5 bg-[#5B3DF5] hover:bg-[#4326C6] text-white font-extrabold rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {submitting ? (
                       <>
@@ -852,51 +852,51 @@ export default function PublicBookingWizard() {
 
         {/* ================= STEP 5: SUCCESS CONFIRMATION ================= */}
         {step === 5 && bookingSuccess && (
-          <div className="bg-white border border-[#E0DAD1] rounded-2xl p-8 sm:p-12 shadow-sm max-w-xl mx-auto text-center">
+          <div className="bg-white border border-[#E5E7EB] rounded-2xl p-8 sm:p-12 shadow-sm max-w-xl mx-auto text-center">
             <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto text-3xl font-black mb-4">
               ✓
             </div>
 
-            <h2 className="text-2xl font-black text-[#1C1A18]">Ride Request Placed!</h2>
-            <p className="text-sm text-[#7A7570] mt-1 mb-6">
+            <h2 className="text-2xl font-black text-[#17171D]">Ride Request Placed!</h2>
+            <p className="text-sm text-[#686875] mt-1 mb-6">
               Your ride has been registered with {bookingSuccess.fleetName || "the fleet operator"}.
             </p>
 
-            <div className="bg-[#FAF8F5] border border-[#E0DAD1] rounded-2xl p-6 text-left space-y-3 mb-6">
-              <div className="flex items-center justify-between pb-3 border-b border-[#E0DAD1]">
-                <span className="text-xs text-[#7A7570] font-bold uppercase tracking-wider">Booking ID</span>
-                <span className="text-lg font-mono font-black text-[#C04E24]">
+            <div className="bg-[#F7F7FB] border border-[#E5E7EB] rounded-2xl p-6 text-left space-y-3 mb-6">
+              <div className="flex items-center justify-between pb-3 border-b border-[#E5E7EB]">
+                <span className="text-xs text-[#686875] font-bold uppercase tracking-wider">Booking ID</span>
+                <span className="text-lg font-mono font-black text-[#5B3DF5]">
                   {bookingSuccess.bookingCode}
                 </span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#7A7570]">Customer</span>
-                <span className="text-xs font-bold text-[#1C1A18]">{customerName}</span>
+                <span className="text-xs text-[#686875]">Customer</span>
+                <span className="text-xs font-bold text-[#17171D]">{customerName}</span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#7A7570]">Contact Phone</span>
-                <span className="text-xs font-bold text-[#1C1A18]">+91 {phone}</span>
+                <span className="text-xs text-[#686875]">Contact Phone</span>
+                <span className="text-xs font-bold text-[#17171D]">+91 {phone}</span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#7A7570]">Agreed Rate</span>
-                <span className="text-xs font-bold text-[#C04E24]">
+                <span className="text-xs text-[#686875]">Agreed Rate</span>
+                <span className="text-xs font-bold text-[#5B3DF5]">
                   ₹{bookingSuccess.agreedRate} / km
                 </span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#7A7570]">Status</span>
+                <span className="text-xs text-[#686875]">Status</span>
                 <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
                   Pending Fleet Confirmation
                 </span>
               </div>
             </div>
 
-            <p className="text-xs text-[#7A7570] mb-6">
-              A confirmation email has been logged to <span className="font-semibold text-[#1C1A18]">{customerEmail}</span>. The fleet dispatch team will assign a vehicle and driver shortly.
+            <p className="text-xs text-[#686875] mb-6">
+              A confirmation email has been logged to <span className="font-semibold text-[#17171D]">{customerEmail}</span>. The fleet dispatch team will assign a vehicle and driver shortly.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -909,7 +909,7 @@ export default function PublicBookingWizard() {
                   setSelectedPackage(null);
                   setBookingSuccess(null);
                 }}
-                className="px-6 py-2.5 bg-[#FAF8F5] border border-[#E0DAD1] hover:border-[#1C1A18] text-[#1C1A18] text-sm font-bold rounded-xl transition-all"
+                className="px-6 py-2.5 bg-[#F7F7FB] border border-[#E5E7EB] hover:border-[#17171D] text-[#17171D] text-sm font-bold rounded-xl transition-all"
               >
                 Book Another Ride
               </button>
@@ -917,7 +917,7 @@ export default function PublicBookingWizard() {
               <button
                 type="button"
                 onClick={() => navigate("/")}
-                className="px-6 py-2.5 bg-[#C04E24] hover:bg-[#A83F1A] text-white text-sm font-bold rounded-xl transition-all"
+                className="px-6 py-2.5 bg-[#5B3DF5] hover:bg-[#4326C6] text-white text-sm font-bold rounded-xl transition-all"
               >
                 Return to Home
               </button>

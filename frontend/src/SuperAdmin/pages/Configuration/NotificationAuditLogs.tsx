@@ -112,16 +112,16 @@ const NotificationAuditLogs: React.FC = () => {
     <PageLayout>
       <div className="py-6 max-w-7xl mx-auto space-y-6">
         {/* Header Card */}
-        <div className="bg-[#1C1A18] border-b-4 border-[#C04E24] rounded-xl p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-[#0B0B0F] border-b-4 border-purple-600 rounded-xl p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="bg-[#C04E24]/20 text-[#DE8A66] border border-[#C04E24]/30 text-[11px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="bg-purple-950/70 text-purple-300 border border-purple-700/50 text-[11px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                 Notification Telemetry & Delivery Audit
               </span>
-              <span className="text-[#EDE9E3] text-xs">Safe Bounded Lifecycle</span>
+              <span className="text-slate-300 text-xs">Safe Bounded Lifecycle</span>
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight">Notification Monitoring Logs</h1>
-            <p className="text-xs text-[#EDE9E3] mt-1">
+            <p className="text-xs text-slate-300 mt-1">
               Real-time delivery status, attempt counters, masked recipient confidentiality, and audit trails.
             </p>
           </div>
@@ -129,19 +129,19 @@ const NotificationAuditLogs: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => fetchLogs(page)}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 text-[#FAF8F5] text-xs font-bold rounded-lg border border-white/10 transition flex items-center gap-1.5"
+              className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg border border-white/10 transition flex items-center gap-1.5"
             >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw size={13} className={loading ? 'animate-spin text-purple-400' : ''} />
               <span>Refresh Logs</span>
             </button>
           </div>
         </div>
 
         {/* Security / Safe Delivery Disclosure Banner */}
-        <div className="bg-[#FAF8F5] border border-[#E0DAD1] rounded-xl p-4 flex items-start gap-3 text-xs text-[#5C5752]">
-          <Info size={18} className="text-[#C04E24] mt-0.5 shrink-0" />
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-start gap-3 text-xs text-slate-600">
+          <Info size={18} className="text-purple-600 mt-0.5 shrink-0" />
           <div className="space-y-1">
-            <p className="font-bold text-[#1C1A18]">Audit Safeguards & Idempotency</p>
+            <p className="font-bold text-slate-900">Audit Safeguards & Idempotency</p>
             <p>
               Recipients are masked to protect PII. Synthetic test addresses are suppressed automatically to prevent external MTA delivery-incomplete loops.
               A provider accepting a message indicates transmission to relay, not confirmed inbox receipt.
@@ -150,14 +150,14 @@ const NotificationAuditLogs: React.FC = () => {
         </div>
 
         {/* Filters & Search Bar */}
-        <div className="bg-white rounded-xl border border-[#E0DAD1] p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             {/* Channel filter */}
-            <div className="flex items-center bg-[#FAF8F5] p-1 rounded-lg border border-[#E0DAD1]">
+            <div className="flex items-center bg-slate-50 p-1 rounded-lg border border-slate-200">
               <button
                 onClick={() => setChannelFilter('ALL')}
                 className={`px-3 py-1 text-xs font-bold rounded-md transition ${
-                  channelFilter === 'ALL' ? 'bg-[#C04E24] text-white shadow-sm' : 'text-slate-600 hover:text-black'
+                  channelFilter === 'ALL' ? 'bg-gradient-to-r from-indigo-600 to-purple-700 text-white shadow-sm' : 'text-slate-600 hover:text-black'
                 }`}
               >
                 All Channels
@@ -165,7 +165,7 @@ const NotificationAuditLogs: React.FC = () => {
               <button
                 onClick={() => setChannelFilter('EMAIL')}
                 className={`px-3 py-1 text-xs font-bold rounded-md transition flex items-center gap-1 ${
-                  channelFilter === 'EMAIL' ? 'bg-[#C04E24] text-white shadow-sm' : 'text-slate-600 hover:text-black'
+                  channelFilter === 'EMAIL' ? 'bg-gradient-to-r from-indigo-600 to-purple-700 text-white shadow-sm' : 'text-slate-600 hover:text-black'
                 }`}
               >
                 <Mail size={12} /> Email
@@ -173,7 +173,7 @@ const NotificationAuditLogs: React.FC = () => {
               <button
                 onClick={() => setChannelFilter('SMS')}
                 className={`px-3 py-1 text-xs font-bold rounded-md transition flex items-center gap-1 ${
-                  channelFilter === 'SMS' ? 'bg-[#C04E24] text-white shadow-sm' : 'text-slate-600 hover:text-black'
+                  channelFilter === 'SMS' ? 'bg-gradient-to-r from-indigo-600 to-purple-700 text-white shadow-sm' : 'text-slate-600 hover:text-black'
                 }`}
               >
                 <MessageSquare size={12} /> SMS
@@ -184,7 +184,7 @@ const NotificationAuditLogs: React.FC = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-[#FAF8F5] border border-[#E0DAD1] text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#C04E24]"
+              className="bg-slate-50 border border-slate-200 text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-purple-600"
             >
               <option value="all">All Delivery Statuses</option>
               <option value="SENT">SENT / DELIVERED</option>
@@ -205,10 +205,10 @@ const NotificationAuditLogs: React.FC = () => {
         </div>
 
         {/* Logs Table */}
-        <div className="bg-white rounded-xl border border-[#E0DAD1] shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           {loading ? (
             <div className="p-12 text-center text-slate-500 text-sm">
-              <RefreshCw className="animate-spin inline-block mr-2" size={16} />
+              <RefreshCw className="animate-spin inline-block mr-2 text-purple-600" size={16} />
               Loading notification audit logs...
             </div>
           ) : error ? (
@@ -221,7 +221,7 @@ const NotificationAuditLogs: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-[#FAF8F5] border-b border-[#E0DAD1] text-[11px] font-bold text-[#7A7570] uppercase tracking-wider">
+                  <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                     <th className="py-3 px-4">Channel & Code</th>
                     <th className="py-3 px-4">Tenant / Fleet</th>
                     <th className="py-3 px-4">Masked Recipient</th>
@@ -297,7 +297,7 @@ const NotificationAuditLogs: React.FC = () => {
 
           {/* Pagination Footer */}
           {totalPages > 1 && (
-            <div className="p-4 bg-[#FAF8F5] border-t border-[#E0DAD1] flex items-center justify-between text-xs text-slate-600">
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
               <span>
                 Showing page <strong>{page}</strong> of <strong>{totalPages}</strong> ({totalCount} total entries)
               </span>
@@ -306,7 +306,7 @@ const NotificationAuditLogs: React.FC = () => {
                   type="button"
                   disabled={page <= 1}
                   onClick={() => fetchLogs(page - 1)}
-                  className="px-3 py-1.5 bg-white border border-[#E0DAD1] rounded-lg font-bold disabled:opacity-50 hover:bg-slate-50 transition"
+                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg font-bold disabled:opacity-50 hover:bg-slate-50 transition"
                 >
                   Previous
                 </button>
@@ -314,7 +314,7 @@ const NotificationAuditLogs: React.FC = () => {
                   type="button"
                   disabled={page >= totalPages}
                   onClick={() => fetchLogs(page + 1)}
-                  className="px-3 py-1.5 bg-white border border-[#E0DAD1] rounded-lg font-bold disabled:opacity-50 hover:bg-slate-50 transition"
+                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg font-bold disabled:opacity-50 hover:bg-slate-50 transition"
                 >
                   Next
                 </button>
@@ -326,10 +326,10 @@ const NotificationAuditLogs: React.FC = () => {
         {/* Inspection Modal */}
         {selectedLog && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-fadeIn border border-[#E0DAD1]">
-              <div className="p-4 bg-[#1C1A18] text-white flex items-center justify-between">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden animate-fadeIn border border-slate-200">
+              <div className="p-4 bg-[#0B0B0F] border-b-2 border-purple-600 text-white flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Bell size={16} className="text-[#DE8A66]" />
+                  <Bell size={16} className="text-purple-400" />
                   <span className="text-sm font-bold">Notification Audit Record</span>
                 </div>
                 <button
@@ -341,44 +341,44 @@ const NotificationAuditLogs: React.FC = () => {
                 </button>
               </div>
 
-              <div className="p-6 space-y-4 text-xs text-[#1C1A18]">
-                <div className="grid grid-cols-2 gap-3 bg-[#FAF8F5] p-3.5 rounded-lg border border-[#E0DAD1]">
+              <div className="p-6 space-y-4 text-xs text-slate-900">
+                <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
                   <div>
-                    <span className="text-[10px] font-bold text-[#7A7570] uppercase">Log ID</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Log ID</span>
                     <p className="font-mono text-slate-800 break-all">{selectedLog.logId}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-[#7A7570] uppercase">Channel</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Channel</span>
                     <p className="font-semibold text-slate-800">{selectedLog.channel}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-[#7A7570] uppercase">Template Code</span>
-                    <p className="font-mono font-bold text-[#843217]">{selectedLog.templateCode}</p>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Template Code</span>
+                    <p className="font-mono font-bold text-purple-700">{selectedLog.templateCode}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-[#7A7570] uppercase">Delivery Status</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Delivery Status</span>
                     <div className="mt-0.5">{getStatusBadge(selectedLog.providerStatus)}</div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex justify-between py-1.5 border-b border-[#FAF8F5]">
+                  <div className="flex justify-between py-1.5 border-b border-slate-100">
                     <span className="text-slate-500">Fleet Tenant:</span>
                     <span className="font-semibold">{selectedLog.fleetName}</span>
                   </div>
-                  <div className="flex justify-between py-1.5 border-b border-[#FAF8F5]">
+                  <div className="flex justify-between py-1.5 border-b border-slate-100">
                     <span className="text-slate-500">Masked Recipient:</span>
                     <span className="font-mono font-bold">{selectedLog.maskedRecipient}</span>
                   </div>
-                  <div className="flex justify-between py-1.5 border-b border-[#FAF8F5]">
+                  <div className="flex justify-between py-1.5 border-b border-slate-100">
                     <span className="text-slate-500">Reference:</span>
-                    <span className="font-mono">{selectedLog.referenceEntity || 'None'} ({selectedLog.referenceId || '&mdash;'})</span>
+                    <span className="font-mono">{selectedLog.referenceEntity || 'None'} ({selectedLog.referenceId || '—'})</span>
                   </div>
-                  <div className="flex justify-between py-1.5 border-b border-[#FAF8F5]">
+                  <div className="flex justify-between py-1.5 border-b border-slate-100">
                     <span className="text-slate-500">Attempts:</span>
                     <span>{selectedLog.attemptCount} / {selectedLog.maxRetries}</span>
                   </div>
-                  <div className="flex justify-between py-1.5 border-b border-[#FAF8F5]">
+                  <div className="flex justify-between py-1.5 border-b border-slate-100">
                     <span className="text-slate-500">Created:</span>
                     <span>{new Date(selectedLog.createdAt).toLocaleString()}</span>
                   </div>
@@ -392,11 +392,11 @@ const NotificationAuditLogs: React.FC = () => {
                 )}
               </div>
 
-              <div className="p-4 bg-[#FAF8F5] border-t border-[#E0DAD1] flex justify-end">
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
                 <button
                   type="button"
                   onClick={() => setSelectedLog(null)}
-                  className="px-4 py-2 bg-[#1C1A18] text-white text-xs font-bold rounded-lg hover:bg-slate-800 transition"
+                  className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white text-xs font-bold rounded-lg shadow-sm transition"
                 >
                   Close
                 </button>

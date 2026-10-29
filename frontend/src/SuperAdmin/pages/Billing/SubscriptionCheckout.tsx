@@ -224,10 +224,10 @@ const SubscriptionCheckout: React.FC = () => {
       <AlertContainer />
 
       {/* Active Subscription Status Banner */}
-      <div className="bg-[#1C1A18] border-b-4 border-[#C04E24] rounded-2xl p-6 text-white mb-8 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      <div className="bg-[#0B0B0F] border-b-4 border-purple-600 rounded-2xl p-6 text-white mb-8 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-3">
-            <span className="px-3 py-1 bg-[#C04E24] text-white font-extrabold text-xs uppercase tracking-wider rounded-md">
+            <span className="px-3 py-1 bg-gradient-to-r from-indigo-600 to-purple-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-md">
               Current Plan: {planTier}
             </span>
             <span
@@ -246,20 +246,20 @@ const SubscriptionCheckout: React.FC = () => {
           <h2 className="text-xl font-black tracking-tight mt-3 text-white">
             Workspace: {currentTenant?.name || "FleetFlow Fleet Operations"}
           </h2>
-          <p className="text-xs text-[#EDE9E3] mt-1">
+          <p className="text-xs text-slate-300 mt-1">
             Authoritative multi-tenant context. Enforced backend quotas protect database integrity.
           </p>
         </div>
 
         <div className="flex gap-4 shrink-0 bg-white/10 p-4 rounded-xl border border-white/15 text-center">
           <div>
-            <div className="text-[10px] uppercase font-bold text-[#EDE9E3]">Vehicle Quota</div>
-            <div className="text-xl font-black text-[#DE8A66]">{vehicleQuota}</div>
+            <div className="text-[10px] uppercase font-bold text-slate-300">Vehicle Quota</div>
+            <div className="text-xl font-black text-purple-400">{vehicleQuota}</div>
           </div>
           <div className="w-px bg-white/20"></div>
           <div>
-            <div className="text-[10px] uppercase font-bold text-[#EDE9E3]">Driver Quota</div>
-            <div className="text-xl font-black text-[#DE8A66]">{driverQuota}</div>
+            <div className="text-[10px] uppercase font-bold text-slate-300">Driver Quota</div>
+            <div className="text-xl font-black text-purple-400">{driverQuota}</div>
           </div>
         </div>
       </div>
@@ -268,19 +268,19 @@ const SubscriptionCheckout: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
         {/* Left 2 Cols: Plan Selection */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-6 rounded-2xl border border-[#E0DAD1] shadow-sm">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div>
-                <h3 className="text-base font-bold text-[#1C1A18]">Select Fleet Subscription Tier</h3>
-                <p className="text-xs text-[#7A7570]">Pick the capacity tier needed for your fleet operations.</p>
+                <h3 className="text-base font-bold text-slate-900">Select Fleet Subscription Tier</h3>
+                <p className="text-xs text-slate-500">Pick the capacity tier needed for your fleet operations.</p>
               </div>
 
               {/* Monthly vs Annual Toggle */}
-              <div className="inline-flex items-center bg-[#FAF8F5] p-1 rounded-xl border border-[#E0DAD1]">
+              <div className="inline-flex items-center bg-slate-50 p-1 rounded-xl border border-slate-200">
                 <button
                   onClick={() => setBillingCycle("monthly")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                    billingCycle === "monthly" ? "bg-white text-[#1C1A18] shadow-sm border border-[#E0DAD1]" : "text-[#5C5752]"
+                    billingCycle === "monthly" ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-600"
                   }`}
                 >
                   Monthly
@@ -288,11 +288,11 @@ const SubscriptionCheckout: React.FC = () => {
                 <button
                   onClick={() => setBillingCycle("annual")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                    billingCycle === "annual" ? "bg-[#C04E24] text-white shadow-sm" : "text-[#5C5752]"
+                    billingCycle === "annual" ? "bg-gradient-to-r from-indigo-600 to-purple-700 text-white shadow-sm" : "text-slate-600"
                   }`}
                 >
                   <span>Annual</span>
-                  <span className="bg-emerald-700 text-white text-[10px] px-1.5 py-0.2 rounded font-black">
+                  <span className="bg-emerald-600 text-white text-[10px] px-1.5 py-0.2 rounded font-black">
                     15% OFF
                   </span>
                 </button>
@@ -314,25 +314,25 @@ const SubscriptionCheckout: React.FC = () => {
                     onClick={() => setSelectedPlanId(plan.id)}
                     className={`cursor-pointer rounded-2xl p-4 border transition-all ${
                       isSelected
-                        ? "border-[#C04E24] bg-[#FDF6F0] ring-2 ring-[#F3D0BD] shadow-md"
-                        : "border-[#E0DAD1] hover:border-[#C04E24]/50 bg-white"
+                        ? "border-purple-600 bg-purple-50/60 ring-2 ring-purple-200 shadow-md"
+                        : "border-slate-200 hover:border-purple-400 bg-white"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-black text-sm text-[#1C1A18]">{plan.name}</span>
+                      <span className="font-black text-sm text-slate-900">{plan.name}</span>
                       {isSelected && (
-                        <FontAwesomeIcon icon={faCheckCircle} className="text-[#C04E24] text-sm" />
+                        <FontAwesomeIcon icon={faCheckCircle} className="text-purple-600 text-sm" />
                       )}
                     </div>
 
                     <div className="mt-3">
-                      <span className="text-xl font-black text-[#C04E24]">{formatINR(price)}</span>
-                      <span className="text-[10px] text-[#7A7570] font-medium ml-1">
+                      <span className="text-xl font-black text-purple-700">{formatINR(price)}</span>
+                      <span className="text-[10px] text-slate-500 font-medium ml-1">
                         /{billingCycle === "annual" ? "yr" : "mo"}
                       </span>
                     </div>
 
-                    <div className="mt-3 pt-3 border-t border-[#E0DAD1] text-[11px] text-[#5C5752] space-y-1">
+                    <div className="mt-3 pt-3 border-t border-slate-100 text-[11px] text-slate-600 space-y-1">
                       <div>🚗 Up to {plan.vehicleQuota} Vehicles</div>
                       <div>👤 Up to {plan.driverQuota} Drivers</div>
                       <div>🏢 Up to {plan.corporateQuota} Corporate Clients</div>
@@ -422,8 +422,8 @@ const SubscriptionCheckout: React.FC = () => {
             </div>
 
             <div className="pt-4 flex justify-between items-baseline">
-              <span className="text-sm font-bold text-[#1C1A18]">Total Payable</span>
-              <span className="text-2xl font-black text-[#C04E24]">{formatINR(grandTotal)}</span>
+              <span className="text-sm font-bold text-slate-900">Total Payable</span>
+              <span className="text-2xl font-black text-purple-700">{formatINR(grandTotal)}</span>
             </div>
           </div>
 
@@ -431,7 +431,7 @@ const SubscriptionCheckout: React.FC = () => {
             <button
               onClick={handleInitiateCheckout}
               disabled={processingCheckout}
-              className="w-full py-3.5 bg-[#C04E24] hover:bg-[#A43D1A] text-white rounded-xl text-xs font-bold tracking-wider uppercase transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white rounded-xl text-xs font-bold tracking-wider uppercase transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {processingCheckout ? (
                 <>
@@ -445,7 +445,7 @@ const SubscriptionCheckout: React.FC = () => {
                 </>
               )}
             </button>
-            <p className="text-[10px] text-[#7A7570] text-center mt-2">
+            <p className="text-[10px] text-slate-400 text-center mt-2">
               GST invoices are archived for compliant corporate accounting.
             </p>
           </div>

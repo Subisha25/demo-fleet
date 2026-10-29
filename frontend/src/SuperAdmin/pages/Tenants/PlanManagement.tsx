@@ -301,14 +301,14 @@ const PlanManagement: React.FC = () => {
           <CommonButton
             text="+ Add New Plan"
             onClick={openAddModal}
-            className="bg-teal-600 hover:bg-teal-700 text-white font-bold"
+            className="bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white font-bold"
           />
         </div>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center p-16 text-slate-500">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mr-3"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mr-3"></div>
           Loading plan catalog...
         </div>
       ) : (
@@ -827,7 +827,7 @@ const PlanManagement: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold shadow-sm"
+                  className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white rounded-lg font-bold shadow-sm"
                 >
                   Save Plan Configuration
                 </button>
