@@ -149,24 +149,25 @@ const UserViewConfirmPendingOrder: React.FC = () => {
   }, [bookingId]);
 
   const handleConfirm = async () => {
-    if (!order?.bookingId || !selectedDriver || !selectedVehicle) {
-      showToast("   Please select both vehicle and driver before confirming.", "warn");
+    if (!order?.bookingId || !selectedDriver) {
+      showToast("Please select a driver before confirming.", "warn");
       return;
     }
     try {
       const res = await axiosInstance.patch("/vendor/confirmBookingforWeb", {
         bookingId: order.bookingId,
         driverId: selectedDriver,
-        vehicleId: selectedVehicle,
+        vehicleId: selectedVehicle || undefined,
       });
 
       if (res.status === 200) {
         showToast("Booking confirmed & email sent to customer.", "success");
         navigate("/orders/closepending");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Confirm booking error:", error);
-      showToast("Failed to confirm booking.", "error");
+      const msg = error?.response?.data?.message || "Failed to confirm booking.";
+      showToast(msg, "error");
     }
   };
 

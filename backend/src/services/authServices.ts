@@ -1,7 +1,7 @@
 import { Request, Response, Router } from 'express';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
-import { Company,Employee, Vendor } from '../models';
+import { Company, Employee, Vendor, Tenant } from '../models';
 import { Security } from '../utils/Security';
 import config from '../config/config';
 import { User } from '../models/user';
@@ -364,12 +364,15 @@ if (existingUserByMobile) {
     // Ensure company SEO URL is valid and never undefined
     let companySeoUrl = company.seoUrl;
     if (!companySeoUrl || companySeoUrl.trim() === "") {
-      companySeoUrl = await generateUniqueCompanySlug(company.companyName || "company", company.companyId);
+      companySeoUrl = await generateUniqueCompanySlug(company.companyName || "company", company.tenantId, company.companyId);
       await company.update({ seoUrl: companySeoUrl });
     }
 
+    const tenant = company.tenantId ? await Tenant.findByPk(company.tenantId) : null;
+    const fleetSlug = tenant?.slug || tenant?.subdomain || 'fleet';
+
     const webBaseUrl = (process.env.WEB_BASE_URL || config.baseurl?.webbaseurl || "http://localhost:3000").replace(/\/$/, "");
-    const companyPortalUrl = `${webBaseUrl}/Company/${encodeURIComponent(companySeoUrl)}`;
+    const companyPortalUrl = `${webBaseUrl}/company/${encodeURIComponent(fleetSlug)}/${encodeURIComponent(companySeoUrl)}`;
     const commonLoginUrl = `${webBaseUrl}/login`;
 
     const managerEmails: string[] = normalizeManagerEmails(company.managerEmail as any);
@@ -526,31 +529,99 @@ export const userLogin = async (req: Request, res: Response) => {
 export const CompanyLogin = async (req: Request, res: Response) => {
   const email = (req.body.email || '').trim().toLowerCase();
   const password = typeof req.body.password === 'string' ? req.body.password : '';
-  const seoUrl = (req.body.seoUrl || '').trim();
+  const fleetSlug = (req.body.fleetSlug || '').trim().toLowerCase();
+  const companySlug = (req.body.companySlug || req.body.seoUrl || '').trim().toLowerCase();
 
   try {
-    if (!email || !password || !seoUrl) {
+    if (!email || !password || !companySlug) {
       return res.status(400).json({
         success: false,
-        message: "Email, password and company URL are required",
+        message: "Email, password and company identifier are required",
       });
     }
 
-    //  Find company by SEO URL
-    const company = await Company.findOne({ where: { seoUrl } });
-    if (!company) {
-      return res.status(404).json({
+    //  Reject SuperAdmin / Fleet Admin administrative accounts from logging into company user portal
+    const empUser = await Employee.findOne({ where: { email } });
+    if (empUser && ['superadmin', 'fleet_admin', 'admin'].includes((empUser.role || '').toLowerCase())) {
+      return res.status(403).json({
         success: false,
-        message: "Invalid company URL",
+        message: "Fleet administrators and SuperAdmins cannot log in through the corporate client portal. Please use the administrative portal.",
       });
     }
+
+    //  Resolve Company & Fleet
+    let tenant: any = null;
+    let company: any = null;
+
+    if (fleetSlug) {
+      tenant = await Tenant.findOne({
+        where: {
+          isDeleted: false,
+          [Op.or]: [
+            { slug: fleetSlug },
+            { subdomain: fleetSlug },
+            { code: fleetSlug.toUpperCase() },
+            ...(fleetSlug === 'fleetflow' || fleetSlug === 'primary' ? [{ tenantId: ROOT_TENANT_ID }] : [])
+          ]
+        }
+      });
+
+      if (!tenant) {
+        return res.status(404).json({
+          success: false,
+          message: "Fleet not found",
+        });
+      }
+
+      company = await Company.findOne({
+        where: {
+          seoUrl: companySlug,
+          tenantId: tenant.tenantId,
+          isDeleted: false,
+        }
+      });
+
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: "Company not found for this fleet",
+        });
+      }
+    } else {
+      // Backward compatibility: Resolve Company by single seoUrl
+      company = await Company.findOne({
+        where: {
+          seoUrl: companySlug,
+          isDeleted: false,
+        }
+      });
+
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: "Invalid company URL",
+        });
+      }
+
+      tenant = company.tenantId ? await Tenant.findByPk(company.tenantId) : null;
+    }
+
+    const companyTenantId = company.tenantId || ROOT_TENANT_ID;
 
     //  Find user by email
     const user = await User.findOne({ where: { email } });
     if (!user) {
-      return res.status(404).json({
+      return res.status(401).json({
         success: false,
-        message: "User not found",
+        message: "Invalid email or password",
+      });
+    }
+
+    // Reject administrative roles if somehow set on user model
+    if (['superadmin', 'fleet_admin', 'admin'].includes((user.role || '').toLowerCase())) {
+      return res.status(403).json({
+        success: false,
+        message: "Administrative accounts cannot log in through corporate client portal.",
       });
     }
 
@@ -562,17 +633,33 @@ export const CompanyLogin = async (req: Request, res: Response) => {
       });
     }
 
+    //  Check if user belongs to that fleet
+    const userTenantId = user.tenantId || companyTenantId;
+    if (userTenantId !== companyTenantId) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to login for this fleet",
+      });
+    }
+
+    // Check active status
+    if ((user as any).status === 'inactive' || (user as any).isDeleted) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is deactivated. Please contact your company administrator.",
+      });
+    }
+
     //  Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: "Invalid credentials",
+        message: "Invalid email or password",
       });
     }
 
     //  Assign role dynamically
-    // let updatedRole = user.isManager ? "manager" : "user";
     let updatedRole = user.companyManager ? "manager" : "user";
 
     // If DB role doesn't match current logic, update it
@@ -581,13 +668,16 @@ export const CompanyLogin = async (req: Request, res: Response) => {
       await user.save();
     }
 
+    const resolvedFleetSlug = tenant?.slug || tenant?.subdomain || 'fleet';
+
     //  Generate JWT token
     const accessToken = Security.generateJwtToken(
       {
         userId: user.userId,
         roles: updatedRole,
         companyId: company.companyId,
-        tenantId: user.tenantId || company.tenantId || ROOT_TENANT_ID
+        tenantId: companyTenantId,
+        email: user.email,
       },
       config.security.jwtSecret,
       config.security.accessTokenExpiry
@@ -602,6 +692,9 @@ export const CompanyLogin = async (req: Request, res: Response) => {
         role: updatedRole,
       },
       accessToken,
+      fleetSlug: resolvedFleetSlug,
+      companySlug: company.seoUrl,
+      companyPortalUrl: `/company/${resolvedFleetSlug}/${company.seoUrl}`,
     });
   } catch (err: any) {
     console.error("User login error:", err);

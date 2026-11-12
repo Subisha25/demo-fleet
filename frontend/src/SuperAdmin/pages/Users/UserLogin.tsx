@@ -13,14 +13,23 @@ interface CompanyData {
   companyName: string;
   companyLogo: string;
   seoUrl: string;
+  tenantId?: string;
+  fleetSlug?: string;
+  fleetName?: string;
+  fleetLogo?: string;
 }
 
 const UserLogin: React.FC = () => {
-  const { seoUrl } = useParams<{ seoUrl: string }>();
+  const { fleetSlug, companySlug, seoUrl } = useParams<{ fleetSlug?: string; companySlug?: string; seoUrl?: string }>();
+  const activeFleetSlug = (fleetSlug || "").trim();
+  const activeCompanySlug = (companySlug || seoUrl || "").trim();
+
   const navigate = useNavigate();
   const { login } = useAuth();
 
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
+  const [loadingCompany, setLoadingCompany] = useState(true);
+  const [companyNotFound, setCompanyNotFound] = useState(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,15 +49,33 @@ const UserLogin: React.FC = () => {
   /* ===== Load Company ===== */
   useEffect(() => {
     const fetchCompany = async () => {
+      if (!activeCompanySlug) {
+        setLoadingCompany(false);
+        setCompanyNotFound(true);
+        return;
+      }
       try {
-        const res = await axiosInstance.get(`/company/${seoUrl}`);
-        setCompanyData(res.data);
-      } catch {
-        showToast("Unable to load company details", "error");
+        setLoadingCompany(true);
+        setCompanyNotFound(false);
+        const url = activeFleetSlug
+          ? `/company/${activeFleetSlug}/${activeCompanySlug}`
+          : `/company/${activeCompanySlug}`;
+        const res = await axiosInstance.get(url);
+        const data = res.data?.data || res.data;
+        if (data && (data.companyName || data.companyId)) {
+          setCompanyData(data);
+        } else {
+          setCompanyNotFound(true);
+        }
+      } catch (err: any) {
+        console.error("Unable to load company details:", err);
+        setCompanyNotFound(true);
+      } finally {
+        setLoadingCompany(false);
       }
     };
-    if (seoUrl) fetchCompany();
-  }, [seoUrl]);
+    fetchCompany();
+  }, [activeFleetSlug, activeCompanySlug]);
 
   /* ===== Login Validation ===== */
   const validate = () => {
@@ -73,7 +100,9 @@ const UserLogin: React.FC = () => {
     const res = await axiosInstance.post(`/auth/companyLogin`, {
       email,
       password,
-      seoUrl,
+      fleetSlug: activeFleetSlug || undefined,
+      companySlug: activeCompanySlug,
+      seoUrl: activeCompanySlug,
     });
 
     const { success, User, accessToken } = res.data;
@@ -105,8 +134,12 @@ const UserLogin: React.FC = () => {
     if (companyData) {
       localStorage.setItem("companySeoUrl", companyData.seoUrl);
       localStorage.setItem("companyName", companyData.companyName);
+      if (companyData.companyLogo) {
         localStorage.setItem("companyLogo", companyData.companyLogo);
-
+      }
+      if (companyData.fleetSlug || activeFleetSlug) {
+        localStorage.setItem("fleetSlug", companyData.fleetSlug || activeFleetSlug);
+      }
     }
 
     await login();
@@ -192,10 +225,41 @@ const UserLogin: React.FC = () => {
     }
   };
 
+  if (companyNotFound && !loadingCompany) {
+    return (
+      <>
+        <AlertContainer />
+        <UserLoginHeader companyData={null} />
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center px-4 py-12">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center border border-gray-100">
+            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Lock size={32} />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Company Portal Not Found</h2>
+            <p className="text-gray-600 text-sm mb-6">
+              The requested corporate portal URL could not be found. Please check the link or contact your fleet administrator.
+            </p>
+            <Link
+              to="/login"
+              className="inline-block w-full py-3 px-4 bg-[#274782] hover:bg-[#1f3764] text-white font-medium rounded-xl transition text-center shadow-md"
+            >
+              Go to Login
+            </Link>
+          </div>
+        </div>
+        <Footer />
+      </>
+    );
+  }
+
+  const registerUrl = activeFleetSlug && activeCompanySlug
+    ? `/company/${activeFleetSlug}/${activeCompanySlug}/managerAddUser`
+    : `/company/${activeCompanySlug}/managerAddUser`;
+
   return (
     <>
       <AlertContainer />
-<UserLoginHeader companyData={companyData} />
+      <UserLoginHeader companyData={companyData} />
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center px-4">
         <div className="w-full max-w-md">
           <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden">
@@ -206,8 +270,13 @@ const UserLogin: React.FC = () => {
                 <Lock className="text-white" size={32} />
               </div>
               <h2 className="text-2xl font-bold text-white">
-                {companyData?.companyName || "User"} Login
+                {companyData?.companyName || "Corporate"} Login
               </h2>
+              {companyData?.fleetName && (
+                <p className="text-blue-200 text-xs font-semibold uppercase tracking-wider mt-1">
+                  Fleet: {companyData.fleetName}
+                </p>
+              )}
               <p className="text-blue-100 text-sm mt-1">Sign in to continue</p>
             </div>
 
@@ -276,8 +345,8 @@ const UserLogin: React.FC = () => {
               </p>
 
               <Link
-                to={`/company/${seoUrl}/managerAddUser`}
-                className="block text-center text-sm text-[#275981]"
+                to={registerUrl}
+                className="block text-center text-sm text-[#275981] hover:underline"
               >
                 Register
               </Link>

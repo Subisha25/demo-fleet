@@ -1,6 +1,6 @@
 // src/SuperAdmin/pages/Orders/ViewClosePendingOrder.tsx
 import React, { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axiosInstance from "../../../../utils/axiosInstance";
 import PageLayout from "../../../../components/PageLayout";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -30,8 +30,12 @@ interface VehicleModelItem {
 
 const ViewClosePendingOrder: React.FC = () => {
   const location = useLocation();
-  const { bookingId } = location.state || {};
+  const { bookingId: stateBookingId } = location.state || {};
+  const { bookingId: paramBookingId } = useParams();
+  const bookingId = stateBookingId || paramBookingId;
   const [order, setOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
@@ -53,13 +57,20 @@ const [selectedVehicleLabel, setSelectedVehicleLabel] = useState(""); // show te
   // ✅ Fetch order details
   const fetchOrder = async (id: string) => {
     try {
+      setLoading(true);
+      setFetchError(null);
       const response = await axiosInstance.post("/order/getOrdersById", {
         bookingId: id,
       });
       setOrder(response.data.data);
       return response.data.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching order by ID:", error);
+      const msg = error?.response?.data?.message || "Error fetching order details.";
+      setFetchError(msg);
+      showToast(msg, "error");
+    } finally {
+      setLoading(false);
     }
   };
 const filteredVehicles = vehicleItems.filter((v) =>
@@ -134,10 +145,45 @@ const fetchVehicleModels = async (vehicleTypeId: string) => {
 }, [bookingId]);
 
 
-  if (!order) {
+  if (loading) {
     return (
       <PageLayout>
-        <p className="p-6 text-gray-600">Loading order details...</p>
+        <div className="flex flex-col justify-center items-center h-[60vh] gap-3">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-gray-600 text-lg font-medium">Loading order details...</p>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  if (fetchError || !order) {
+    return (
+      <PageLayout>
+        <div className="p-6 max-w-xl mx-auto mt-12 bg-white rounded-lg border border-red-200 shadow-sm text-center">
+          <div className="w-12 h-12 mx-auto mb-3 text-red-500 flex items-center justify-center rounded-full bg-red-50">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">Unable to Load Order Details</h3>
+          <p className="text-gray-600 text-sm mb-6">{fetchError || "Order details could not be retrieved."}</p>
+          <div className="flex justify-center gap-4">
+            <button
+              onClick={() => navigate("/orders/closepending")}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded font-medium text-sm transition-colors"
+            >
+              Back to Close Pending
+            </button>
+            <button
+              onClick={() => {
+                if (bookingId) fetchOrder(bookingId);
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium text-sm transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
       </PageLayout>
     );
   }

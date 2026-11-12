@@ -27,40 +27,88 @@ import { Op } from 'sequelize';
 
 export const confirmBooking = async (req: any, res: Response) => {
   try {
-    const role = req.role;
+    const role = (req.role || req.roles || '').toLowerCase();
+    const loggedUser = req.userId;
     const { bookingId, driverId, vehicleId, vehicleMasterId } = req.body;
+
+    if (!bookingId || !driverId) {
+      return res.status(400).json({ success: false, message: "bookingId and driverId are required" });
+    }
+
+    if (role === ROLES.USER || role === ROLES.DRIVER) {
+      return res.status(403).json({ success: false, message: "Not Authorized" });
+    }
+
+    if (loggedUser) {
+      const empData = await Employee.findOne({ where: { employeeId: loggedUser } });
+      if (empData) {
+        const empRole = (empData.role || '').toLowerCase();
+        if (empRole === ROLES.USER || empRole === ROLES.DRIVER) {
+          return res.status(403).json({ success: false, message: "Not Authorized" });
+        }
+      }
+    }
+
     const bookingData = await Booking.findByPk(bookingId);
     if (!bookingData) {
-  return res.status(404).json({ message: "Booking not found" });
-}
-  
-const userData = await User.findOne({ where: { userId: bookingData?.userId } });
- 
-const company = await Company.findOne({ where:  { companyId: userData?.companyId } });
-   
-       const whereCondition: any = { bookingId };
-    
-      if (company?.managerApproval) {
-      
-         whereCondition.confirmStatus= ORDER.STATUS.PENDING;
-          whereCondition.bookingStatus= ORDER.STATUS.CONFIRMED;
-      } else if(!company?.managerApproval) {
-       
-          whereCondition.confirmStatus= ORDER.STATUS.PENDING;
-          whereCondition.bookingStatus= ORDER.STATUS.PENDING;
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+    assertTenantOwnership(bookingData, "Booking");
+
+    if (String(bookingData.confirmStatus) === String(ORDER.STATUS.CONFIRMED)) {
+      return res.status(400).json({ success: false, message: "Booking is already confirmed" });
+    }
+
+    const driver = await Drivers.findByPk(driverId);
+    if (!driver) {
+      return res.status(404).json({ success: false, message: "Driver not found" });
+    }
+    assertTenantOwnership(driver, "Driver");
+
+    const bookingTenantId = bookingData.tenantId || ROOT_TENANT_ID;
+    const driverTenantId = driver.tenantId || ROOT_TENANT_ID;
+    if (bookingTenantId !== driverTenantId) {
+      return res.status(403).json({ success: false, message: "Forbidden: Driver does not belong to the booking fleet." });
+    }
+
+    let resolvedVehicleId = vehicleId || bookingData.vehicleId || null;
+    let resolvedVehicleMasterId = vehicleMasterId || bookingData.vehicleMasterId || null;
+
+    if (vehicleId) {
+      const vehicleCheck = await Vehicle.findByPk(vehicleId);
+      if (!vehicleCheck) {
+        return res.status(404).json({ success: false, message: "Vehicle not found" });
       }
-    
+      assertTenantOwnership(vehicleCheck, "Vehicle");
+      const vehicleTenantId = vehicleCheck.tenantId || ROOT_TENANT_ID;
+      if (bookingTenantId !== vehicleTenantId) {
+        return res.status(403).json({ success: false, message: "Forbidden: Vehicle does not belong to the booking fleet." });
+      }
+    }
+
+    if (vehicleMasterId) {
+      const vmCheck = await VehicleMaster.findByPk(vehicleMasterId);
+      if (vmCheck) {
+        assertTenantOwnership(vmCheck, "VehicleMaster");
+      }
+    } else if (resolvedVehicleId && !resolvedVehicleMasterId) {
+      const defaultVm = await VehicleMaster.findOne({ where: { vehicleId: resolvedVehicleId } });
+      if (defaultVm) {
+        resolvedVehicleMasterId = defaultVm.vehicleMasterId;
+      }
+    }
+
     // 🔹 Update Booking Status
     const updateConfirm = await Booking.update(
       {
         confirmStatus: ORDER.STATUS.CONFIRMED,
         bookingStatus: ORDER.STATUS.CONFIRMED,
         driverId,
-        vehicleId,
-        vehicleMasterId
+        vehicleId: resolvedVehicleId,
+        vehicleMasterId: resolvedVehicleMasterId
       },
       {
-          where: whereCondition,
+        where: { bookingId }
       }
     );
 
@@ -68,14 +116,12 @@ const company = await Company.findOne({ where:  { companyId: userData?.companyId
       return res.status(200).json({ message: 'No matching bookings found to update' });
     }
 
-    // 🔹 Fetch booking with relations for email
+    // 🔹 Fetch booking with relations for notifications
     const booking = await Booking.findByPk(bookingId);
     const user = booking ? await User.findByPk(booking.userId) : null;
-    const driver = await Drivers.findByPk(driverId);
-   // const vehicle = await Vehicle.findByPk(vehicleId);
-    const vehicle = await Vehicle.findByPk(vehicleId, {
-  include: [{ model: VehicleMaster, as: "vehicleMaster", required: false }],
-});
+    const vehicle = resolvedVehicleId ? await Vehicle.findByPk(resolvedVehicleId, {
+      include: [{ model: VehicleMaster, as: "vehicleMaster", required: false }],
+    }) : null;
     //push notification
     try {
       const driverToken = await Drivers.findOne({
@@ -236,16 +282,19 @@ const company = await Company.findOne({ where:  { companyId: userData?.companyId
     try {
       await sendSmsNotifications({ booking, user, driver, vehicle, formattedBookingDate, shouldSendSms });
     } catch (smsErr: any) {
-      console.error('SMS send error:', smsErr);
-      return res.status(500).json({ error: 'Internal server error' });
+      console.error('SMS send error (ignored to preserve confirmation):', smsErr);
     }
 
     return res.status(200).json({
+      success: true,
       message: 'Booking confirmed successfully',
       updateConfirm
     });
 
-  } catch (err) {
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ success: false, message: err.message || "Cross-tenant access denied" });
+    }
     console.error('Update Confirm Status Error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
@@ -253,31 +302,80 @@ const company = await Company.findOne({ where:  { companyId: userData?.companyId
 
 export const confirmBookingforWeb = async (req: any, res: Response) => {
   try {
-    const role = req.role;
+    const role = (req.role || req.roles || '').toLowerCase();
     const loggedUser = req.userId;
 
     const { bookingId, driverId, vehicleId, vehicleMasterId } = req.body;
 
-    if (!bookingId || !driverId || !vehicleId || !vehicleMasterId) {
+    if (!bookingId || !driverId) {
       return res.status(400).json({
-        message: "bookingId, driverId, vehicleId, vehicleMasterId are required",
+        success: false,
+        message: "bookingId and driverId are required",
       });
+    }
+
+    if (role === ROLES.USER || role === ROLES.DRIVER) {
+      return res.status(403).json({ success: false, message: "Not Authorized" });
+    }
+
+    if (loggedUser) {
+      const empData = await Employee.findOne({ where: { employeeId: loggedUser } });
+      if (empData) {
+        const empRole = (empData.role || '').toLowerCase();
+        if (empRole === ROLES.USER || empRole === ROLES.DRIVER) {
+          return res.status(403).json({ success: false, message: "Not Authorized" });
+        }
+      }
     }
 
     const bookingData = await Booking.findByPk(bookingId);
     if (!bookingData) {
-      return res.status(404).json({ message: "Booking not found" });
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
+    assertTenantOwnership(bookingData, "Booking");
+
+    if (String(bookingData.confirmStatus) === String(ORDER.STATUS.CONFIRMED)) {
+      return res.status(400).json({ success: false, message: "Booking is already confirmed" });
     }
 
-    // Auth
-    const empData = await Employee.findOne({ where: { employeeId: loggedUser } });
-    if (empData?.role !== ROLES.SUPERADMIN) {
-      return res.status(403).json({ message: "Not Authorized" });
+    const driver = await Drivers.findByPk(driverId);
+    if (!driver) {
+      return res.status(404).json({ success: false, message: "Driver not found" });
+    }
+    assertTenantOwnership(driver, "Driver");
+
+    const bookingTenantId = bookingData.tenantId || ROOT_TENANT_ID;
+    const driverTenantId = driver.tenantId || ROOT_TENANT_ID;
+    if (bookingTenantId !== driverTenantId) {
+      return res.status(403).json({ success: false, message: "Forbidden: Driver does not belong to the booking fleet." });
     }
 
-    const whereCondition: any = { bookingId };
-    whereCondition.confirmStatus = ORDER.STATUS.PENDING;
-    //whereCondition.bookingStatus = ORDER.STATUS.PENDING;
+    let resolvedVehicleId = vehicleId || bookingData.vehicleId || null;
+    let resolvedVehicleMasterId = vehicleMasterId || bookingData.vehicleMasterId || null;
+
+    if (vehicleId) {
+      const vehicleCheck = await Vehicle.findByPk(vehicleId);
+      if (!vehicleCheck) {
+        return res.status(404).json({ success: false, message: "Vehicle not found" });
+      }
+      assertTenantOwnership(vehicleCheck, "Vehicle");
+      const vehicleTenantId = vehicleCheck.tenantId || ROOT_TENANT_ID;
+      if (bookingTenantId !== vehicleTenantId) {
+        return res.status(403).json({ success: false, message: "Forbidden: Vehicle does not belong to the booking fleet." });
+      }
+    }
+
+    if (vehicleMasterId) {
+      const vmCheck = await VehicleMaster.findByPk(vehicleMasterId);
+      if (vmCheck) {
+        assertTenantOwnership(vmCheck, "VehicleMaster");
+      }
+    } else if (resolvedVehicleId && !resolvedVehicleMasterId) {
+      const defaultVm = await VehicleMaster.findOne({ where: { vehicleId: resolvedVehicleId } });
+      if (defaultVm) {
+        resolvedVehicleMasterId = defaultVm.vehicleMasterId;
+      }
+    }
 
     // ✅ Update Booking Status + store vehicleMasterId
     const updateConfirm = await Booking.update(
@@ -285,25 +383,24 @@ export const confirmBookingforWeb = async (req: any, res: Response) => {
         confirmStatus: ORDER.STATUS.CONFIRMED,
         bookingStatus: ORDER.STATUS.CONFIRMED,
         driverId,
-        vehicleId,
-        vehicleMasterId, // ✅ STORE HERE
+        vehicleId: resolvedVehicleId,
+        vehicleMasterId: resolvedVehicleMasterId,
       },
-      { where: whereCondition }
+      { where: { bookingId } }
     );
 
     if (updateConfirm[0] === 0) {
-      return res.status(200).json({ message: "No matching bookings found to update" });
+      return res.status(200).json({ success: true, message: "No matching bookings found to update" });
     }
 
     // 🔹 Fetch booking for notifications
     const booking = await Booking.findByPk(bookingId);
     const user = booking ? await User.findByPk(booking.userId) : null;
-    const driver = await Drivers.findByPk(driverId);
 
     // ✅ Fetch exact selected vehicleMaster (BEST)
-    const vehicleMaster = await VehicleMaster.findByPk(vehicleMasterId, {
+    const vehicleMaster = resolvedVehicleMasterId ? await VehicleMaster.findByPk(resolvedVehicleMasterId, {
       include: [{ model: Vehicle, as: "vehicle", required: false, attributes: ["vehicleId", "vehicleName"] }],
-    });
+    }) : null;
 
     const vehicleName = vehicleMaster?.vehicle?.vehicleName ?? "";
     const vehicleNumber = vehicleMaster?.vehicleNumber ?? "";
@@ -397,7 +494,7 @@ export const confirmBookingforWeb = async (req: any, res: Response) => {
       console.log("Company has disabled email OR shouldSendSms false");
     }
 
-    // ✅ SMS (centralized)
+    // ✅ SMS (centralized) - fails gracefully without breaking confirmation
     try {
       await sendSmsNotifications({
         booking,
@@ -407,23 +504,27 @@ export const confirmBookingforWeb = async (req: any, res: Response) => {
           vehicleName,
           vehicleNumber,
           vehicleModelName,
-          vehicleMasterId,
-          vehicleId,
+          vehicleMasterId: resolvedVehicleMasterId,
+          vehicleId: resolvedVehicleId,
         },
         formattedBookingDate,
         shouldSendSms,
       });
     } catch (smsErr: any) {
-      console.error("SMS send error:", smsErr);
-      return res.status(500).json({ error: "Internal server error" });
+      console.error("SMS send error (ignored to preserve confirmation):", smsErr);
     }
 
     return res.status(200).json({
+      success: true,
       message: "Booking confirmed successfully",
       updateConfirm,
-      stored: { vehicleId, vehicleMasterId }, // ✅ for quick verify
+      stored: { vehicleId: resolvedVehicleId, vehicleMasterId: resolvedVehicleMasterId }, // ✅ for quick verify
+      bookingId,
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (isTenantError(err)) {
+      return res.status(403).json({ success: false, message: err.message || "Cross-tenant access denied" });
+    }
     console.error("Update Confirm Status Error:", err);
     return res.status(500).json({ error: "Internal server error" });
   }

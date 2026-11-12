@@ -20,10 +20,11 @@ export function slugify(text: string): string {
 
 /**
  * Generates a unique SEO URL slug for a company.
- * Guarantees globally unique slug across unscoped companies.
+ * When tenantId is supplied, uniqueness is scoped within that fleet/tenant.
  */
 export async function generateUniqueCompanySlug(
   baseText: string,
+  tenantId?: string,
   excludeCompanyId?: string
 ): Promise<string> {
   const baseSlug = slugify(baseText);
@@ -32,6 +33,9 @@ export async function generateUniqueCompanySlug(
 
   while (true) {
     const whereClause: any = { seoUrl: candidate };
+    if (tenantId) {
+      whereClause.tenantId = tenantId;
+    }
     if (excludeCompanyId) {
       whereClause.companyId = { [Op.ne]: excludeCompanyId };
     }

@@ -738,8 +738,11 @@ export const createClosePending = async (req: any, res: Response) => {
       });
     }
 
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId);
     const booking = await Booking.findOne({
-      where: { bookingId },
+      where: isUuid
+        ? { [Op.or]: [{ bookingId }, { bookingCode: bookingId }] }
+        : { bookingCode: bookingId },
       include: [
         {
           model: User,
@@ -897,7 +900,7 @@ export const createClosePending = async (req: any, res: Response) => {
         bookingStatus: ORDER.STATUS.COMPLETED
       },
       {
-        where: { bookingId: bookingId },
+        where: { bookingId: booking.bookingId },
       }
     );
 
@@ -913,7 +916,7 @@ export const createClosePending = async (req: any, res: Response) => {
 
 
     const invoice = await Invoice.create({
-      bookingId,
+      bookingId: booking.bookingId,
       //     paymentId: payment.paymentId,
       userId: booking.userId,
       vehicleTypeId: booking.vehicleTypeId,
@@ -953,12 +956,6 @@ export const createClosePending = async (req: any, res: Response) => {
             model: VehicleType,
             as: "vehicleType",
             required: false,
-          },
-          {
-            model: Vehicle,
-            as: "vehicle",
-            required: false,
-            attributes: ["localPerKm", "localPerHour"]
           },
           {
             model: Payment,
@@ -1056,7 +1053,7 @@ export const createClosePending = async (req: any, res: Response) => {
             model: Vehicle,
             as: "vehicle",
             required: false,
-            attributes: ["localPerKm"],
+            attributes: ["vehicleId", "vehicleName"],
             include: [
               {
                 model: VehicleMaster,

@@ -9,6 +9,7 @@ import { DataTable, Column } from "../../../../components/DataTable";
 import CommonButton from "../../../../components/CommonButton";
 import SearchBar from "../../../../components/SearchBar";
 import TrashToggleButton from "../../../../components/TrashToggleButton";
+import { useTenant } from "../../../../context/TenantContext";
 
 type Company = {
   companyId: string;
@@ -16,11 +17,15 @@ type Company = {
   seoUrl: string;
   allowTax: string;
   isDeleted: boolean;
-   companyLogo?: string;
+  companyLogo?: string;
+  tenantSlug?: string;
+  fleetName?: string;
+  companyPortalUrl?: string;
 };
 
 const ListCompany: React.FC = () => {
   const navigate = useNavigate();
+  const { currentTenant } = useTenant();
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [showTrashed, setShowTrashed] = useState(false);
@@ -137,7 +142,8 @@ const [loading, setLoading] = useState(false);
           return <span className="text-gray-400 italic">Not generated</span>;
         }
 
-        const fullSeoUrl = `${origin}/Company/${encodeURIComponent(row.seoUrl)}`;
+        const tenantSlug = row.tenantSlug || currentTenant?.slug || currentTenant?.subdomain || 'fleet';
+        const fullSeoUrl = `${origin}/company/${encodeURIComponent(tenantSlug)}/${encodeURIComponent(row.seoUrl)}`;
 
         const handleSeoClick = () => {
           localStorage.setItem("companyId", row.companyId);

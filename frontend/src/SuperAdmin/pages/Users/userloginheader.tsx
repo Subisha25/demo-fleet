@@ -9,16 +9,29 @@ type CompanyData = {
   companyName: string;
   companyLogo: string;
   seoUrl: string;
+  fleetSlug?: string;
+  fleetName?: string;
+  fleetLogo?: string;
 };
 
 const UserLoginHeader: React.FC<{ companyData: CompanyData | null }> = ({ companyData }) => {
   const BASE_URL = config.baseurl.apibaseurl;
-  const { seoUrl } = useParams();   // for redirect
+  const { fleetSlug, companySlug, seoUrl } = useParams<{ fleetSlug?: string; companySlug?: string; seoUrl?: string }>();
+
+  const activeFleet = fleetSlug || companyData?.fleetSlug;
+  const activeCompany = companySlug || seoUrl || companyData?.seoUrl;
+  const portalLink = activeFleet && activeCompany ? `/company/${activeFleet}/${activeCompany}` : (activeCompany ? `/company/${activeCompany}` : '/');
 
   const logoSrc =
     companyData?.companyLogo
       ? `${BASE_URL}/uploads/companyLogo/${companyData.companyLogo}`
       : null;
+
+  const fleetLogoSrc = companyData?.fleetLogo
+    ? (companyData.fleetLogo.startsWith('http') || companyData.fleetLogo.startsWith('/')
+        ? companyData.fleetLogo
+        : `${BASE_URL}/uploads/fleetLogo/${companyData.fleetLogo}`)
+    : null;
 
   return (
     <header className="w-full bg-white shadow-sm">
@@ -41,10 +54,32 @@ const UserLoginHeader: React.FC<{ companyData: CompanyData | null }> = ({ compan
       {/* 🟢 Logo Row */}
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         
-        {/* ✅ LEFT SIDE – PLATFORM LOGO (DO NOT REMOVE) */}
-        <div>
-          <Link to={`/company/${seoUrl}`}>
-            <FleetFlowLogo size="sm" showTagline={false} />
+        {/* ✅ LEFT SIDE – FLEET & PLATFORM BRANDING */}
+        <div className="flex items-center gap-3">
+          <Link to={portalLink} className="flex items-center gap-3">
+            {fleetLogoSrc ? (
+              <img
+                src={fleetLogoSrc}
+                alt={companyData?.fleetName || "Fleet Logo"}
+                className="max-h-[44px] object-contain rounded"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
+            ) : null}
+            {companyData?.fleetName && (
+              <div className="border-l border-gray-300 pl-3">
+                <span className="text-base font-bold text-gray-800 tracking-tight block">
+                  {companyData.fleetName}
+                </span>
+                <span className="text-[10px] text-gray-500 uppercase tracking-widest block font-medium">
+                  Corporate Mobility
+                </span>
+              </div>
+            )}
+            {!fleetLogoSrc && !companyData?.fleetName && (
+              <FleetFlowLogo size="sm" showTagline={false} />
+            )}
           </Link>
         </div>
 

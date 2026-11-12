@@ -1300,7 +1300,7 @@ export const createCompany = async (req: any, res: Response) => {
     //  normalize/split and store as array
     const managerEmails: string[] = managerEmail ? normalizeManagerEmails(managerEmail) : [];
 
-    const finalSeoUrl = await generateUniqueCompanySlug(seoUrl || companyName || "company");
+    const finalSeoUrl = await generateUniqueCompanySlug(seoUrl || companyName || "company", tenantId);
 
     // Foreign key safety: verify employeeId exists in employee table, and userId in user table
     let resolvedEmployeeId = null;
@@ -2111,6 +2111,19 @@ export const getCompletedList = async (req: any, res: Response) => {
         { pickupPoint: { [Op.like]: `%${search}%` } },
       ];
     }
+
+    // Tenant isolation
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
+    Object.assign(bookingWhere, tenantCondition);
 
     // Company where must be applied on nested include (User -> Company)
     const companyWhere = companyId ? { companyId } : undefined;

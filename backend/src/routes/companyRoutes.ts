@@ -6,6 +6,7 @@ import {
   deleteCompany,
   restoreCompany,
   getCompanyBySeoUrl,
+  getCompanyByFleetAndCompanySlug,
   getCompanyTaxes,
 } from '../services/companyServices';
 import { authMiddleware } from '../middleware/authMiddleware';
@@ -15,9 +16,10 @@ import { requirePaidForModification } from '../middleware/entitlementMiddleware'
 const router = express.Router();
 
 router.get('/getAllCompany', authMiddleware, getAllCompany);
-router.get('/:seoUrl', getCompanyBySeoUrl);
 router.get('/company/:companyId/taxes', authMiddleware, getCompanyTaxes);
 router.get('/getCompanyById/:id', authMiddleware, getCompanyById);
+router.get('/:fleetSlug/:companySlug', getCompanyByFleetAndCompanySlug);
+router.get('/:seoUrl', getCompanyBySeoUrl);
 
 router.put(
   '/companyUpdate/:id',

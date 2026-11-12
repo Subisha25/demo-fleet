@@ -9,6 +9,9 @@ function randomCode(len = DEFAULT_LEN) {
 
 export async function createShortCode(fullUrl: string, len = DEFAULT_LEN, ttlSeconds?: number) {
   if (!fullUrl) throw new Error('fullUrl required');
+  if (process.env.NODE_ENV === 'test' || process.env.SMS_MOCK_MODE === 'true') {
+    return 'mock_' + randomCode(len);
+  }
   for (let i = 0; i < 6; i++) {
     const code = randomCode(len);
     try {
@@ -25,6 +28,7 @@ export async function createShortCode(fullUrl: string, len = DEFAULT_LEN, ttlSec
 
 export async function resolveShortCode(code: string) {
   if (!code) return null;
+  if (code.startsWith('mock_')) return 'https://example.com/mock-redirect';
   const rec: any = await ShortLink.findOne({ where: { code } });
   if (!rec) return null;
   if (rec.expiresAt && new Date(rec.expiresAt) < new Date()) { await rec.destroy().catch(()=>{}); return null; }

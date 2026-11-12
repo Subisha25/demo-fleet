@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Company, Employee, Invoice, Tax, Vendor, User, Booking } from '../models';
+import { Company, Employee, Invoice, Tax, Vendor, User, Booking, Tenant } from '../models';
 import { USERS } from "../utils/costants";
 const { ROLES } = USERS;
 import { Op } from 'sequelize';
@@ -9,28 +9,125 @@ import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 import { generateUniqueCompanySlug } from '../utils/slugUtils';
 
+/**
+ * Resolve Company and Fleet by two-slug URL: /company/:fleetSlug/:companySlug
+ */
+export const getCompanyByFleetAndCompanySlug = async (req: Request, res: Response) => {
+  try {
+    const { fleetSlug, companySlug } = req.params;
 
+    if (!fleetSlug || !companySlug) {
+      return res.status(400).json({ success: false, message: "Fleet slug and company slug are required" });
+    }
+
+    const cleanFleetSlug = fleetSlug.trim().toLowerCase();
+    const cleanCompanySlug = companySlug.trim().toLowerCase();
+
+    // 1. Resolve Tenant by slug, subdomain, code or primary identifier
+    const tenant = await Tenant.findOne({
+      where: {
+        isDeleted: false,
+        [Op.or]: [
+          { slug: cleanFleetSlug },
+          { subdomain: cleanFleetSlug },
+          { code: cleanFleetSlug.toUpperCase() },
+          ...(cleanFleetSlug === 'fleetflow' || cleanFleetSlug === 'primary' ? [{ tenantId: ROOT_TENANT_ID }] : [])
+        ]
+      }
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: "Fleet not found" });
+    }
+
+    // 2. Resolve Company by seoUrl within this tenant
+    const company = await Company.findOne({
+      where: {
+        seoUrl: cleanCompanySlug,
+        tenantId: tenant.tenantId,
+        isDeleted: false,
+      },
+      attributes: [
+        "companyId",
+        "companyName",
+        "companyLogo",
+        "seoUrl",
+        "tenantId",
+        "companyAddress",
+        "companyPhno",
+        "startTime",
+        "closeTime"
+      ]
+    });
+
+    if (!company) {
+      return res.status(404).json({ success: false, message: "Company not found for this fleet" });
+    }
+
+    const resolvedFleetSlug = tenant.slug || tenant.subdomain || cleanFleetSlug;
+
+    return res.status(200).json({
+      success: true,
+      ...company.toJSON(),
+      tenantId: tenant.tenantId,
+      fleetSlug: resolvedFleetSlug,
+      fleetName: tenant.displayName || tenant.name,
+      fleetLogo: tenant.brandingTokens?.logoUrl || tenant.logoUrl || null,
+      companyPortalUrl: `/company/${resolvedFleetSlug}/${company.seoUrl}`
+    });
+  } catch (error: any) {
+    console.error("Error fetching company by fleet and company slug:", error);
+    return res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+/**
+ * Backward compatibility: Resolve Company by single seoUrl: /company/:seoUrl
+ */
 export const getCompanyBySeoUrl = async (req: Request, res: Response) => {
   try {
     const { seoUrl } = req.params;
 
     if (!seoUrl) {
-      return res.status(400).json({ message: "SEO URL is required" });
+      return res.status(400).json({ success: false, message: "SEO URL is required" });
     }
 
+    const cleanSeoUrl = seoUrl.trim().toLowerCase();
+
     const company = await Company.findOne({
-      where: { seoUrl, isDeleted: false },
-      attributes: ["companyId", "companyName", "companyLogo", "seoUrl"]
+      where: { seoUrl: cleanSeoUrl, isDeleted: false },
+      attributes: [
+        "companyId",
+        "companyName",
+        "companyLogo",
+        "seoUrl",
+        "tenantId",
+        "companyAddress",
+        "companyPhno",
+        "startTime",
+        "closeTime"
+      ]
     });
 
     if (!company) {
-      return res.status(404).json({ message: "Company not found" });
+      return res.status(404).json({ success: false, message: "Company not found" });
     }
 
-    return res.status(200).json(company);
+    const tenant = company.tenantId ? await Tenant.findByPk(company.tenantId) : null;
+    const resolvedFleetSlug = tenant?.slug || tenant?.subdomain || 'fleet';
+
+    return res.status(200).json({
+      success: true,
+      ...company.toJSON(),
+      tenantId: company.tenantId || ROOT_TENANT_ID,
+      fleetSlug: resolvedFleetSlug,
+      fleetName: tenant?.displayName || tenant?.name || 'FleetFlow',
+      fleetLogo: tenant?.brandingTokens?.logoUrl || tenant?.logoUrl || null,
+      companyPortalUrl: `/company/${resolvedFleetSlug}/${company.seoUrl}`
+    });
   } catch (error: any) {
     console.error("Error fetching company:", error);
-    return res.status(500).json({ message: "Internal Server Error" });
+    return res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
 
@@ -66,9 +163,28 @@ export const getAllCompany = async (req: Request, res: Response) => {
       });
     }
 
+    const tenantIds = Array.from(new Set(company.map((c: any) => c.tenantId).filter(Boolean)));
+    const tenants = tenantIds.length > 0 ? await Tenant.findAll({
+      where: { tenantId: { [Op.in]: tenantIds } },
+      attributes: ['tenantId', 'slug', 'subdomain', 'name', 'displayName']
+    }) : [];
+    const tenantMap = new Map(tenants.map(t => [t.tenantId, t]));
+
+    const enriched = company.map((c: any) => {
+      const cJson = c.toJSON ? c.toJSON() : c;
+      const t = tenantMap.get(cJson.tenantId);
+      const fleetSlug = t?.slug || t?.subdomain || 'fleet';
+      return {
+        ...cJson,
+        tenantSlug: fleetSlug,
+        fleetName: t?.displayName || t?.name || 'Fleet Mobility',
+        companyPortalUrl: `/company/${fleetSlug}/${cJson.seoUrl}`
+      };
+    });
+
     res.status(200).json({
       message: 'Company retrieved successfully',
-      data: company,
+      data: enriched,
     });
   } catch (error: any) {
     res.status(500).json({
@@ -334,9 +450,9 @@ export const updateCompany = async (req: any, res: Response) => {
 
     let finalSeoUrl = company.seoUrl;
     if (seoUrl && seoUrl.trim() !== "" && seoUrl !== company.seoUrl) {
-      finalSeoUrl = await generateUniqueCompanySlug(seoUrl, id);
+      finalSeoUrl = await generateUniqueCompanySlug(seoUrl, company.tenantId, id);
     } else if (!finalSeoUrl) {
-      finalSeoUrl = await generateUniqueCompanySlug(companyName || company.companyName || "company", id);
+      finalSeoUrl = await generateUniqueCompanySlug(companyName || company.companyName || "company", company.tenantId, id);
     }
 
     const updateData: any = {

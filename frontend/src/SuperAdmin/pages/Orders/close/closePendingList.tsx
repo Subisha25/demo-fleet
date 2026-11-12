@@ -3,7 +3,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import InputBox from "../../../../components/InputBox";
 import { showToast, ActionModal } from "../../../../components/AlertBox";
 import CommonButton from "../../../../components/CommonButton";
-import axios from "axios";
+import axiosInstance from "../../../../utils/axiosInstance";
 import PageLayout from "../../../../components/PageLayout";
 import config from "../../../../config/config"; 
 
@@ -315,6 +315,8 @@ const ClosePendingOrderDetails: React.FC = () => {
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [data, setData] = useState<BookingResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [ratePerKm, setRatePerKm] = useState<number>(0);
   const [ratePerHour, setRatePerHour] = useState<number>(0);
   const [packages, setPackages] = useState<PackageOption[]>([]);
@@ -400,9 +402,10 @@ const r = (v: any) => Math.round(num(v)); // ✅ round to nearest rupee
   useEffect(() => {
     const fetchBooking = async () => {
       try {
-        const BASE_URL = config.baseurl.apibaseurl;
-        const res = await axios.get<BookingResponse>(
-          `${BASE_URL}/api/order/details/${bookingCode}`
+        setLoading(true);
+        setFetchError(null);
+        const res = await axiosInstance.get<BookingResponse>(
+          `/order/details/${bookingCode}`
         );
         setData(res.data);
         const bookingData = res.data;
@@ -468,9 +471,13 @@ if (bookingData.packages?.length > 0) {
   setPackages(fetchedPackages);
 }
 
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching booking", error);
-        showToast("Error fetching booking details.", "error");
+        const msg = error?.response?.data?.message || "Error fetching booking details.";
+        setFetchError(msg);
+        showToast(msg, "error");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -1023,25 +1030,21 @@ sgstAmount: taxDetails.sgst?.amount || 0,
 };
 
 
-        const token = localStorage.getItem("token");
-        const BASE_URL = config.baseurl.apibaseurl;
-        
-        await axios.post(
-            `${BASE_URL}/api/closePendingOrder/createClosePending`,
-            payload,
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            }
+        setIsClosing(true);
+        await axiosInstance.post(
+            "/closePendingOrder/createClosePending",
+            payload
         );
 
         showToast("Order closed successfully!", "success");
         resetAllFields();
         navigate("/orders/paymentpending");
-    } catch (err) {
+    } catch (err: any) {
         console.error("Error closing order", err);
-        showToast("Error closing order. Please try again.", "error");
+        const errorMsg = err?.response?.data?.message || "Error closing order. Please try again.";
+        showToast(errorMsg, "error");
+    } finally {
+        setIsClosing(false);
     }
 }else {
         Object.values(newErrors).forEach((error) => {
@@ -1072,11 +1075,59 @@ const isFormValid =
     )
   );
 
-  if (!data) {
+  if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <p className="text-gray-500 text-lg">Loading booking details...</p>
-      </div>
+      <PageLayout>
+        <div className="flex flex-col justify-center items-center h-[60vh] gap-3">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-gray-600 text-lg font-medium">Loading booking details...</p>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  if (fetchError || !data) {
+    return (
+      <PageLayout>
+        <div className="p-6 max-w-xl mx-auto mt-12 bg-white rounded-lg border border-red-200 shadow-sm text-center">
+          <div className="w-12 h-12 mx-auto mb-3 text-red-500 flex items-center justify-center rounded-full bg-red-50">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">Unable to Load Booking Details</h3>
+          <p className="text-gray-600 text-sm mb-6">{fetchError || "Booking details could not be retrieved."}</p>
+          <div className="flex justify-center gap-4">
+            <CommonButton
+              onClick={() => navigate("/orders/closepending")}
+              variant="secondary"
+              className="px-4 py-2"
+            >
+              Back to Close Pending
+            </CommonButton>
+            <CommonButton
+              onClick={() => {
+                if (bookingCode) {
+                  setLoading(true);
+                  setFetchError(null);
+                  axiosInstance.get<BookingResponse>(`/order/details/${bookingCode}`)
+                    .then((res) => {
+                      setData(res.data);
+                    })
+                    .catch((err) => {
+                      setFetchError(err?.response?.data?.message || "Error fetching booking details.");
+                    })
+                    .finally(() => setLoading(false));
+                }
+              }}
+              variant="primary"
+              className="px-4 py-2"
+            >
+              Retry
+            </CommonButton>
+          </div>
+        </div>
+      </PageLayout>
     );
   }
 
@@ -1093,7 +1144,7 @@ const money2 = (v: any) => {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold">Close Pending Order</h2>
           <p className="text-black text-xl">
-            # {data.booking.bookingCode} - ({data.booking.user.username})
+            # {data.booking?.bookingCode} - ({data.booking?.user?.username || "Guest"})
           </p>
         </div>
 

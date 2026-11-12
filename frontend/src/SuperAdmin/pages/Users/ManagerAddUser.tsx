@@ -30,7 +30,9 @@ interface Company {
 
 export default function ManagerAddUser() {
   const [companies, setCompanies] = useState<Company[]>([]);
-  const { seoUrl } = useParams();
+  const { fleetSlug, companySlug, seoUrl } = useParams<{ fleetSlug?: string; companySlug?: string; seoUrl?: string }>();
+  const activeFleetSlug = (fleetSlug || "").trim();
+  const activeCompanySlug = (companySlug || seoUrl || "").trim();
   const [companyName, setCompanyName] = useState("");
 
   const [username, setUsername] = useState("");
@@ -270,7 +272,10 @@ export default function ManagerAddUser() {
         setPresentAddress("");
         setPinCode("");
 
-        setTimeout(() => navigate(`/company/${seoUrl}`), 1000);
+        const redirectUrl = activeFleetSlug && activeCompanySlug
+          ? `/company/${activeFleetSlug}/${activeCompanySlug}`
+          : `/company/${activeCompanySlug}`;
+        setTimeout(() => navigate(redirectUrl), 1000);
       } else {
         showToast(response.data?.message || "Already exists. Please try again.", "error");
       }
@@ -285,12 +290,15 @@ export default function ManagerAddUser() {
 useEffect(() => {
   const fetchCompanyDetails = async () => {
     try {
-      if (!seoUrl) {
+      if (!activeCompanySlug) {
         showToast("SEO URL not found in the link!", "error");
         return;
       }
 
-      const response = await axiosInstance.get(`/company/${seoUrl}`);
+      const targetUrl = activeFleetSlug
+        ? `/company/${activeFleetSlug}/${activeCompanySlug}`
+        : `/company/${activeCompanySlug}`;
+      const response = await axiosInstance.get(targetUrl);
       const company = response.data?.data || response.data;
 
       if (company?.companyName) {
@@ -316,7 +324,7 @@ useEffect(() => {
   };
 
   fetchCompanyDetails();
-}, [seoUrl]);
+}, [activeFleetSlug, activeCompanySlug]);
   useEffect(() => {
     const fetchCompanies = async () => {
       try {

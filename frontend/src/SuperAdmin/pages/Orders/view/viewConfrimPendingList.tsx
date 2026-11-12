@@ -169,36 +169,43 @@ const ViewConfirmPendingOrder: React.FC = () => {
     if (isConfirming) return;
     setIsConfirming(true);
 
-    if (!order?.bookingId || !selectedDriver || !selectedVehicleKey) {
-      showToast("Please select both vehicle and driver before confirming.", "warn");
+    if (!order?.bookingId) {
+      showToast("Booking ID not found.", "warn");
       setIsConfirming(false);
       return;
     }
 
-    // ✅ split vehicleId + vehicleMasterId from "vehicleId::vehicleMasterId"
-    const [vehicleId, vehicleMasterId] = selectedVehicleKey.split("::");
-
-    if (!vehicleId || !vehicleMasterId) {
-      showToast("Invalid vehicle selection. Please select again.", "warn");
+    if (!selectedDriver) {
+      showToast("Please select a driver before confirming.", "warn");
       setIsConfirming(false);
       return;
+    }
+
+    let vehicleId: string | undefined = undefined;
+    let vehicleMasterId: string | undefined = undefined;
+
+    if (selectedVehicleKey) {
+      const parts = selectedVehicleKey.split("::");
+      vehicleId = parts[0];
+      vehicleMasterId = parts[1];
     }
 
     try {
       const res = await axiosInstance.patch("/vendor/confirmBookingforWeb", {
         bookingId: order.bookingId,
         driverId: selectedDriver,
-        vehicleId,
-        vehicleMasterId, // ✅ NEW
+        vehicleId: vehicleId || undefined,
+        vehicleMasterId: vehicleMasterId || undefined,
       });
 
       if (res.status === 200) {
-        showToast("Booking confirmed & notification sent.", "success");
-        navigate(`/orders/close/close-pending-order/${order.bookingCode}`);
+        showToast("Booking confirmed successfully.", "success");
+        navigate("/orders/closepending");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Confirm booking error:", error);
-      showToast("Failed to confirm booking.", "error");
+      const msg = error?.response?.data?.message || "Failed to confirm booking.";
+      showToast(msg, "error");
     } finally {
       setIsConfirming(false);
     }
@@ -405,12 +412,12 @@ const ViewConfirmPendingOrder: React.FC = () => {
           <div className="flex flex-wrap gap-4 mt-6">
             <button
               className={`px-6 py-2 rounded flex items-center gap-2 text-white ${
-                !selectedVehicleKey || !selectedDriver || isConfirming
+                !selectedDriver || isConfirming
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-green-600 hover:bg-green-700"
               }`}
               onClick={handleConfirm}
-              disabled={!selectedVehicleKey || !selectedDriver || isConfirming}
+              disabled={!selectedDriver || isConfirming}
             >
               <FontAwesomeIcon icon={faCheckCircle} />
               {isConfirming ? "Confirming..." : "Confirm Booking"}

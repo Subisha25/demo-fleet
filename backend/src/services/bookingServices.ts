@@ -1053,7 +1053,11 @@ export const getOrderById = async (req: Request, res: Response) => {
       });
     }
 
-    const order = await Booking.findByPk(bookingId, {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId);
+    const order = await Booking.findOne({
+      where: isUuid
+        ? { [Op.or]: [{ bookingId }, { bookingCode: bookingId }] }
+        : { bookingCode: bookingId },
       include: [
         {
           model: VehicleType,
@@ -1417,8 +1421,12 @@ export const getBookingDetails = async (req: Request, res: Response) => {
   try {
     const { bookingCode } = req.params;
 
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingCode);
+
     const booking = await Booking.findOne({
-      where: { bookingCode },
+      where: isUuid
+        ? { [Op.or]: [{ bookingCode }, { bookingId: bookingCode }] }
+        : { bookingCode },
       include: [
         {
           model: User,
@@ -1431,6 +1439,18 @@ export const getBookingDetails = async (req: Request, res: Response) => {
               attributes: ["companyId", "companyName", "allowTax"],
             },
           ],
+        },
+        {
+          model: Drivers,
+          as: "driver",
+          attributes: ["driverId", "driverName", "driverEmail", "phno"],
+          required: false,
+        },
+        {
+          model: Vehicle,
+          as: "vehicle",
+          attributes: ["vehicleId", "vehicleName", "vehicleTypeId"],
+          required: false,
         },
       ],
     });
@@ -1454,12 +1474,25 @@ export const getBookingDetails = async (req: Request, res: Response) => {
       })
       : null;
 
-    const vehicleType = await VehicleType.findOne({
-      where: { vehicleTypeId: booking.vehicleTypeId },
-      attributes: ["vehicleTypeId", "vehicleType", "AdvanceBookingHours"],
-    });
+    let vehicleType = booking.vehicleTypeId
+      ? await VehicleType.findOne({
+        where: { vehicleTypeId: booking.vehicleTypeId },
+        attributes: ["vehicleTypeId", "vehicleType", "AdvanceBookingHours"],
+      })
+      : null;
 
-    if (!vehicleType) return res.status(404).json({ message: "VehicleType not found" });
+    if (!vehicleType && vehicle?.vehicleTypeId) {
+      vehicleType = await VehicleType.findOne({
+        where: { vehicleTypeId: vehicle.vehicleTypeId },
+        attributes: ["vehicleTypeId", "vehicleType", "AdvanceBookingHours"],
+      });
+    }
+
+    const effectiveVehicleType = vehicleType || ({
+      vehicleTypeId: booking.vehicleTypeId || "",
+      vehicleType: "Standard",
+      AdvanceBookingHours: "0",
+    } as any);
 
     // helpers
     const norm = (s: any) => String(s || "").replace(/\s+/g, "").toLowerCase();
@@ -1483,11 +1516,13 @@ export const getBookingDetails = async (req: Request, res: Response) => {
       return key ? vehiclesObj[key] : null;
     };
 
-    const packageData = await PackageData.findAll({
-      where: { companyId: userCompanyId, isDeleted: false },
-      attributes: ["packageDataId", "packageType", "packages", "companyId"],
-      order: [["createdAt", "DESC"]],
-    });
+    const packageData = userCompanyId
+      ? await PackageData.findAll({
+        where: { companyId: userCompanyId, isDeleted: false },
+        attributes: ["packageDataId", "packageType", "packages", "companyId"],
+        order: [["createdAt", "DESC"]],
+      })
+      : [];
 
     const pickupNorm = norm(booking.pickupPoint);
     const isOutstationPickup = pickupNorm.includes("outstation");
@@ -1512,7 +1547,7 @@ export const getBookingDetails = async (req: Request, res: Response) => {
       // ✅ NEW FORMAT (object)
       if (parsed && !Array.isArray(parsed) && typeof parsed === "object") {
         const vehiclesObj = parsed.vehicles || {};
-        const row = pickVehicleRow(vehiclesObj, vehicleType.vehicleType) || {};
+        const row = pickVehicleRow(vehiclesObj, effectiveVehicleType.vehicleType) || {};
 
         /* ✅ OUTSTATION */
         if (isOutstationPickup) {
@@ -1524,7 +1559,7 @@ export const getBookingDetails = async (req: Request, res: Response) => {
             packageDataId: pkg.packageDataId,
             packageType: pkg.packageType,
             companyId: pkg.companyId,
-            vehicleType: vehicleType.vehicleType,
+            vehicleType: effectiveVehicleType.vehicleType,
             packages: [
               {
                 outstationPerKm: perKm,
@@ -1565,7 +1600,7 @@ export const getBookingDetails = async (req: Request, res: Response) => {
             packageDataId: pkg.packageDataId,
             packageType: pkg.packageType,
             companyId: pkg.companyId,
-            vehicleType: vehicleType.vehicleType,
+            vehicleType: effectiveVehicleType.vehicleType,
             packages: monthlyPackages,
           };
         }
@@ -1602,7 +1637,7 @@ export const getBookingDetails = async (req: Request, res: Response) => {
           packageDataId: pkg.packageDataId,
           packageType: pkg.packageType,
           companyId: pkg.companyId,
-          vehicleType: vehicleType.vehicleType,
+          vehicleType: effectiveVehicleType.vehicleType,
           packages: localPackages,
         };
       }
@@ -1611,9 +1646,9 @@ export const getBookingDetails = async (req: Request, res: Response) => {
       const arr: any[] = Array.isArray(parsed) ? parsed : [];
       const matched = arr.map((p: any) => {
         const amount =
-          p[vehicleType.vehicleType] ??
-          p[String(vehicleType.vehicleType || "").toLowerCase()] ??
-          p[String(vehicleType.vehicleType || "").toUpperCase()] ??
+          p[effectiveVehicleType.vehicleType] ??
+          p[String(effectiveVehicleType.vehicleType || "").toLowerCase()] ??
+          p[String(effectiveVehicleType.vehicleType || "").toUpperCase()] ??
           0;
 
         if (isOutstationPickup) {
@@ -1641,7 +1676,7 @@ export const getBookingDetails = async (req: Request, res: Response) => {
         packageDataId: pkg.packageDataId,
         packageType: pkg.packageType,
         companyId: pkg.companyId,
-        vehicleType: vehicleType.vehicleType,
+        vehicleType: effectiveVehicleType.vehicleType,
         packages: matched,
       };
     });
@@ -1660,7 +1695,7 @@ export const getBookingDetails = async (req: Request, res: Response) => {
       vehicle,
       userId: booking.user?.userId,
       companyId: booking.user?.companyId,
-      vehicleType,
+      vehicleType: effectiveVehicleType,
       packages: formattedPackages,
       tax: taxDetails,
     });
@@ -2120,6 +2155,7 @@ export const getOrderPaymentListById = async (req: any, res: Response) => {
             "startDate",
             "endDate",
             "bookingId",
+            "tenantId",
           ],
           include: [
             {
@@ -2137,6 +2173,7 @@ export const getOrderPaymentListById = async (req: any, res: Response) => {
                 "purpose",
                 "roundTrip",
                 "vehicleTypeId",
+                "tenantId",
               ],
             },
           ],

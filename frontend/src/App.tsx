@@ -400,6 +400,13 @@ const App: React.FC = () => {
 
           <Route path="/managerusers/list/:id" element={<ManagerUserList />} />
           <Route path="/users/userviewdetails/:userId" element={<UserViewDetails />} />
+          {/* Two-Slug Company User Login & Registration */}
+          <Route path="/company/:fleetSlug/:companySlug" element={<UserLogin />} />
+          <Route path="/Company/:fleetSlug/:companySlug" element={<UserLogin />} />
+          <Route path="/company/:fleetSlug/:companySlug/managerAddUser" element={<ManagerAddUser />} />
+          <Route path="/Company/:fleetSlug/:companySlug/managerAddUser" element={<ManagerAddUser />} />
+          {/* Backward compatibility: single-slug */}
+          <Route path="/company/:seoUrl" element={<UserLogin />} />
           <Route path="/Company/:seoUrl" element={<UserLogin />} />
           <Route path="/invoice/user-invoice-details/:userId" element={<UserInvoiceDetails />} />
         <Route path="/users/userinvoice/:id" element={<UserInvoice />} />
@@ -427,7 +434,8 @@ const App: React.FC = () => {
 
 <Route path="/user/howitworks" element={<HowItWorks />} />
 
-<Route path="/company/:seoUrl/managerAddUser" element={<ManagerAddUser />} />
+<Route path="/company/:seoUrl/managerAddUser" element={<ManagerAddUser />} />
+<Route path="/Company/:seoUrl/managerAddUser" element={<ManagerAddUser />} />
 
 
            <Route path="/Users/BookingHistory/MyorderDetails/:id" element={<MyorderDetails />} />
