@@ -5,6 +5,7 @@ import {
   maskApiKey,
 } from '../utils/cryptoUtils';
 import { Tenant } from '../models/tenant';
+import { isSmsMockMode } from '../utils/mockModes';
 import { TenantSubscription } from '../models/tenantSubscription';
 import { TenantSmsConfig } from '../models/tenantSmsConfig';
 import {
@@ -47,9 +48,9 @@ async function run() {
   console.log('========================================================================\n');
 
   // Verify Mock Mode Safety
-  await check('NOTIFICATION_MOCK_MODE is strictly "true"', () => {
-    if (process.env.NOTIFICATION_MOCK_MODE !== 'true') {
-      throw new Error(`Expected NOTIFICATION_MOCK_MODE to be "true", got: ${process.env.NOTIFICATION_MOCK_MODE}`);
+  await check('SMS mock mode is strictly active', () => {
+    if (!isSmsMockMode() && process.env.NOTIFICATION_MOCK_MODE !== 'true') {
+      throw new Error(`Expected SMS mock mode to be active`);
     }
   });
 

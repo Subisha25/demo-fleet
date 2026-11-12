@@ -829,35 +829,6 @@ const isValidManagerEmail = (email: string) => {
         showToast("Please select a pickup date and time.", "error");
         return;
       }
-if (requireManagerApproval) {
-  if (!costCenter.trim()) {
-    showToast("Cost Center is required", "error");
-    setIsBooking(false);
-    return;
-  }
-  if (!managerEmail) {
-    showToast("Manager email is required", "error");
-    setIsBooking(false);
-    return;
-  }
-
-  // if (!managerEmail.toLowerCase().endsWith("@danfoss.com")) {
-  //   showToast("Only Danfoss email (name@danfoss.com) is allowed", "error");
-  //   setIsBooking(false);
-  //   return;
-  // }
-
-//   if (!managerEmail.toLowerCase().endsWith("@gmail.com")) {
-//   showToast("Only Gmail (name@gmail.com) is allowed", "error");
-//   setIsBooking(false);
-//   return;
-// }
-if (!isValidManagerEmail(managerEmail)) {
-  showToast("Please enter a valid manager email address", "error");
-  setIsBooking(false);
-  return;
-}
-
 if (formData.bookingFor === "On behalf of") {
   if (!formData.behalfOfPerson.trim()) {
     showToast("Please enter booking on behalf person name.", "error");
@@ -877,13 +848,6 @@ if (formData.bookingFor === "On behalf of") {
   return;
 }
 }
-
-}
-//   if (!managerEmail.toLowerCase().endsWith("@gmail.com")) {
-//   showToast("Only Gmail (name@gmail.com) is allowed", "error");
-//   setIsBooking(false);
-//   return;
-// }
 
       const istOffsetMinutes = 330;
       const istOffsetHours = Math.floor(istOffsetMinutes / 60);
@@ -979,16 +943,10 @@ const payload: any = {
 
   vehicleId: selectedVehicleId || null,
   vehicleTypeId,
-    // ✅ DANFOSS FIELDS
-costCenter: requireManagerApproval ? costCenter.trim() : null,
-// managerUserId: requireManagerApproval ? managerUserId : null,
-managerEmail: managerEmail ? managerEmail.trim() : null,
+  costCenter: null,
+  managerEmail: null,
 };
 
-// if (requireManagerApproval) {
-//   payload.costCenter = costCenter.trim();
-//   payload.managerUserId = managerUserId;
-// }
       const res = await axiosInstance.post<BookingResponse>(
         `emp/createBookingForWeb`,
         payload
@@ -1000,7 +958,6 @@ managerEmail: managerEmail ? managerEmail.trim() : null,
     : "Booking created successfully!";
   showToast(successMessage, "success");
 
-  // ✅ ROLE CHECK + REDIRECT (superadmin only)
   const backupKey = "auth_backup_user_context";
   const backupStr = localStorage.getItem(backupKey);
 
@@ -1015,10 +972,10 @@ managerEmail: managerEmail ? managerEmail.trim() : null,
     }
   } catch {}
 
-  if (role === "superadmin") {
+  if (role === "superadmin" || role === "fleet_admin" || role === "admin") {
     setIsBooking(false);
     navigate("/orders/confirmpending", { replace: true });
-    return; // ✅ stop reset (because page is changing)
+    return;
   }
 
   // ✅ normal flow (non-superadmin)
@@ -1333,43 +1290,7 @@ setTimeout(() => {
     />
   ) : null}
 </div>
-              {requireManagerApproval && (
-  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
 
-       {/* Manager Dropdown */}
-   <div ref={managerBoxRef} className="relative">
-  <label className="block text-sm font-medium mb-1">Approver Manager<span className=" ml-1 text-red-500">*</span></label>
-
- 
-  <input
-    type="email"
-    className="border rounded w-full px-2 py-1"
-    placeholder="Enter Manager Email"
-    value={managerEmail}
- 
-onChange={(e) => {
-  setManagerEmail(e.target.value);
-}}
-/>
-
-</div>
-
-    {/* Cost Center */}
-    <div>
-      <label className="block text-sm font-medium mb-1">Cost Center<span className=" ml-1 text-red-500">*</span></label>
-      <input
-        type="text"
-        className="border rounded w-full px-2 py-1"
-        placeholder="Enter cost center"
-        value={costCenter}
-        onChange={(e) => setCostCenter(e.target.value)}
-      />
-    </div>
-
- 
-
-  </div>
-)}
 
 
               <div>

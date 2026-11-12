@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import PublicLayout from "./PublicLayout";
 import axios from "axios";
@@ -50,6 +50,16 @@ export default function PublicBookingWizard() {
   const [otpVerified, setOtpVerified] = useState(false);
   const [verificationToken, setVerificationToken] = useState("");
   const [mockOtpHint, setMockOtpHint] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState<number>(0);
+
+  // 30s Resend Cooldown Countdown
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   // Step 2: Seat Capacity
   const [seatCapacity, setSeatCapacity] = useState<number>(4);
@@ -123,10 +133,14 @@ export default function PublicBookingWizard() {
     setOtpLoading(true);
     setAlert(null);
     try {
-      const res = await axios.post(`${API_BASE}/api/public/booking/send-otp`, { phone: cleanPhone });
+      const res = await axios.post(`${API_BASE}/api/public/booking/send-otp`, {
+        phone: cleanPhone,
+        ...(slug ? { slug } : {}),
+      });
       if (res.data && res.data.success) {
         setSessionId(res.data.sessionId);
         setOtpSent(true);
+        setResendCooldown(30);
         if (res.data.mockOtp) {
           setMockOtpHint(res.data.mockOtp);
           setOtp(res.data.mockOtp); // Auto-fill in dev/mock for instant convenience
@@ -160,6 +174,7 @@ export default function PublicBookingWizard() {
         phone: phone.trim().replace(/\D/g, ""),
         otp: cleanOtp,
         sessionId,
+        ...(slug ? { slug } : {}),
       });
 
       if (res.data && res.data.success) {
@@ -457,10 +472,12 @@ export default function PublicBookingWizard() {
                   <button
                     type="button"
                     onClick={handleSendOtp}
-                    disabled={otpLoading}
-                    className="text-xs font-semibold text-[#686875] hover:text-[#5B3DF5]"
+                    disabled={otpLoading || resendCooldown > 0}
+                    className="text-xs font-semibold text-[#686875] hover:text-[#5B3DF5] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    Didn't receive code? Resend OTP
+                    {resendCooldown > 0
+                      ? `Resend OTP in ${resendCooldown}s`
+                      : "Didn't receive code? Resend OTP"}
                   </button>
                 </div>
               </form>

@@ -44,6 +44,21 @@ const Header: React.FC = () => {
   const role = (localStorage.getItem('role') || 'User').toLowerCase();
   const isSuperAdmin = role === 'superadmin';
 
+  const fleetName = currentTenant?.displayName || currentTenant?.name || 'Fleet Mobility Portal';
+  const fleetLogo = currentTenant?.brandingTokens?.logoUrl || currentTenant?.logoUrl;
+  const getFleetInitials = (name?: string, code?: string) => {
+    if (code && code.trim().length > 0 && code !== 'FF' && code !== 'ALL') {
+      return code.trim().slice(0, 3).toUpperCase();
+    }
+    if (!name) return 'FL';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+  const fleetInitials = getFleetInitials(fleetName, currentTenant?.code);
+
   // Fetch registration notifications for SuperAdmin
   const fetchNotifications = async () => {
     if (!isSuperAdmin) return;
@@ -118,17 +133,39 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="h-16 flex items-center justify-between px-6 bg-white border-b border-gray-200 shadow-sm transition-colors duration-200">
+    <header className="sticky top-0 z-30 h-16 flex items-center justify-between px-6 bg-white border-b border-gray-200 shadow-sm transition-colors duration-200">
       {/* Left: Tenant Branding & Plan Badge */}
       <div className="flex items-center space-x-3.5">
-        <div className="flex items-center space-x-2 text-gray-900">
-          <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600 shadow-sm">
-            <FontAwesomeIcon icon={isSuperAdmin ? faShieldAlt : faBuilding} className="text-sm" />
-          </div>
-          <span className="font-bold tracking-tight text-base sm:text-lg text-gray-900">
+        <div className="flex items-center space-x-2.5 text-gray-900">
+          {isSuperAdmin ? (
+            <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600 shadow-sm">
+              <FontAwesomeIcon icon={faShieldAlt} className="text-sm" />
+            </div>
+          ) : fleetLogo ? (
+            <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 p-0.5 flex items-center justify-center shadow-sm overflow-hidden relative">
+              <img
+                src={fleetLogo}
+                alt={fleetName}
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.parentElement?.querySelector('.header-fallback');
+                  if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                }}
+              />
+              <div className="header-fallback hidden w-full h-full items-center justify-center font-bold text-xs bg-indigo-50 text-indigo-700 rounded">
+                {fleetInitials}
+              </div>
+            </div>
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold text-xs shadow-sm">
+              {fleetInitials}
+            </div>
+          )}
+          <span className="font-bold tracking-tight text-base sm:text-lg text-gray-900 truncate max-w-xs" title={isSuperAdmin ? 'FleetFlow SaaS' : fleetName}>
             {isSuperAdmin
               ? 'FleetFlow SaaS'
-              : currentTenant?.name || 'Fleet Mobility Portal'}
+              : fleetName}
           </span>
         </div>
 

@@ -1212,14 +1212,14 @@ export const createClosePending = async (req: any, res: Response) => {
       const payLink = `${BASE_URL}/invoice/user-invoice-details/${booking.userId}`;
 
       try {
-        let needEmail = false;
+        let needEmail = true;
 
         if (booking.user?.companyId) {
           const company = await Company.findByPk(
             booking.user.companyId,
             { attributes: ["needEmail"] }
           );
-          needEmail = company?.needEmail === true;
+          needEmail = company ? company.needEmail !== false : true;
         }
         if (needEmail) {
           const logoPath = path.join(process.cwd(), "uploads", "logo.png");

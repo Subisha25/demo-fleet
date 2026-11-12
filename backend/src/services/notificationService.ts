@@ -5,6 +5,8 @@ import { NotificationLog } from '../models/notificationLog';
 import { Employee } from '../models/employee';
 import { ROOT_TENANT_ID, getTenantContext } from '../context/tenantContext';
 import config from '../config/config';
+import { isEmailMockMode, isSmsMockMode } from '../utils/mockModes';
+import { createSmtpTransporter, getSmtpConfig, maskEmail } from './emailConfServices';
 import {
   normalizePhoneNumberForSms,
   send2FactorTemplateSms,
@@ -345,12 +347,28 @@ export async function sendNotification(options: SendNotificationOptions): Promis
     }
   }
 
+  // Validate recipient format upfront
+  if (channel === 'SMS') {
+    const phoneCheck = normalizePhoneNumberForSms(recipient);
+    if (!phoneCheck.valid) {
+      return {
+        success: false,
+        logId,
+        providerStatus: 'FAILED',
+        error: phoneCheck.error || 'Invalid mobile number format',
+      };
+    }
+  }
+
   // Determine whether to mock delivery (safe test / synthetic domain protection)
-  const isMockMode =
-    process.env.NOTIFICATION_MOCK_MODE === 'true' ||
-    process.env.NODE_ENV === 'test' ||
-    (channel === 'EMAIL' && isTestOrSyntheticRecipient(recipient)) ||
-    (channel === 'SMS' && (recipient.startsWith('+91987654321') || recipient === '9876543210' || recipient.startsWith('99999')));
+  let isMockMode = false;
+  if (channel === 'EMAIL') {
+    isMockMode = isEmailMockMode() || isTestOrSyntheticRecipient(recipient);
+  } else if (channel === 'SMS') {
+    isMockMode = isSmsMockMode();
+  } else {
+    isMockMode = true;
+  }
 
   if (isMockMode) {
     providerStatus = 'MOCK';
@@ -359,34 +377,28 @@ export async function sendNotification(options: SendNotificationOptions): Promis
   } else {
     try {
       if (channel === 'EMAIL') {
-        const smtpServer = (config.sendmail?.smtp_server || process.env.SMTP_SERVER || process.env.SMTP_HOST || '').trim();
-        const smtpUser = (config.sendmail?.smtp_email || process.env.SMTP_EMAIL_ADDRESS || process.env.SMTP_USER || '').trim();
-        const smtpPass = (config.sendmail?.smtp_password || process.env.SMTP_EMAIL_PASSWORD || process.env.SMTP_PASS || '').trim();
-        const smtpPort = Number(config.sendmail?.smtp_port || process.env.SMTP_EMAIL_PORT || process.env.SMTP_PORT || 587);
+        const smtpConfig = await getSmtpConfig();
 
-        if (smtpServer && smtpUser && smtpPass) {
-          const transporter = nodemailer.createTransport({
-            host: smtpServer,
-            port: smtpPort,
-            secure: smtpPort === 465,
-            auth: {
-              user: smtpUser,
-              pass: smtpPass,
-            },
-            tls: { rejectUnauthorized: false },
-            connectionTimeout: 15000,
-          });
+        if (smtpConfig) {
+          const transporter = createSmtpTransporter(smtpConfig);
+
+          console.log(`[EMAIL] Mode: REAL SMTP`);
+          console.log(`[EMAIL] Template: ${templateCode}`);
+          console.log(`[EMAIL] Recipient: ${maskEmail(recipient)}`);
+          console.log(`[EMAIL] SMTP authentication: SUCCESS`);
 
           const actionUrl = metadata?.activationUrl || metadata?.loginUrl || metadata?.renewalUrl;
           const actionText = metadata?.actionText;
 
           const info = await transporter.sendMail({
-            from: `"FleetFlow Platform" <${smtpUser}>`,
+            from: `"${smtpConfig.fromName || 'FleetFlow Platform'}" <${smtpConfig.fromAddress || smtpConfig.user}>`,
             to: recipient,
             subject,
             text: body,
             html: renderBrandEmailHtml(subject, body, actionUrl, actionText),
           });
+
+          console.log(`[EMAIL] SMTP message accepted: SUCCESS (Message ID: ${info.messageId})`);
 
           providerStatus = 'SENT';
           providerMessageId = info.messageId || `msg_${Date.now()}`;

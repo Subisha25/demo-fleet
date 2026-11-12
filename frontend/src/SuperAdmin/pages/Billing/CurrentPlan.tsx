@@ -68,18 +68,29 @@ const CurrentPlan: React.FC = () => {
       // Fetch overview data for current fleet
       const res = await axiosInstance.get('/tenants/dashboard/stats');
       if (res.data && res.data.success) {
-        const stats = res.data;
+        const stats = res.data.data || res.data;
         const sub = stats.subscription || {};
-        const quotas = stats.quotas || {
-          vehicles: { current: 0, limit: 15 },
-          drivers: { current: 0, limit: 15 },
-          companies: { current: 0, limit: 3 },
-          trips: { current: 0, limit: 1000 },
+        const quotas = stats.quotas || {};
+
+        const planTier = (sub.planTier || sub.plan || 'PRO').toUpperCase() as 'BASIC' | 'PRO' | 'ENTERPRISE';
+        const billingCycle = (sub.billingCycle || 'MONTHLY').toUpperCase() as 'MONTHLY' | 'ANNUAL';
+
+        const tierDefaultLimits: Record<string, { vehicles: number; drivers: number; companies: number; trips: number }> = {
+          BASIC: { vehicles: 15, drivers: 15, companies: 3, trips: 100 },
+          PRO: { vehicles: 75, drivers: 75, companies: 20, trips: 250 },
+          ENTERPRISE: { vehicles: -1, drivers: -1, companies: -1, trips: -1 },
+        };
+
+        const resolvedQuotas = {
+          vehicles: quotas.vehicles || { current: 0, limit: tierDefaultLimits[planTier]?.vehicles || 75 },
+          drivers: quotas.drivers || { current: 0, limit: tierDefaultLimits[planTier]?.drivers || 75 },
+          companies: quotas.companies || { current: 0, limit: tierDefaultLimits[planTier]?.companies || 20 },
+          trips: quotas.trips || { current: 0, limit: tierDefaultLimits[planTier]?.trips || 250 },
         };
 
         const now = new Date();
-        const start = sub.startDate ? new Date(sub.startDate) : new Date(now.getTime() - 15 * 86400000);
-        const end = sub.endDate ? new Date(sub.endDate) : new Date(now.getTime() + 15 * 86400000);
+        const start = sub.currentPeriodStart || sub.startDate ? new Date(sub.currentPeriodStart || sub.startDate) : new Date(now.getTime() - 15 * 86400000);
+        const end = sub.currentPeriodEnd || sub.endDate ? new Date(sub.currentPeriodEnd || sub.endDate) : new Date(now.getTime() + 15 * 86400000);
 
         const totalMs = Math.max(1, end.getTime() - start.getTime());
         const elapsedMs = Math.max(0, now.getTime() - start.getTime());
@@ -87,9 +98,6 @@ const CurrentPlan: React.FC = () => {
         const daysElapsed = Math.min(daysTotal, Math.max(0, Math.round(elapsedMs / 86400000)));
         const daysRemaining = Math.max(0, Math.round((end.getTime() - now.getTime()) / 86400000));
         const progressPercent = Math.min(100, Math.max(0, Math.round((daysElapsed / daysTotal) * 100)));
-
-        const planTier = (sub.plan || 'PRO').toUpperCase() as 'BASIC' | 'PRO' | 'ENTERPRISE';
-        const billingCycle = (sub.billingCycle || 'MONTHLY').toUpperCase() as 'MONTHLY' | 'ANNUAL';
 
         const tierNames: Record<string, string> = {
           BASIC: 'Starter Mobility',
@@ -147,7 +155,7 @@ const CurrentPlan: React.FC = () => {
           daysElapsed,
           daysRemaining,
           progressPercent,
-          quotas,
+          quotas: resolvedQuotas,
           features: defaultFeatures[planTier] || [],
           allPlanCatalog: [
             { tier: 'BASIC', name: 'Starter Mobility', monthly: 299, annual: 3050 },

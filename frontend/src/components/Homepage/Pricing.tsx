@@ -248,7 +248,11 @@ export default function Pricing() {
                       : "bg-[#17171D] text-white hover:bg-[#5B3DF5] hover:shadow-lg"
                   }`}
                 >
-                  Register Your Fleet — {plan.name}
+                  {plan.id === "pro"
+                    ? "Get Started with Pro"
+                    : plan.id === "basic"
+                    ? "Select Starter"
+                    : "Select Enterprise"}
                 </button>
               </div>
             );

@@ -47,6 +47,44 @@ const menu: MenuItem[] = [
       { label: 'Notification Logs', path: '/admin/notifications/audit', icon: faBell },
     ],
   },
+
+    {
+    label: 'Configuration',
+    icon: faCogs,
+    children: [
+      { label: 'SMS Integration', path: '/configuration/sms-integration', icon: faComments },
+      { label: 'Settings', path: '/configuration/master', icon: faCogs },
+      { label: 'Email Templates', path: '/configuration/email', icon: faEnvelope },
+      { label: 'SMS Templates', path: '/configuration/sms', icon: faFileLines },
+    ],
+  },
+  {
+    label: 'Payment Mode',
+    icon: faMoneyCheckAlt,
+    children: [
+      { label: 'Add Payment Mode', path: '/paymentmode/add', icon: faPlus },
+      { label: 'List Payment Mode', path: '/paymentmode/list', icon: faList },
+    ],
+  },
+  
+  {
+    label: 'Owners',
+    icon: faUserTie,
+    children: [
+      { label: 'Add Owner', path: '/vendors/add', icon: faUserPlus },
+      { label: 'List Owner', path: '/vendors/list', icon: faList },
+    ],
+  },
+  
+   {
+    label: 'Vehicle',
+    icon: faCar,
+    children: [
+      { label: 'Add Vehicle', path: '/vehicle/add', icon: faPlus },
+      { label: 'Vehicle List', path: '/vehicle/vehiclemaster/list', icon: faTruck },
+    ],
+  },
+
   {
     label: 'Master',
     icon: faCrown,
@@ -59,20 +97,21 @@ const menu: MenuItem[] = [
           { label: 'List Tax', path: '/master/tax/list', icon: faList },
         ],
       },
-      {
-        label: 'Pickup Area',
-        icon: faMapMarkerAlt,
-        children: [
-          { label: 'Add Pickup Area', path: '/master/pickuparea/add', icon: faPlus },
-          { label: 'Pickup Area Info', path: '/master/pickuparea/info', icon: faList },
-        ],
-      },
+    
       {
         label: 'Pickup City',
         icon: faCity,
         children: [
           { label: 'Add Pickup City', path: '/master/pickupcity/add', icon: faPlus },
           { label: 'List Pickup City', path: '/master/pickupcity/list', icon: faList },
+        ],
+      },
+        {
+        label: 'Pickup Area',
+        icon: faMapMarkerAlt,
+        children: [
+          { label: 'Add Pickup Area', path: '/master/pickuparea/add', icon: faPlus },
+          { label: 'Pickup Area Info', path: '/master/pickuparea/info', icon: faList },
         ],
       },
       {
@@ -93,30 +132,24 @@ const menu: MenuItem[] = [
       },
     ],
   },
-  {
-    label: 'Configuration',
-    icon: faCogs,
+
+
+    {
+    label: 'Drivers',
+    icon: faUserSecret,
     children: [
-      { label: 'SMS Integration', path: '/configuration/sms-integration', icon: faComments },
-      { label: 'Settings', path: '/configuration/master', icon: faCogs },
-      { label: 'Email Templates', path: '/configuration/email', icon: faEnvelope },
-      { label: 'SMS Templates', path: '/configuration/sms', icon: faFileLines },
+      { label: 'Add Driver', path: '/drivers/add', icon: faUserPlus },
+      { label: 'Driver List', path: '/drivers/list', icon: faList },
+      { label: 'Assigned List', path: '/drivers/assignedlist', icon: faClipboardCheck },
     ],
   },
-  {
-    label: 'Payment Mode',
-    icon: faMoneyCheckAlt,
+
+   {
+    label: 'Users',
+    icon: faUsers,
     children: [
-      { label: 'Add Payment Mode', path: '/paymentmode/add', icon: faPlus },
-      { label: 'List Payment Mode', path: '/paymentmode/list', icon: faList },
-    ],
-  },
-  {
-    label: 'Vehicle',
-    icon: faCar,
-    children: [
-      { label: 'Add Vehicle', path: '/vehicle/add', icon: faPlus },
-      { label: 'Vehicle List', path: '/vehicle/vehiclemaster/list', icon: faTruck },
+      { label: 'Add User', path: '/users/adduser', icon: faUserPlus },
+      { label: 'User List', path: '/users/list', icon: faUserFriends },
     ],
   },
   {
@@ -131,31 +164,8 @@ const menu: MenuItem[] = [
       { label: 'Cancelled Order', path: '/orders/cancelled', icon: faTimesCircle },
     ],
   },
-  {
-    label: 'Users',
-    icon: faUsers,
-    children: [
-      { label: 'Add User', path: '/users/adduser', icon: faUserPlus },
-      { label: 'User List', path: '/users/list', icon: faUserFriends },
-    ],
-  },
-  {
-    label: 'Owners',
-    icon: faUserTie,
-    children: [
-      { label: 'Add Owner', path: '/vendors/add', icon: faUserPlus },
-      { label: 'List Owner', path: '/vendors/list', icon: faList },
-    ],
-  },
-  {
-    label: 'Drivers',
-    icon: faUserSecret,
-    children: [
-      { label: 'Add Driver', path: '/drivers/add', icon: faUserPlus },
-      { label: 'Driver List', path: '/drivers/list', icon: faList },
-      { label: 'Assigned List', path: '/drivers/assignedlist', icon: faClipboardCheck },
-    ],
-  },
+
+
   {
     label: 'Invoice',
     icon: faFileInvoice,
@@ -210,6 +220,24 @@ const Sidebar: React.FC = () => {
 
   const tenantName = localStorage.getItem('tenantName') || 'FleetFlow Operator';
 
+  const isPlatformSuperAdmin = isSuperAdmin && !isInspecting;
+  const fleetName = currentTenant?.displayName || currentTenant?.name || tenantName || 'Fleet Mobility';
+  const fleetLogo = currentTenant?.brandingTokens?.logoUrl || currentTenant?.logoUrl;
+
+  const getFleetInitials = (name?: string, code?: string) => {
+    if (code && code.trim().length > 0 && code !== 'FF' && code !== 'ALL') {
+      return code.trim().slice(0, 3).toUpperCase();
+    }
+    if (!name) return 'FL';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  const fleetInitials = getFleetInitials(fleetName, currentTenant?.code);
+
   const toggleDropdown = (label: string) => {
     setOpenDropdown((prev) =>
       prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
@@ -246,22 +274,76 @@ const Sidebar: React.FC = () => {
       <div className="sticky top-0 z-10 bg-[#0B0B0F] border-b border-[#1F1F2E] px-4 py-3.5">
         <div className="flex items-center gap-3">
           {collapsed ? (
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-700 flex items-center justify-center font-black text-white text-lg shadow-md shadow-purple-900/30">
-              FF
-            </div>
-          ) : (
+            isPlatformSuperAdmin ? (
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-700 flex items-center justify-center font-black text-white text-lg shadow-md shadow-purple-900/30">
+                FF
+              </div>
+            ) : fleetLogo ? (
+              <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 p-1 flex items-center justify-center shadow-md overflow-hidden relative">
+                <img
+                  src={fleetLogo}
+                  alt={fleetName}
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.parentElement?.querySelector('.collapsed-fallback');
+                    if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                  }}
+                />
+                <div className="collapsed-fallback hidden w-full h-full items-center justify-center font-black text-white text-base bg-gradient-to-r from-indigo-600 to-purple-700 rounded-lg">
+                  {fleetInitials}
+                </div>
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-700 flex items-center justify-center font-black text-white text-base shadow-md shadow-purple-900/30">
+                {fleetInitials}
+              </div>
+            )
+          ) : isPlatformSuperAdmin ? (
             <div className="flex items-center gap-2.5">
               <FleetFlowLogo size="sm" variant="light" showTagline={false} />
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              {fleetLogo ? (
+                <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 p-1 flex items-center justify-center shrink-0 shadow-md overflow-hidden relative">
+                  <img
+                    src={fleetLogo}
+                    alt={fleetName}
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.parentElement?.querySelector('.expanded-fallback');
+                      if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                    }}
+                  />
+                  <div className="expanded-fallback hidden w-full h-full items-center justify-center font-black text-white text-sm bg-gradient-to-r from-indigo-600 to-purple-700 rounded-lg">
+                    {fleetInitials}
+                  </div>
+                </div>
+              ) : (
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-700 flex items-center justify-center font-black text-white text-base shrink-0 shadow-md shadow-purple-900/30">
+                  {fleetInitials}
+                </div>
+              )}
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-white text-base tracking-tight truncate max-w-[170px]" title={fleetName}>
+                  {fleetName}
+                </span>
+                <span className="text-[11px] text-gray-400 font-medium truncate">
+                  Fleet Operations Portal
+                </span>
+              </div>
             </div>
           )}
         </div>
         {!collapsed && (
           <div className="mt-2.5 pt-2.5 border-t border-[#1F1F2E] flex items-center justify-between">
             <span className="text-xs font-semibold text-gray-200 truncate max-w-[150px]">
-              {isSuperAdmin && !isInspecting ? 'FleetFlow SaaS Platform' : (currentTenant?.name || tenantName)}
+              {isPlatformSuperAdmin ? 'FleetFlow SaaS Platform' : fleetName}
             </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-950/70 text-purple-300 border border-purple-700/50 uppercase tracking-wider">
-              {isSuperAdmin && !isInspecting ? 'Platform Admin' : `${currentTenant?.planTier || 'PRO'} Plan`}
+              {isPlatformSuperAdmin ? 'Platform Admin' : `${currentTenant?.planTier || 'PRO'} Plan`}
             </span>
           </div>
         )}

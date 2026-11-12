@@ -542,7 +542,6 @@ const handleResendMonthlyInvoiceEmail = async (monthlyInvoiceId?: string) => {
                   <div className="text-sm text-gray-700 space-y-1">
                     <p><span className="font-medium">Company Name:</span> {company?.companyName || m?.companyName || "-"}</p>
                     <p><span className="font-medium">Company Address:</span> {company?.companyAddress || "-"}</p>
-                    <p><span className="font-medium">Manager Email:</span> {company?.managerEmail || "-"}</p>
                     <p><span className="font-medium">Monthly Invoice ID:</span> {m?.monthlyInvoiceId || "-"}</p>
                   </div>
                 </div>

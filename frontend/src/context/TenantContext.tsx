@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axiosInstance from '../utils/axiosInstance';
+import { useAuth } from './AuthContext';
 
 export interface TenantBranding {
   primaryColor?: string;
@@ -28,13 +29,16 @@ export interface TenantSubscriptionInfo {
 export interface TenantInfo {
   tenantId: string;
   name: string;
+  displayName?: string;
   code: string;
   subdomain?: string;
+  slug?: string;
   customDomain?: string;
   status: string;
   planTier: 'BASIC' | 'PRO' | 'ENTERPRISE';
   contactEmail?: string;
   contactPhone?: string;
+  logoUrl?: string;
   brandingTokens?: TenantBranding;
   subscription?: TenantSubscriptionInfo;
 }
@@ -92,6 +96,7 @@ const ALL_FLEETS_TENANT: TenantInfo = {
 const TenantContext = createContext<TenantContextType | undefined>(undefined);
 
 export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
   const role = localStorage.getItem('role');
   const isSuperAdmin = role === 'superadmin';
 
@@ -111,7 +116,7 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const applyBranding = (tenant: TenantInfo) => {
     const primary = tenant.brandingTokens?.primaryColor || '#5B3DF5';
-    const title = tenant.brandingTokens?.portalTitle || tenant.name;
+    const title = tenant.brandingTokens?.portalTitle || tenant.displayName || tenant.name;
     document.documentElement.style.setProperty('--primary-tenant-color', primary);
     if (tenant.tenantId === 'all' || !tenant.tenantId || tenant.tenantId === 'e7b8a1c0-0000-0000-0000-000000000001') {
       document.title = 'FleetFlow | Enterprise Cloud Mobility & Fleet Operations Platform';
@@ -124,7 +129,8 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const refreshTenant = async () => {
     try {
-      if (selectedFleet === 'all') {
+      const currentRole = localStorage.getItem('role');
+      if (currentRole === 'superadmin' && selectedFleet === 'all') {
         setCurrentTenant(ALL_FLEETS_TENANT);
         applyBranding(ALL_FLEETS_TENANT);
         setLoading(false);
@@ -222,7 +228,7 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       localStorage.setItem('tenantId', userTenant);
       refreshTenant();
     }
-  }, []);
+  }, [isAuthenticated]);
 
   return (
     <TenantContext.Provider

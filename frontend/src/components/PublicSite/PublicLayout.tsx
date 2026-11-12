@@ -8,9 +8,9 @@ interface PublicLayoutProps {
 
 export default function PublicLayout({ children }: PublicLayoutProps) {
   return (
-    <div className="min-h-screen flex flex-col bg-[#F7F7FB] text-[#17171D] font-sans antialiased selection:bg-[#5B3DF5]/20 selection:text-[#5B3DF5]">
+    <div className="min-h-screen flex flex-col bg-[#F7F7FB] text-[#17171D] font-sans antialiased selection:bg-[#5B3DF5]/20 selection:text-[#5B3DF5] overflow-x-hidden">
       <PublicHeader />
-      <main className="flex-grow pt-20">
+      <main className="flex-grow pt-16 sm:pt-20">
         {children}
       </main>
       <PublicFooter />

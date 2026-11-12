@@ -12,15 +12,22 @@ import { VehicleMaster } from '../models/vehicleMaster';
 import { Booking } from '../models/booking';
 import { ORDER } from '../utils/costants';
 import { ROOT_TENANT_ID } from '../context/tenantContext';
+import { NotificationLog } from '../models/notificationLog';
 import { sendNotification } from './notificationService';
 import { checkBookingQuota } from './quotaService';
-
-const PHONE_REGEX = /^[6-9]\d{9}$/;
-const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+import { isSmsMockMode } from '../utils/mockModes';
+import {
+  send2FactorOTP,
+  dispatchAuditedSms,
+  validateMobileRecipient,
+  validateEmailRecipient,
+  maskPhoneNumber,
+} from './smsServices';
 
 // In-memory verification cache for replay-protected tokens (backed by OTP table)
 interface VerifiedSession {
   phone: string;
+  tenantId?: string;
   expiresAt: number;
 }
 const verifiedSessions = new Map<string, VerifiedSession>();
@@ -28,26 +35,51 @@ const verifiedSessions = new Map<string, VerifiedSession>();
 // Rate limit map: phone -> timestamps[]
 const otpRateLimits = new Map<string, number[]>();
 
+// Resend cooldown map: phone -> lastTimestamp
+const otpLastRequestTime = new Map<string, number>();
+
+// Failed attempt counter map: sessionId -> attemptCount (max 5 before invalidation)
+const otpVerificationAttempts = new Map<string, number>();
+
 // Duplicate submission protection: fingerprint -> timestamp
 const submissionCache = new Map<string, number>();
 
 /**
  * Step 1A: Request Phone OTP for Public Cab Booking
+ * Enforces:
+ * - Advanced Indian mobile validation (10 digits, starts 6-9, non-dummy)
+ * - 30-second resend cooldown
+ * - 5 OTP requests per phone per 15 minutes
+ * - Tenant isolation (resolves fleet from slug, companyId, or tenantId)
+ * - Real 2Factor OTP dispatch (template OTP1)
+ * - Clean error responses from gateway (never claims false success)
  */
 export const sendPublicBookingOtp = async (req: Request, res: Response) => {
   try {
-    const { phone } = req.body;
-    const cleanPhone = String(phone || '').trim().replace(/\D/g, '');
+    const { phone, slug, tenantId, companyId } = req.body;
 
-    if (!cleanPhone || !PHONE_REGEX.test(cleanPhone)) {
+    // 1. Advanced Phone Validation & Dummy Protection
+    const validation = validateMobileRecipient(phone);
+    if (!validation.valid) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide a valid 10-digit Indian mobile number starting with 6-9.',
+        message: validation.error || 'Please provide a valid 10-digit Indian mobile number.',
+      });
+    }
+    const cleanPhone = validation.normalizedPhone;
+
+    // 2. 30-Second Resend Cooldown
+    const now = Date.now();
+    const lastRequest = otpLastRequestTime.get(cleanPhone) || 0;
+    if (now - lastRequest < 30 * 1000) {
+      const waitSeconds = Math.ceil((30 * 1000 - (now - lastRequest)) / 1000);
+      return res.status(429).json({
+        success: false,
+        message: `Please wait ${waitSeconds}s before requesting a new OTP.`,
       });
     }
 
-    // Rate limiting: Max 5 OTP requests per phone per 15 minutes
-    const now = Date.now();
+    // 3. Rate limiting: Max 5 OTP requests per phone per 15 minutes
     const history = (otpRateLimits.get(cleanPhone) || []).filter((ts) => now - ts < 15 * 60 * 1000);
     if (history.length >= 5) {
       return res.status(429).json({
@@ -57,45 +89,77 @@ export const sendPublicBookingOtp = async (req: Request, res: Response) => {
     }
     history.push(now);
     otpRateLimits.set(cleanPhone, history);
+    otpLastRequestTime.set(cleanPhone, now);
 
-    // Generate 6-digit cryptographic or deterministic random OTP
+    // 4. Resolve Tenant Context
+    let resolvedTenantId = tenantId;
+    if (!resolvedTenantId && slug) {
+      const tenant = await Tenant.findOne({ where: { slug } });
+      if (tenant) resolvedTenantId = tenant.tenantId;
+    }
+    if (!resolvedTenantId && companyId) {
+      const comp = await Company.findOne({ where: { companyId } });
+      if (comp) resolvedTenantId = comp.tenantId;
+    }
+    resolvedTenantId = resolvedTenantId || ROOT_TENANT_ID;
+
+    // 5. Generate Cryptographic 6-digit OTP
     const rawOtp = crypto.randomInt(100000, 999999).toString();
     const sessionId = 'PUB_' + crypto.randomBytes(16).toString('hex');
     const expiresAt = new Date(now + 5 * 60 * 1000); // 5 minutes expiry
 
     // Save to OTP table
-    await OTP.create({
+    const otpRecord = await OTP.create({
       otp: rawOtp,
       loginId: uuidv4(),
       sessionId,
       expiresAt,
     });
 
-    const isMock = process.env.NOTIFICATION_MOCK_MODE !== 'false';
+    // 6. Direct Provider Dispatch via 2Factor OTP Route
+    const otpResult = await send2FactorOTP(cleanPhone, rawOtp, 'OTP1', resolvedTenantId);
 
-    // Dispatches via safe notification service (audited and mocked in mock mode)
-    try {
-      await sendNotification({
-        channel: 'SMS',
-        recipient: cleanPhone,
-        templateCode: 'PUBLIC_BOOKING_OTP',
-        body: `Your FleetFlow ride verification code is ${rawOtp}. Valid for 5 minutes.`,
-        metadata: { otp: rawOtp },
+    // If dispatch failed or provider rejected, revoke OTP and return clear error
+    if (!otpResult.success) {
+      await OTP.destroy({ where: { otpId: otpRecord.otpId } });
+      console.error(`[PublicBooking OTP Provider Failure] Recipient: ${maskPhoneNumber(cleanPhone)} | Error: ${otpResult.error}`);
+      return res.status(502).json({
+        success: false,
+        message: otpResult.error || 'Failed to dispatch verification code via SMS provider. Please verify your mobile number or try again.',
       });
-    } catch (smsErr) {
-      console.warn('[PublicBooking OTP] SMS dispatch notice:', smsErr);
     }
 
-    // Mock mode / dev notification
+    const isMock = isSmsMockMode();
     if (isMock) {
-      console.log(`[PublicBooking OTP Mock] Mobile: ${cleanPhone} | Session: ${sessionId} | OTP: ${rawOtp}`);
+      console.log(`[PublicBooking OTP Mock] Mobile: ${maskPhoneNumber(cleanPhone)} | Session: ${sessionId} | OTP: ${rawOtp} | Status: MOCK_DISPATCHED`);
+    } else {
+      console.log(`[PublicBooking OTP Live] Mobile: ${maskPhoneNumber(cleanPhone)} | Session: ${sessionId} | ProviderMsgId: ${otpResult.providerMessageId}`);
+    }
+
+    // Persist to notification_logs for complete auditing
+    try {
+      await NotificationLog.create({
+        channel: 'SMS',
+        recipient: cleanPhone,
+        tenantId: resolvedTenantId,
+        templateCode: 'PUBLIC_BOOKING_OTP',
+        referenceEntity: 'OTP_SESSION',
+        referenceId: sessionId,
+        providerStatus: isMock ? 'MOCK' : otpResult.providerStatus,
+        providerMessageId: otpResult.providerMessageId || null,
+        errorDetails: otpResult.error || null,
+        retryCount: 0,
+        maxRetries: 3,
+        metadata: { sessionId, template: 'OTP1' },
+      });
+    } catch (logErr) {
+      console.warn('[PublicBooking OTP] Failed to log NotificationLog entry:', logErr);
     }
 
     return res.status(200).json({
       success: true,
       message: 'OTP sent successfully to your mobile number.',
       sessionId,
-      // Provide mockOtp in development/mock mode for automated testing & smooth evaluation
       ...(isMock ? { mockOtp: rawOtp } : {}),
     });
   } catch (error: any) {
@@ -109,15 +173,19 @@ export const sendPublicBookingOtp = async (req: Request, res: Response) => {
 
 /**
  * Step 1B: Verify Phone OTP
+ * Enforces:
+ * - Maximum 5 failed verification attempts before session invalidation
+ * - Single-use consumption (record destroyed upon verification)
+ * - Issues a tamper-resistant token with 30-minute validity
  */
 export const verifyPublicBookingOtp = async (req: Request, res: Response) => {
   try {
-    const { phone, otp, sessionId } = req.body;
+    const { phone, otp, sessionId, slug, tenantId } = req.body;
     const cleanPhone = String(phone || '').trim().replace(/\D/g, '');
     const cleanOtp = String(otp || '').trim();
     const cleanSessionId = String(sessionId || '').trim();
 
-    if (!cleanPhone || !PHONE_REGEX.test(cleanPhone)) {
+    if (!cleanPhone || cleanPhone.length !== 10) {
       return res.status(400).json({
         success: false,
         message: 'Valid 10-digit mobile number is required.',
@@ -138,6 +206,17 @@ export const verifyPublicBookingOtp = async (req: Request, res: Response) => {
       });
     }
 
+    // Check failed attempt count
+    const attempts = otpVerificationAttempts.get(cleanSessionId) || 0;
+    if (attempts >= 5) {
+      await OTP.destroy({ where: { sessionId: cleanSessionId } });
+      otpVerificationAttempts.delete(cleanSessionId);
+      return res.status(429).json({
+        success: false,
+        message: 'Too many incorrect attempts. This OTP session has been invalidated. Please request a new OTP.',
+      });
+    }
+
     // Look up OTP record
     const otpRecord = await OTP.findOne({
       where: {
@@ -147,19 +226,33 @@ export const verifyPublicBookingOtp = async (req: Request, res: Response) => {
     });
 
     if (!otpRecord || otpRecord.otp !== cleanOtp) {
+      const nextAttempts = attempts + 1;
+      otpVerificationAttempts.set(cleanSessionId, nextAttempts);
+
+      if (nextAttempts >= 5) {
+        await OTP.destroy({ where: { sessionId: cleanSessionId } });
+        otpVerificationAttempts.delete(cleanSessionId);
+        return res.status(429).json({
+          success: false,
+          message: 'Too many incorrect attempts. This OTP session has been invalidated. Please request a new OTP.',
+        });
+      }
+
+      const remaining = 5 - nextAttempts;
       return res.status(400).json({
         success: false,
-        message: 'Invalid or expired OTP. Please check the code or request a new one.',
+        message: `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`,
       });
     }
 
-    // Delete verified OTP to prevent replay
+    // Success: Delete verified OTP to prevent replay and clear attempt counter
+    otpVerificationAttempts.delete(cleanSessionId);
     await OTP.destroy({ where: { otpId: otpRecord.otpId } });
 
     // Generate tamper-resistant verification token
     const token = 'VTOK_' + crypto.randomBytes(24).toString('hex');
     const expiresAt = Date.now() + 30 * 60 * 1000; // 30 minutes to complete booking
-    verifiedSessions.set(token, { phone: cleanPhone, expiresAt });
+    verifiedSessions.set(token, { phone: cleanPhone, tenantId, expiresAt });
 
     // Also persist token marker in OTP table
     await OTP.create({
@@ -446,21 +539,23 @@ export const createPublicBooking = async (req: Request, res: Response) => {
       });
     }
 
-    const cleanEmail = String(customerEmail || '').toLowerCase().trim();
-    if (!cleanEmail || !EMAIL_REGEX.test(cleanEmail)) {
+    const emailValidation = validateEmailRecipient(customerEmail);
+    if (!emailValidation.valid) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide a valid email address.',
+        message: emailValidation.error || 'Please provide a valid email address.',
       });
     }
+    const cleanEmail = emailValidation.normalizedEmail;
 
-    const cleanPhone = String(phone || '').trim().replace(/\D/g, '');
-    if (!cleanPhone || !PHONE_REGEX.test(cleanPhone)) {
+    const phoneValidation = validateMobileRecipient(phone);
+    if (!phoneValidation.valid) {
       return res.status(400).json({
         success: false,
-        message: 'Valid 10-digit mobile number is required.',
+        message: phoneValidation.error || 'Valid 10-digit mobile number is required.',
       });
     }
+    const cleanPhone = phoneValidation.normalizedPhone;
 
     // 2. Verify OTP Verification Token independently
     const isVerified = await isTokenVerified(verificationToken, cleanPhone);
@@ -621,7 +716,7 @@ export const createPublicBooking = async (req: Request, res: Response) => {
     // Clean up used verification session
     verifiedSessions.delete(verificationToken);
 
-    // Mock-safe notification log entry (no real emails/SMS sent during testing)
+    // Mock-safe email confirmation notification
     try {
       await sendNotification({
         channel: 'EMAIL',
@@ -635,6 +730,22 @@ export const createPublicBooking = async (req: Request, res: Response) => {
       });
     } catch (notifErr) {
       console.warn('[PublicBooking] Confirmation notification notice:', notifErr);
+    }
+
+    // Audited customer SMS booking acknowledgment (Registered template: Booking Creation)
+    try {
+      await dispatchAuditedSms({
+        recipient: cleanPhone,
+        templateCode: 'BOOKING_CREATED',
+        templateName: 'Booking Creation',
+        vars: [cleanName],
+        message: `${tenant.name}: Hello ${cleanName}, your ride request #${newBooking.bookingCode} has been placed successfully.`,
+        referenceEntity: 'BOOKING',
+        referenceId: newBooking.bookingId,
+        tenantId: tenant.tenantId,
+      });
+    } catch (smsErr) {
+      console.warn('[PublicBooking] Confirmation SMS notice:', smsErr);
     }
 
     return res.status(201).json({

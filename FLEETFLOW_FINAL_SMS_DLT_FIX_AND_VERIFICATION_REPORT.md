@@ -16,7 +16,9 @@ All SMS configuration and delivery issues have been resolved, strictly adhering 
 1. **Clarification on Old Number (`9003241571`):**  
    Strictly **NOT** added or restored to any SMS configuration, recipient fallback, SuperAdmin contact, or provider request. The forensic audit confirmed that `9003241571` was historically Grace Cabs's customer-support helpline text string (`var10`), not an SMS recipient or delivery gateway parameter. SuperAdmin contact resolution dynamically retrieves `SUPERADMIN_PHONE` from environment (`9080280818`) or database profile, never defaulting to `9003241571`.
 2. **Approved 2Factor DLT Template Names:**  
-   Mapped all operational notification triggers to pre-approved 2Factor DLT template names registered under header `GRCCAB`, including the exact registered telecom spelling `'Booking Confimation Message'`.
+   Mapped all operational notification triggers to pre-approved 
+   
+   2Factor DLT template names registered under header `GRCCAB`, including the exact registered telecom spelling `'Booking Confimation Message'`.
 3. **Correct `var1...varN` Parameter Ordering:**  
    Configured variable ordering to exactly match registered DLT specifications discovered in the reference codebase.
 4. **Sender ID `GRCCAB`:**  

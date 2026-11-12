@@ -13,6 +13,7 @@ import { combineTableNames } from 'sequelize/lib/utils';
 import { ROOT_TENANT_ID } from '../context/tenantContext';
 import { send2FactorOTP as sendProviderOTP } from '../services/smsServices';
 import { NotificationLog } from '../models/notificationLog';
+import { isSmsMockMode } from '../utils/mockModes';
  
 const { ROLES } = USERS;
  
@@ -26,7 +27,7 @@ const send2FactorOTP = async (mobile: string, otp: string) => {
 
   // Write audit log to demodb.notification_logs
   try {
-    const isMock = process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test';
+    const isMock = isSmsMockMode();
     await NotificationLog.create({
       channel: 'SMS',
       recipient: mobile,
@@ -233,8 +234,8 @@ if (existingOtp) {
       return;
     }
  
-    // Log OTP for development (remove in production)
-    console.log(`OTP sent to ${mobile}: ${otp}`);
+    // Sanitized audit log (never log raw OTP)
+    console.log(`[AppLogin] OTP dispatch initiated for mobile: ${mobile.slice(-4).padStart(mobile.length, '*')}`);
  
     res.status(200).json({
       success: true,
@@ -425,8 +426,8 @@ export const resendOTP = async (req: Request, res: Response) => {
       return;
     }
  
-    // Log OTP for development (remove in production)
-    console.log(`Resent OTP to ${mobile}: ${otp}`);
+    // Sanitized audit log (never log raw OTP)
+    console.log(`[AppLogin] Resent OTP dispatch initiated for mobile: ${mobile.slice(-4).padStart(mobile.length, '*')}`);
  
     res.status(200).json({
       success: true,

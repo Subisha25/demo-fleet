@@ -36,10 +36,6 @@ export default function ManagerAddUser() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
-  const [danfossUserId, setDanfossUserId] = useState("");
-const [managerId, setManagerId] = useState("");
-const [managerEmail, setManagerEmail] = useState("");
-const [costCenter, setCostCenter] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "other">("male");
   const [country, setCountry] = useState("");
   const [state, setState] = useState("");
@@ -49,7 +45,6 @@ const [costCenter, setCostCenter] = useState("");
   const [presentAddress, setPresentAddress] = useState("");
   const [pinCode, setPinCode] = useState("");
   const [loadingPincode, setLoadingPincode] = useState(false);
-  const [isManager, setIsManager] = useState(false);
 
   const navigate = useNavigate();
 
@@ -192,15 +187,6 @@ const [costCenter, setCostCenter] = useState("");
       return;
     }
 
-    // Danfoss validation
-    if (companyName?.toLowerCase().includes("danfoss")) {
-      const emailLower = email.trim().toLowerCase();
-      if (!emailLower.endsWith("@danfoss.com") ) {
-        showToast("Danfoss users must use @danfoss.com email only.", "error");
-        return;
-      }
-    }
-
     try {
       const check = await axiosInstance.get(`/user/getAllUsers`, {
         params: { email: email.trim() },
@@ -266,11 +252,6 @@ const [costCenter, setCostCenter] = useState("");
         isDeleted: 0,
         status: "active",
         isConfirmed: 1,
-        isManager,
-          danfossuserId: danfossUserId,
-  managerId: managerId,
-  managerEmail: managerEmail,
-    costCenter: costCenter
       };
 
       const response = await axiosInstance.post("/auth/createUser", payload);
@@ -288,8 +269,6 @@ const [costCenter, setCostCenter] = useState("");
         setAddress("");
         setPresentAddress("");
         setPinCode("");
-        setIsManager(false);
-        setCostCenter("");
 
         setTimeout(() => navigate(`/company/${seoUrl}`), 1000);
       } else {
@@ -511,61 +490,9 @@ useEffect(() => {
                     disabled
                     className="border p-2 w-full bg-gray-100 cursor-not-allowed"
                   />
-
-                  {companyName?.toLowerCase().includes("danfoss") && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <input
-                        type="checkbox"
-                        id="isManager"
-                        checked={isManager}
-                        onChange={(e) => setIsManager(e.target.checked)}
-                        className="w-4 h-4"
-                      />
-                      <label htmlFor="isManager" className="text-gray-700">
-                        Is Manager
-                      </label>
-                    </div>
-                  )}
                 </div>
-{companyName?.toLowerCase().includes("danfoss") && (
-  <>
-    <InputBox
-      label={<>User ID</>}
-      name="danfossUserId"
-      placeholder="Enter User ID"
-      value={danfossUserId}
-      onChange={(name, value) => setDanfossUserId(value)}
-      icon={faUser}
-    />
 
-    <InputBox
-      label={<>Manager ID</>}
-      name="managerId"
-      placeholder="Enter Manager ID"
-      value={managerId}
-      onChange={(name, value) => setManagerId(value)}
-      icon={faUser}
-    />
 
-    <InputBox
-      label={<>Manager Email</>}
-      name="managerEmail"
-      type="email"
-      placeholder="Enter Manager Email"
-      value={managerEmail}
-      onChange={(name, value) => setManagerEmail(value)}
-      icon={faEnvelope}
-    />
-       <InputBox
-      label={<>Cost Center</>}
-      name="costCenter"
-      placeholder="Enter Cost Center"
-      value={costCenter}
-      onChange={(name, value) => setCostCenter(value)}
-      icon={faHashtag}
-    />
-  </>
-)}
                 <InputBox
                   label={<>Permanent Address</>}
                   name="address"

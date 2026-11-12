@@ -20,6 +20,7 @@ import {
   getSuperAdminEmail,
 } from '../services/notificationService';
 import config from '../config/config';
+import { isSmsMockMode } from '../utils/mockModes';
 
 let realNetworkCalls = 0;
 const originalGet = axios.get;
@@ -74,9 +75,9 @@ async function runTests() {
   });
 
   // 2. Mock mode enabled
-  await check('NOTIFICATION_MOCK_MODE is strictly "true"', () => {
-    if (process.env.NOTIFICATION_MOCK_MODE !== 'true') {
-      throw new Error(`NOTIFICATION_MOCK_MODE is "${process.env.NOTIFICATION_MOCK_MODE}", expected "true"`);
+  await check('SMS mock mode is strictly active', () => {
+    if (!isSmsMockMode() && process.env.NOTIFICATION_MOCK_MODE !== 'true') {
+      throw new Error(`SMS mock mode is not active`);
     }
   });
 
@@ -214,8 +215,10 @@ async function runTests() {
   // 13. Un-templated 2Factor message rejection safety when not mocked
   await check('sendDirectSms protects against un-templated text if 2Factor is configured without mock', async () => {
     const origMock = process.env.NOTIFICATION_MOCK_MODE;
+    const origSmsMock = process.env.SMS_MOCK_MODE;
     try {
       process.env.NOTIFICATION_MOCK_MODE = 'false';
+      process.env.SMS_MOCK_MODE = 'false';
       const res = await sendDirectSms('9080280818', 'Arbitrary text without DLT template');
       if (res.success || res.providerStatus !== 'FAILED') {
         throw new Error(`Expected rejection of un-templated SMS, got: ${JSON.stringify(res)}`);
@@ -225,6 +228,7 @@ async function runTests() {
       }
     } finally {
       process.env.NOTIFICATION_MOCK_MODE = origMock;
+      process.env.SMS_MOCK_MODE = origSmsMock;
     }
   });
 

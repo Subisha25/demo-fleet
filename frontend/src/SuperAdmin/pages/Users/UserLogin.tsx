@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import axiosInstance from "../../../utils/axiosInstance";
 import { useAuth } from "../../../context/AuthContext";
@@ -6,6 +6,7 @@ import { showToast, AlertContainer } from "../../../components/AlertBox";
 import UserLoginHeader from "./userloginheader";
 import Footer from "../../../components/Homepage/Footer";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
+import LoadingButton from "../../../components/LoadingButton";
 
 interface CompanyData {
   companyId: string;
@@ -26,6 +27,7 @@ const UserLogin: React.FC = () => {
   const [errors, setErrors] = useState<{ email?: string; password?: string; server?: string }>({});
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   /* ===== Forgot Password States ===== */
   const [showForgetModal, setShowForgetModal] = useState(false);
@@ -59,11 +61,13 @@ const UserLogin: React.FC = () => {
   };
 
   /* ===== Login Submit ===== */
-const onSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!validate()) return;
-  setSubmitting(true);
-  setErrors({});
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmittingRef.current || submitting) return;
+    if (!validate()) return;
+    isSubmittingRef.current = true;
+    setSubmitting(true);
+    setErrors({});
 
   try {
     const res = await axiosInstance.post(`/auth/companyLogin`, {
@@ -121,6 +125,7 @@ const onSubmit = async (e: React.FormEvent) => {
       server: err?.response?.data?.message || "Login failed",
     });
   } finally {
+    isSubmittingRef.current = false;
     setSubmitting(false);
   }
 };
@@ -252,9 +257,16 @@ const onSubmit = async (e: React.FormEvent) => {
                 </div>
               </div>
 
-              <button className="w-full bg-gradient-to-r from-[#274782] to-[#352E6B] text-white py-3.5 rounded-xl">
-                {submitting ? "Signing in..." : "Sign In"}
-              </button>
+              <LoadingButton
+                type="submit"
+                loading={submitting}
+                loadingText="Signing In..."
+                variant="primary"
+                size="lg"
+                className="w-full shadow-md"
+              >
+                Sign In
+              </LoadingButton>
 
               <p
                 onClick={() => setShowForgetModal(true)}

@@ -5,50 +5,35 @@ import { createShortCode } from '../utils/shortLinkStore';
 import { getFleetDocumentBranding } from './fleetBrandingService';
 import { ROOT_TENANT_ID } from '../context/tenantContext';
 import { getTenantDecryptedCredentials } from './tenantSmsConfigService';
+import { isSmsMockMode } from '../utils/mockModes';
+import {
+  validateMobileRecipient,
+  validateEmailRecipient,
+  maskPhoneNumber as secureMaskPhone,
+  maskEmail as secureMaskEmail,
+} from '../utils/validationUtils';
+
+export { validateMobileRecipient, validateEmailRecipient };
 
 /**
  * Masks phone number for secure production logging.
  * Masks all but the last 4 digits.
  */
 export function maskPhoneNumber(phone?: string | null): string {
-  if (!phone || typeof phone !== 'string') return 'UNKNOWN';
-  const clean = phone.replace(/\s+/g, '');
-  if (clean.length <= 4) return '****';
-  return '*'.repeat(clean.length - 4) + clean.slice(-4);
+  return secureMaskPhone(phone);
 }
 
 /**
  * Normalizes and validates phone numbers.
- * Supports standard Indian mobile numbers (10 digits).
- * Prevents duplicate country codes (+91+91 or 9191).
+ * Delegates to centralized validateMobileRecipient for strict validation,
+ * TRAI 6-9 checking, and fake/dummy/placeholder number protection.
  */
 export function normalizePhoneNumberForSms(phone?: string | null): {
   valid: boolean;
   normalizedPhone: string;
   error?: string;
 } {
-  if (!phone || typeof phone !== 'string') {
-    return { valid: false, normalizedPhone: '', error: 'Phone number is missing or empty' };
-  }
-
-  const trimmed = phone.trim();
-  let cleaned = trimmed.replace(/[\s\-\(\)]/g, '');
-  let digitsOnly = cleaned.replace(/\D/g, '');
-
-  // Strip redundant leading 91 prefixes until 10 digits remain
-  while (digitsOnly.startsWith('91') && digitsOnly.length > 10) {
-    digitsOnly = digitsOnly.substring(2);
-  }
-
-  if (digitsOnly.length !== 10) {
-    return {
-      valid: false,
-      normalizedPhone: digitsOnly,
-      error: `Invalid phone length: ${digitsOnly.length} digits (10 digits required)`,
-    };
-  }
-
-  return { valid: true, normalizedPhone: digitsOnly };
+  return validateMobileRecipient(phone);
 }
 
 /**
@@ -70,9 +55,12 @@ export function parse2FactorDlrXml(xmlStr: string): {
   } else if (
     rawStatus === 'FAILED' ||
     rawStatus === 'UNDELIVERED' ||
-    rawStatus === 'REJECTED' ||
-    (errorMatch && errorMatch[1] !== '0' && errorMatch[1] !== 'NA')
+    rawStatus === 'REJECTED'
   ) {
+    deliveryStatus = 'FAILED';
+  } else if (rawStatus === 'SUBMITTED' || rawStatus === 'PENDING' || rawStatus === 'QUEUED') {
+    deliveryStatus = 'PENDING';
+  } else if (errorMatch && errorMatch[1] !== '0' && errorMatch[1] !== 'NA' && errorMatch[1] !== '') {
     deliveryStatus = 'FAILED';
   } else {
     deliveryStatus = 'PENDING';
@@ -219,7 +207,7 @@ export async function send2FactorTemplateSms(options: {
   const tenantCreds = await getTenantDecryptedCredentials(options.tenantId);
 
   // Safety mock mode check: Prevent real SMS transmission in test/mock environment
-  if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
+  if (isSmsMockMode()) {
     // If a non-root tenant is explicitly checked and is unconfigured, report UNCONFIGURED
     if (options.tenantId && options.tenantId !== ROOT_TENANT_ID && !tenantCreds.isConfigured) {
       const msg = `SMS provider unconfigured for tenant ${options.tenantId}`;
@@ -324,7 +312,7 @@ export async function send2FactorOTP(
   const tenantCreds = await getTenantDecryptedCredentials(tenantId);
 
   // Respect mock mode
-  if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
+  if (isSmsMockMode()) {
     if (tenantId && tenantId !== ROOT_TENANT_ID && !tenantCreds.isConfigured) {
       return {
         success: false,
@@ -332,7 +320,7 @@ export async function send2FactorOTP(
         error: `SMS OTP provider unconfigured for tenant ${tenantId}`,
       };
     }
-    console.log(`[SMS Service OTP: MOCK MODE] Destination: ${maskPhoneNumber(phoneCheck.normalizedPhone)} | OTP: ${otp} | Template: ${templateName} | Status: MOCK`);
+    console.log(`[SMS Service OTP: MOCK MODE] Destination: ${maskPhoneNumber(phoneCheck.normalizedPhone)} | Template: ${templateName} | Status: MOCK`);
     return {
       success: true,
       providerStatus: 'SENT',
@@ -403,7 +391,7 @@ export async function sendDirectSms(
   const tenantCreds = await getTenantDecryptedCredentials(tenantId);
 
   // Safety mock mode check: Prevent real SMS transmission in test/mock environment
-  if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
+  if (isSmsMockMode()) {
     if (tenantId && tenantId !== ROOT_TENANT_ID && !tenantCreds.isConfigured) {
       return {
         success: false,
@@ -576,7 +564,7 @@ export async function dispatchAuditedSms(options: {
 
   // Persist to notification_logs
   try {
-    const isMock = process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test';
+    const isMock = isSmsMockMode();
     const statusToLog = isMock ? 'MOCK' : sendResult.providerStatus;
 
     await NotificationLog.create({

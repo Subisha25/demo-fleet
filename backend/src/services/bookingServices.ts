@@ -31,7 +31,7 @@ import { UniqueConstraintError } from "sequelize";
 import fs from 'fs';
 import { assertTenantOwnership, withTenant, isTenantError } from '../utils/tenantGuard';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
-import { dispatchAuditedSms, sanitizeDltLocationString } from './smsServices';
+import { dispatchAuditedSms, sanitizeDltLocationString, validateMobileRecipient } from './smsServices';
 import { getFleetDocumentBranding } from './fleetBrandingService';
 
 const logoPath = path.join(__dirname, "..", "images", "logo.png");
@@ -683,14 +683,14 @@ export const cancelBooking = async (req: any, res: Response) => {
     // -----------------------------
     // 📧 Send Email to User only
     // -----------------------------
-    let needEmail = false;
+    let needEmail = true;
 
     if (booking.user?.companyId) {
       const company = await Company.findByPk(
         booking.user.companyId,
         { attributes: ["needEmail"] }
       );
-      needEmail = company?.needEmail === true;
+      needEmail = company ? company.needEmail !== false : true;
     }
 
     console.log("cancel needEmail:", needEmail);
@@ -728,23 +728,32 @@ export const cancelBooking = async (req: any, res: Response) => {
 
     try {
       const user = booking.user as any;
-      if (user?.mobile) {
-        await dispatchAuditedSms({
-          recipient: user.mobile,
-          templateCode: 'BOOKING_CANCELLATION',
-          templateName: 'Booking Cancellation',
-          vars: [
-            user.username || '',
-            booking.bookingCode || '',
-            sanitizeDltLocationString(booking.pickupArea || ''),
-            sanitizeDltLocationString(booking.dropPoint || ''),
-          ],
-          message: `Grace Cabs: Your booking ${booking.bookingCode || ''} has been cancelled. Pickup: ${booking.pickupArea || ''}, Drop: ${booking.dropPoint || ''}.`,
-          referenceEntity: 'BOOKING',
-          referenceId: String(booking.bookingId || booking.id),
-        });
+      const targetMobile = booking.behalfOfPhone || user?.mobile;
+      const targetName = booking.behalfOfName || user?.username || 'Customer';
+
+      if (targetMobile) {
+        const phoneCheck = validateMobileRecipient(targetMobile);
+        if (phoneCheck.valid) {
+          await dispatchAuditedSms({
+            recipient: phoneCheck.normalizedPhone,
+            templateCode: 'BOOKING_CANCELLATION',
+            templateName: 'Booking Cancellation',
+            vars: [
+              targetName,
+              booking.bookingCode || '',
+              sanitizeDltLocationString(booking.pickupArea || ''),
+              sanitizeDltLocationString(booking.dropPoint || ''),
+            ],
+            message: `FleetFlow: Your booking ${booking.bookingCode || ''} has been cancelled. Pickup: ${booking.pickupArea || ''}, Drop: ${booking.dropPoint || ''}.`,
+            referenceEntity: 'BOOKING',
+            referenceId: String(booking.bookingId || booking.id),
+            tenantId: booking.tenantId || undefined,
+          });
+        } else {
+          console.warn(`[cancelBooking] Invalid customer mobile for cancellation SMS: ${targetMobile} (${phoneCheck.error})`);
+        }
       } else {
-        console.log("User mobile number not found for cancellation SMS");
+        console.log("Customer mobile number not found for cancellation SMS");
       }
     } catch (err: any) {
       console.error("Booking cancellation SMS dispatch error:", err?.message);

@@ -134,7 +134,7 @@ managerEmail!: string;
 
    @Column({
     type: DataType.BOOLEAN,
-    defaultValue: false,
+    defaultValue: true,
   })
   needEmail!: boolean;
 

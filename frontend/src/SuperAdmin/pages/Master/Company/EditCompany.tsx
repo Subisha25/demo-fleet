@@ -1,4 +1,4 @@
-import React, { useEffect, useState, FormEvent } from "react";
+import React, { useEffect, useState, FormEvent, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import PageLayout from "../../../../components/PageLayout";
 import CommonButton from "../../../../components/CommonButton";
@@ -63,14 +63,15 @@ export default function EditCompany() {
     domainName: "",
     companyAddress: "",
     allowTax: false,
-    needEmail: false,
-    managerApproval: false,
     gstNo: "", 
     startTime: defaultStart,
     endTime: defaultEnd,
     priorMinutes: defaultPrior,
     companyCode: "", 
   });
+
+  const [submitting, setSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   // Handle logo change
 const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,11 +121,7 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
             domainName: company.domainName || "",
             companyAddress: company.companyAddress || "",
             allowTax: company.allowTax === "Yes",
-              needEmail: company.needEmail === 1 || company.needEmail === true, // ✅ ADD
- managerApproval:
-    company.managerApproval === 1 ||
-    company.managerApproval === true, 
-             gstNo: company.gstNo || "",   // ✅ added here
+            gstNo: company.gstNo || "",
             startTime: company.startTime || defaultStart,
             endTime: company.closeTime || defaultEnd,
             priorMinutes: company.priorMinutes || defaultPrior,
@@ -159,11 +156,20 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   // 🔹 Submit
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || submitting) return;
 
     if (!companyForm.companyName) {
       showToast("Company Name is required", "warn");
       return;
     }
+
+    if (!companyForm.companyCode || !companyForm.companyCode.trim()) {
+      showToast("Company Code is required", "warn");
+      return;
+    }
+
+    isSubmittingRef.current = true;
+    setSubmitting(true);
 
     try {
       const formData = new FormData();
@@ -173,14 +179,8 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       formData.append("domainName", companyForm.domainName);
       formData.append("companyAddress", companyForm.companyAddress); // ✅ ADD
       formData.append("allowTax", companyForm.allowTax ? "Yes" : "No");
-      formData.append(
-  "needEmail",
-  companyForm.needEmail ? "true" : "false"   // ✅ IMPORTANT
-);
-      formData.append(
-        "managerApproval",
-        companyForm.managerApproval ? "true" : "false"
-      );
+      formData.append("needEmail", "false");
+      formData.append("managerApproval", "false");
       formData.append("gstNo", companyForm.gstNo);
       formData.append("startTime", companyForm.startTime);
       formData.append("closeTime", companyForm.endTime);
@@ -189,10 +189,6 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 
       if (companyLogo) {
         formData.append("companyLogo", companyLogo);
-      }
-      if (!companyForm.companyCode || !companyForm.companyCode.trim()) {
-        showToast("Company Code is required", "warn");
-        return;
       }
 
       formData.append("companyCode", companyForm.companyCode.trim());
@@ -205,6 +201,9 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       navigate("/master/company/list");
     } catch (error: any) {
       showToast(error.response?.data?.message || "Update failed. Please try again.", "error");
+    } finally {
+      isSubmittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -227,10 +226,12 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         <h1 className="text-3xl font-bold text-gray-800">Edit Company</h1>
         <form onSubmit={handleSubmit} className="space-y-12">
           {/* Company Info */}
-          <div className="bg-white py-3">
-            <h2 className="text-xl font-semibold text-[#025A64] flex items-center gap-2 py-3 underline">
-              <FontAwesomeIcon icon={faBuilding} />
-              Company Info
+          <div className="bg-white py-4 px-4 rounded-xl border border-slate-200 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 py-3 border-b border-slate-100 mb-4">
+              <span className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-sm">
+                <FontAwesomeIcon icon={faBuilding} />
+              </span>
+              <span>Company Information</span>
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 ">
@@ -357,24 +358,7 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                 />
                 <label>Allow Tax</label>
               </div>
-              <div className="w-full flex items-center gap-2 mt-6">
-  <input
-    type="checkbox"
-    name="needEmail"
-    checked={companyForm.needEmail}
-    onChange={handleInputChange}
-  />
-  <label>Need Email</label>
-</div>
-              <div className="w-full flex items-center gap-2 mt-6">
-                <input
-                  type="checkbox"
-                  name="managerApproval"
-                  checked={companyForm.managerApproval}
-                  onChange={handleInputChange}
-                />
-                <label>Manager Approval Required</label>
-              </div>
+
 
             </div>
           </div>
@@ -425,9 +409,15 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
           </div> */}
 
           {/* Save Button */}
-          <div className="flex justify-end">
-            <CommonButton type="submit" variant="success" className="px-8 py-3">
-              Update
+          <div className="flex justify-end pt-4">
+            <CommonButton
+              type="submit"
+              variant="primary"
+              loading={submitting}
+              loadingText="Updating Company..."
+              className="px-8 py-3 shadow-md"
+            >
+              Update Company
             </CommonButton>
           </div>
         </form>

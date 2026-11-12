@@ -24,11 +24,6 @@ type UserDetailsType = {
   mobile: string;
   gender: string;
   companyId: string;
-    isManager?: boolean;
-     danfossuserId?: string;
-  managerId?: string;
-  managerEmail?: string;
-  costCenter?: string; 
   isConfirmed: boolean;
   isActive: boolean;
   isDeleted: boolean;
@@ -118,11 +113,6 @@ const [statsErr, setStatsErr] = useState<string | null>(null);
     mobile: '',
     gender: '',
     companyId: '',
-      isManager: false,
-        danfossuserId: '',
-  managerId: '',
-  managerEmail: '',
-  costCenter: ''  
   });
 
   type UserDetailsResponse = {
@@ -184,11 +174,6 @@ useEffect(() => {
   mobile: userData.mobile,
   gender: userData.gender,
   companyId: userData.companyId,
-  isManager: userData.isManager ?? false,
-  danfossuserId: userData.danfossuserId || '',
-  managerId: userData.managerId || '',
-  managerEmail: userData.managerEmail || '',
-    costCenter: userData.costCenter || ''
 });
 
     // ✅ set both addressList and extraAddresses
@@ -758,77 +743,7 @@ const handleUpdateUser = async (e: React.FormEvent) => {
   </select>
 </div>
 
-{/* Corporate / Manager Fields */}
-{formData.companyId && (
-  <div className="flex items-center gap-2 mt-2">
-    <input
-      type="checkbox"
-      checked={formData.isManager}
-      onChange={(e) =>
-        setFormData(prev => ({
-          ...prev,
-          isManager: e.target.checked,
-        }))
-      }
-      className="w-4 h-4"
-    />
-    <label className="text-sm text-gray-700">Is Manager</label>
-  </div>
-)}
-{formData.companyId && (
-  <>
-    <div>
-      <label className="block text-sm font-medium text-gray-700">
-        User ID
-      </label>
-      <input
-        name="danfossuserId"
-        type="text"
-        value={formData.danfossuserId}
-        onChange={handleInputChange}
-        className="mt-1 block w-full px-3 py-2 border rounded"
-      />
-    </div>
 
-    <div>
-      <label className="block text-sm font-medium text-gray-700">
-        Manager ID
-      </label>
-      <input
-        name="managerId"
-        type="text"
-        value={formData.managerId}
-        onChange={handleInputChange}
-        className="mt-1 block w-full px-3 py-2 border rounded"
-      />
-    </div>
-
-    <div>
-      <label className="block text-sm font-medium text-gray-700">
-        Manager Email
-      </label>
-      <input
-        name="managerEmail"
-        type="email"
-        value={formData.managerEmail}
-        onChange={handleInputChange}
-        className="mt-1 block w-full px-3 py-2 border rounded"
-      />
-    </div>
-    <div>
-  <label className="block text-sm font-medium text-gray-700">
-    Cost Center
-  </label>
-  <input
-    name="costCenter"
-    type="text"
-    value={formData.costCenter}
-    onChange={handleInputChange}
-    className="mt-1 block w-full px-3 py-2 border rounded"
-  />
-</div>
-  </>
-)}
 
                   </form>
                 </div>

@@ -841,35 +841,6 @@ const isValidManagerEmail = (email: string) => {
         showToast("Please select a pickup date and time.", "error");
         return;
       }
-if (requireManagerApproval) {
-  if (!costCenter.trim()) {
-    showToast("Cost Center is required", "error");
-    setIsBooking(false);
-    return;
-  }
-  if (!managerEmail) {
-    showToast("Manager email is required", "error");
-    setIsBooking(false);
-    return;
-  }
-
-  // if (!managerEmail.toLowerCase().endsWith("@danfoss.com")) {
-  //   showToast("Only Danfoss email (name@danfoss.com) is allowed", "error");
-  //   setIsBooking(false);
-  //   return;
-  // }
-
-//   if (!managerEmail.toLowerCase().endsWith("@gmail.com")) {
-//   showToast("Only Gmail (name@gmail.com) is allowed", "error");
-//   setIsBooking(false);
-//   return;
-// }
-if (!isValidManagerEmail(managerEmail)) {
-  showToast("Enter valid mail (eg: name@danfoss.com)", "error");
-  setIsBooking(false);
-  return;
-}
-
 if (formData.behalfOfPerson.trim()) {
     if (!formData.behalfOfPerson.trim()) {
     showToast("Please enter booking on behalf person name.", "error");
@@ -889,13 +860,6 @@ if (formData.behalfOfPerson.trim()) {
   return;
 }
 }
-
-}
-//   if (!managerEmail.toLowerCase().endsWith("@gmail.com")) {
-//   showToast("Only Gmail (name@gmail.com) is allowed", "error");
-//   setIsBooking(false);
-//   return;
-// }
 
       const istOffsetMinutes = 330;
       const istOffsetHours = Math.floor(istOffsetMinutes / 60);
@@ -986,19 +950,12 @@ companyId: effectiveCompanyId, // 🔥 ADD THIS
 selfName: selfName || null,
   vehicleId: selectedVehicleId || null,
   vehicleTypeId,
-    // ✅ DANFOSS FIELDS
-costCenter: requireManagerApproval ? costCenter.trim() : null,
-// managerUserId: requireManagerApproval ? managerUserId : null,
-managerEmail: managerEmail ? managerEmail.trim() : null,
+  costCenter: null,
+  managerEmail: null,
 };
 
-// if (requireManagerApproval) {
-//   payload.costCenter = costCenter.trim();
-//   payload.managerUserId = managerUserId;
-// }
       const res = await axiosInstance.post<BookingResponse>(
-     //   `emp/createBookingForWeb`,
-     `emp/createBookingForWebOnCall`,
+        `emp/createBookingForWebOnCall`,
         payload
       );
 
@@ -1008,7 +965,6 @@ managerEmail: managerEmail ? managerEmail.trim() : null,
     : "Booking created successfully!";
   showToast(successMessage, "success");
 
-  // ✅ ROLE CHECK + REDIRECT (superadmin only)
   const backupKey = "auth_backup_user_context";
   const backupStr = localStorage.getItem(backupKey);
 
@@ -1023,10 +979,10 @@ managerEmail: managerEmail ? managerEmail.trim() : null,
     }
   } catch {}
 
-  if (role === "superadmin") {
+  if (role === "superadmin" || role === "fleet_admin" || role === "admin") {
     setIsBooking(false);
     navigate("/orders/confirmpending", { replace: true });
-    return; // ✅ stop reset (because page is changing)
+    return;
   }
 
   // ✅ normal flow (non-superadmin)
@@ -1361,127 +1317,7 @@ setTimeout(() => {
     <option value="Personal">Personal</option>
   </select>
 </div>
-              {requireManagerApproval && (
-  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
 
-       {/* Manager Dropdown */}
-   <div ref={managerBoxRef} className="relative">
-  <label className="block text-sm font-medium mb-1">Approver Manager<span className=" ml-1 text-red-500">*</span></label>
-
-  {/* Search Input */}
-  {/* <input
-    type="text"
-    className="border rounded w-full px-2 py-1"
-    placeholder={
-      loadingManagers
-        ? "Loading managers..."
-        : managers.length
-        ? "Search manager name / email..."
-        : "No managers found"
-    }
-    value={
-      showManagerDropdown
-        ? managerSearch
-        : selectedManager
-        ? `${selectedManager.username}${selectedManager.email ? ` (${selectedManager.email})` : ""}`
-        : managerSearch
-    }
-    onChange={(e) => {
-      setManagerSearch(e.target.value);
-      setShowManagerDropdown(true);
-      setManagerUserId(""); // optional: typing again clears selection
-    }}
-    onFocus={() => {
-      setShowManagerDropdown(true);
-      // if already selected, show search as empty so user can type again
-      if (selectedManager) setManagerSearch("");
-    }}
-    disabled={loadingManagers || managers.length === 0}
-  /> */}
-  <input
-    type="email"
-    className="border rounded w-full px-2 py-1"
-    placeholder="Enter Manager Email"
-    value={managerEmail}
-  // onChange={(e) => {
-  //   const value = e.target.value;
-  //   setManagerEmail(value);
-
-    // if (value && !value.toLowerCase().endsWith("@danfoss.com")) {
-    //   setManagerEmailError("Danfoss users must use @danfoss.com email only.");
-    // } else {
-    //   setManagerEmailError("");
-    // }
-//     if (value && !value.toLowerCase().endsWith("@gmail.com")) {
-//   setManagerEmailError("Only Gmail (name@gmail.com) is allowed.");
-// } else {
-//   setManagerEmailError("");
-// }
-//   }} 
-onChange={(e) => {
-  setManagerEmail(e.target.value);
-}}
-/>
-  {/* {managerEmailError && (
-  <p className="text-red-500 text-sm mt-1">{managerEmailError}</p>
-)} */}
-  {/* Dropdown */}
-  {/* {showManagerDropdown && !loadingManagers && managers.length > 0 && (
-    <div className="absolute z-30 mt-1 w-full bg-white border rounded shadow max-h-52 overflow-y-auto">
-      {filteredManagers.length === 0 ? (
-        <div className="px-3 py-2 text-sm text-gray-500">No results found</div>
-      ) : (
-        filteredManagers.map((m) => (
-          <button
-            type="button"
-            key={m.userId}
-            className="w-full text-left px-3 py-2 hover:bg-gray-100"
-            onClick={() => {
-              setManagerUserId(m.userId);
-              setManagerSearch(`${m.username}${m.email ? ` (${m.email})` : ""}`);
-              setShowManagerDropdown(false);
-            }}
-          >
-            <div className="text-sm font-medium">{m.username}</div>
-            {m.email && <div className="text-xs text-gray-500">{m.email}</div>}
-          </button>
-        ))
-      )}
-    </div>
-  )} */}
-
-  {/* Clear selection */}
-  {/* {managerUserId && (
-    <button
-      type="button"
-      className="mt-1 text-xs text-red-600"
-      onClick={() => {
-        setManagerUserId("");
-        setManagerSearch("");
-        setShowManagerDropdown(false);
-      }}
-    >
-      Clear
-    </button>
-  )} */}
-</div>
-
-    {/* Cost Center */}
-    <div>
-      <label className="block text-sm font-medium mb-1">Cost Center<span className=" ml-1 text-red-500">*</span></label>
-      <input
-        type="text"
-        className="border rounded w-full px-2 py-1"
-        placeholder="Enter cost center"
-        value={costCenter}
-        onChange={(e) => setCostCenter(e.target.value)}
-      />
-    </div>
-
- 
-
-  </div>
-)}
 
 
               <div>

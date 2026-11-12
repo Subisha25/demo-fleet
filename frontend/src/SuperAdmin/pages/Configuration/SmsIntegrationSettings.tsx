@@ -228,6 +228,7 @@ const SmsIntegrationSettings: React.FC = () => {
     try {
       setTestingSms(true);
       const res = await axiosInstance.post('/sms/config/test-sms', {
+        phone: testPhoneNumber.trim(),
         phoneNumber: testPhoneNumber.trim(),
         confirmRealSms: true,
       });

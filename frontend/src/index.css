@@ -333,3 +333,45 @@ a {
   background-color: #f1f5f9 !important;
 }
 
+/* =========================================================================
+   PUBLIC WEBSITE NAVBAR STYLES
+   Explicit high-specificity rules to guarantee dark charcoal default text,
+   vibrant purple hover & active states, and prevent any white-on-white text
+   ========================================================================= */
+.public-navbar,
+header .public-navbar {
+  background-color: transparent;
+}
+
+.public-navbar .nav-link,
+header .public-navbar a.nav-link,
+header nav.public-navbar a {
+  color: #303044 !important;
+  font-weight: 600;
+  transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+  text-decoration: none !important;
+}
+
+.public-navbar .nav-link:hover,
+header .public-navbar a.nav-link:hover,
+header nav.public-navbar a:hover {
+  color: #5B3DF5 !important;
+  background-color: #F3F0FF !important;
+  text-decoration: none !important;
+}
+
+.public-navbar .nav-link.active,
+header .public-navbar a.nav-link.active,
+header nav.public-navbar a.active {
+  color: #5B3DF5 !important;
+  font-weight: 700 !important;
+  background-color: #F3F0FF !important;
+}
+
+.public-navbar .nav-link:focus-visible,
+header .public-navbar a.nav-link:focus-visible {
+  outline: 2px solid #5B3DF5;
+  outline-offset: 2px;
+}
+
+

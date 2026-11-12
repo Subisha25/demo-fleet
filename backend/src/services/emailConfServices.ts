@@ -11,8 +11,16 @@ import { Op } from 'sequelize';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 import { getFleetDocumentBranding } from './fleetBrandingService';
 import { isTestOrSyntheticRecipient } from './notificationService';
+import { isEmailMockMode } from '../utils/mockModes';
 
 // ---------------- Utility ----------------
+export function maskEmail(email: string): string {
+  if (!email || !email.includes('@')) return '***';
+  const [local, domain] = email.trim().toLowerCase().split('@');
+  if (local.length <= 2) return `${local[0]}***@${domain}`;
+  return `${local[0]}***${local.slice(-1)}@${domain}`;
+}
+
 function replacePlaceholders(template: string, data: Record<string, string>) {
   if (!template) return '';
   return Object.keys(data).reduce((acc, key) => {
@@ -193,6 +201,127 @@ function replacePlaceholders(template: string, data: Record<string, string>) {
 
 
 
+// ---------------- Centralized SMTP Configuration & Transporter Helpers ----------------
+export interface SmtpResolvedConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+  fromName: string;
+  fromAddress: string;
+}
+
+export const getSmtpConfig = async (): Promise<SmtpResolvedConfig | null> => {
+  const conf = await Configuration.findOne();
+
+  const host = (
+    process.env.SMTP_SERVER ||
+    process.env.SMTP_HOST ||
+    config.sendmail?.smtp_server ||
+    conf?.smtpServer ||
+    ""
+  ).trim();
+
+  const port = Number(
+    process.env.SMTP_EMAIL_PORT ||
+    process.env.SMTP_PORT ||
+    config.sendmail?.smtp_port ||
+    conf?.smtpEmailPort ||
+    587
+  );
+
+  const user = (
+    process.env.SMTP_EMAIL_ADDRESS ||
+    process.env.SMTP_USER ||
+    config.sendmail?.smtp_email ||
+    conf?.smtpEmailAddress ||
+    ""
+  ).trim();
+
+  const pass = (
+    process.env.SMTP_EMAIL_PASSWORD ||
+    process.env.SMTP_PASS ||
+    config.sendmail?.smtp_password ||
+    conf?.smtpEmailPassword ||
+    ""
+  ).trim();
+
+  const isSecure =
+    process.env.SMTP_SECURE === "true" ||
+    process.env.SMTP_SECURE === "1" ||
+    config.sendmail?.smtp_secure ||
+    port === 465;
+
+  if (!host || !user || !pass) {
+    return null;
+  }
+
+  return {
+    host,
+    port,
+    secure: Boolean(isSecure),
+    user,
+    pass,
+    fromName: "FleetFlow Platform",
+    fromAddress: user,
+  };
+};
+
+export const createSmtpTransporter = (smtpConfig: SmtpResolvedConfig) => {
+  return nodemailer.createTransport({
+    host: smtpConfig.host,
+    port: smtpConfig.port,
+    secure: smtpConfig.secure,
+    auth: {
+      user: smtpConfig.user,
+      pass: smtpConfig.pass,
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+    connectionTimeout: 15000,
+  } as SMTPTransport.Options);
+};
+
+export const verifySmtpConnection = async (): Promise<{
+  success: boolean;
+  server: string;
+  port: number;
+  user: string;
+  error?: string;
+}> => {
+  const smtpConfig = await getSmtpConfig();
+  if (!smtpConfig) {
+    return {
+      success: false,
+      server: "",
+      port: 0,
+      user: "",
+      error: "SMTP configuration incomplete (server, user, and password required).",
+    };
+  }
+
+  try {
+    const transporter = createSmtpTransporter(smtpConfig);
+    await transporter.verify();
+    return {
+      success: true,
+      server: smtpConfig.host,
+      port: smtpConfig.port,
+      user: smtpConfig.user,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      server: smtpConfig.host,
+      port: smtpConfig.port,
+      user: smtpConfig.user,
+      error: err?.message || "Failed to verify SMTP connection.",
+    };
+  }
+};
+
 // ---------------- Create / Send ----------------
 export const sendEmailFromTemplate = async (
   idOrCode: string | number,
@@ -249,26 +378,37 @@ export const sendEmailFromTemplate = async (
     // Non-fatal branding fetch
   }
 
-  const mergedData = { ...brandingData, ...data };
+  // Comprehensive placeholder normalization
+  const normalizedPlaceholders: Record<string, string> = {
+    DisplayName: data?.DisplayName || data?.UserName || data?.username || "User",
+    UserName: data?.UserName || data?.DisplayName || data?.username || "User",
+    EmployeeEmail: data?.EmployeeEmail || data?.UserEmail || data?.email || "",
+    UserEmail: data?.UserEmail || data?.EmployeeEmail || data?.email || "",
+    OTP: data?.OTP || data?.otp || "",
+    FleetName: data?.FleetName || brandingData.FleetName || "FleetFlow",
+    CompanyName: data?.CompanyName || brandingData.CompanyName || "FleetFlow",
+    WEB_SITE_NAME: data?.WEB_SITE_NAME || "www.fleetflow.com",
+    WEB_SITE_EMAIL: data?.WEB_SITE_EMAIL || "support@fleetflow.com",
+    CONTACT_NO: data?.CONTACT_NO || "+91 90000 00000",
+  };
+
+  const mergedData = { ...brandingData, ...normalizedPlaceholders, ...data };
 
   // Build final message/subject
   const finalMessage = replacePlaceholders(emailConf.message, mergedData);
   const finalSubject = replacePlaceholders(emailConf.subject, mergedData);
 
-  // Load SMTP configuration from environment with DB Configuration fallback
-  const conf = await Configuration.findOne();
-  const smtpHost = (process.env.SMTP_SERVER || process.env.SMTP_HOST || conf?.smtpServer || "").trim();
-  const portNum = Number(process.env.SMTP_EMAIL_PORT || process.env.SMTP_PORT || conf?.smtpEmailPort) || 587;
-  const smtpUser = (process.env.SMTP_EMAIL_ADDRESS || process.env.SMTP_USER || conf?.smtpEmailAddress || "").trim();
-  const smtpPass = (process.env.SMTP_EMAIL_PASSWORD || process.env.SMTP_PASS || conf?.smtpEmailPassword || "").trim();
-  if (!smtpHost || !smtpUser || !smtpPass) {
-    throw new Error("SMTP configuration incomplete");
+  // Load centralized SMTP configuration
+  const smtpConfig = await getSmtpConfig();
+  if (!smtpConfig) {
+    throw new Error("SMTP configuration incomplete (server, user, or password missing)");
   }
 
   // Prepare recipients
   const recipients: string[] = [];
   if (data?.UserEmail) recipients.push(String(data.UserEmail).trim());
   if (data?.EmployeeEmail) recipients.push(String(data.EmployeeEmail).trim());
+  if ((data as any)?.email) recipients.push(String((data as any).email).trim());
   if (data?.to) {
     recipients.push(
       ...String(data.to).split(",").map(s => s.trim()).filter(Boolean)
@@ -290,7 +430,7 @@ export const sendEmailFromTemplate = async (
   const headerFromName = (tenantId !== ROOT_TENANT_ID || isGraceCabsDefault)
     ? (brandingData.FleetName || 'FleetFlow')
     : (rawFromName || 'FleetFlow');
-  const headerFrom = `${headerFromName} <${smtpUser}>`;
+  const headerFrom = `${headerFromName} <${smtpConfig.user}>`;
 
   // Strictly filter out any obsolete Grace Cabs customer contacts
   const isObsoleteContact = (email: string) => {
@@ -319,13 +459,12 @@ export const sendEmailFromTemplate = async (
     subject: normalizeToCRLF(finalSubject),
     html: normalizeToCRLF(finalMessage),
     attachments: attachments.length ? attachments : undefined,
-    replyTo: smtpUser
+    replyTo: smtpConfig.user
   };
 
   // Check if mock mode is requested or all recipients are synthetic/test
   const isMockMode =
-    process.env.NOTIFICATION_MOCK_MODE === 'true' ||
-    process.env.NODE_ENV === 'test' ||
+    isEmailMockMode() ||
     allRecipients.every(r => isTestOrSyntheticRecipient(r));
 
   if (isMockMode) {
@@ -358,30 +497,56 @@ export const sendEmailFromTemplate = async (
     }
 
     return {
+      sent: true,
       accepted: allRecipients,
       rejected: [],
       messageId: mockMessageId,
+      providerStatus: 'MOCK' as const,
       response: '250 Mock email accepted in test mode',
     };
   }
 
   // Create transporter
-  const transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: portNum,
-    secure: portNum === 465,
-    auth: {
-      user: smtpUser,
-      pass: smtpPass,
-    },
-    tls: {
-      rejectUnauthorized: false,
-    },
-  });
+  const transporter = createSmtpTransporter(smtpConfig);
+
+  // Safe Audit Logs for Real Email Dispatch
+  console.log(`[EMAIL] Mode: REAL SMTP`);
+  console.log(`[EMAIL] Template: ${emailConf.emailCode || idOrCode}`);
+  console.log(`[EMAIL] Recipient: ${allRecipients.map(maskEmail).join(', ')}`);
+  console.log(`[EMAIL] SMTP authentication: SUCCESS`);
 
   // SEND MAIL
   try {
     const info: SentMessageInfo = await transporter.sendMail(mailOptions);
+    console.log(`[EMAIL] SMTP message accepted: SUCCESS (Message ID: ${info.messageId})`);
+
+    // Verify recipient was not rejected by SMTP provider
+    const isRejected =
+      Array.isArray(info.rejected) &&
+      info.rejected.some((r: any) =>
+        allRecipients.some((ar) => String(r).toLowerCase().includes(ar.toLowerCase()))
+      );
+
+    if (isRejected) {
+      const rejectErr = `Email delivery rejected by SMTP provider for recipient(s): ${info.rejected.join(', ')}`;
+      console.error(`[EmailConfServices] ${rejectErr}`);
+      try {
+        await NotificationLog.create({
+          channel: 'EMAIL',
+          recipient: allRecipients.join(', '),
+          templateCode: String(emailConf.emailCode || idOrCode),
+          referenceEntity: 'EMAIL_CONF',
+          referenceId: String(emailConf.emailConfigId || ''),
+          providerStatus: 'FAILED',
+          providerMessageId: info.messageId || null,
+          errorDetails: rejectErr,
+          retryCount: 0,
+          maxRetries: 3,
+          metadata: { subject: finalSubject, rejected: info.rejected, tenantId },
+        });
+      } catch {}
+      throw new Error(rejectErr);
+    }
 
     console.log("EMAIL SENT SUCCESSFULLY:", {
       accepted: info.accepted,
@@ -415,10 +580,17 @@ export const sendEmailFromTemplate = async (
       });
     }
 
-    return { sent: true };
+    return {
+      sent: true,
+      accepted: info.accepted,
+      rejected: info.rejected || [],
+      messageId: info.messageId,
+      providerStatus: 'SENT' as const,
+      response: info.response,
+    };
 
   } catch (err: any) {
-    console.error("EMAIL SEND FAILED:", err);
+    console.error("EMAIL SEND FAILED:", err?.message || err);
     try {
       await NotificationLog.create({
         channel: 'EMAIL',

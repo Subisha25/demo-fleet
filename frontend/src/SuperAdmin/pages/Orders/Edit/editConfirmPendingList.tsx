@@ -313,29 +313,11 @@ setShowDanfossFields((isDanfoss && managerApproval) || hasValues);
     return;
   }
 
-  if (showDanfossFields && !formData.managerEmail) {
-    showToast("Manager email is required", "error");
-    return;
-  }
-
-  if (showDanfossFields && !formData.costCenter) {
-    showToast("Cost center is required", "error");
-    return;
-  }
     if (!bookingId) {
       showToast("Booking ID not found.", "error");
       navigate('/confirmpending');
       return;
     }
-// ✅ Validate manager email must be danfoss.com
-if (showDanfossFields && formData.managerEmail) {
-  const email = formData.managerEmail.trim().toLowerCase();
-
-  if (!email.endsWith("@danfoss.com")) {
-    showToast("Approver Manager email must be a @danfoss.com address.", "error");
-    return;
-  }
-}
     // ✅ Validate behalfOfPhone if provided
     if (
       formData.bookingFor === 'On behalf of' &&
@@ -373,8 +355,8 @@ if (showDanfossFields && formData.managerEmail) {
             ? formData.behalfOfPhone.trim() || null
             : null,
         // ✅ Danfoss fields (send always; backend ignores if not needed)
-        costCenter: showDanfossFields ? formData.costCenter.trim() || null : null,
-        managerEmail: showDanfossFields ? formData.managerEmail.trim() || null : null,
+        costCenter: null,
+        managerEmail: null,
       };
 
       const response = await axiosInstance.put(`/order/editBooking/${bookingId}`, payload);
@@ -483,41 +465,7 @@ if (showDanfossFields && formData.managerEmail) {
           </td>
         </tr>
 
-        {/* ✅ Danfoss: Approver Manager + Cost Center */}
-        {showDanfossFields && (
-          <>
-            <tr>
-              <td className="w-[150px] py-1 pr-2 text-[13px] font-medium text-green-700">
-                Approver Manager
-              </td>
-              <td className="py-1">
-                <input
-                  type="email"
-                  name="managerEmail"
-                  value={formData.managerEmail}
-                  onChange={handleInputChange}
-                  placeholder="Enter manager email"
-                  className="w-full h-8 px-2 text-[13px] border border-gray-300 rounded-md shadow-sm outline-none focus:ring-1 focus:ring-green-500"
-                />
-              </td>
-            </tr>
-            <tr>
-              <td className="w-[150px] py-1 pr-2 text-[13px] font-medium text-green-700">
-                Cost Center
-              </td>
-              <td className="py-1">
-                <input
-                  type="text"
-                  name="costCenter"
-                  value={formData.costCenter}
-                  onChange={handleInputChange}
-                  placeholder="Enter cost center"
-                  className="w-full h-8 px-2 text-[13px] border border-gray-300 rounded-md shadow-sm outline-none focus:ring-1 focus:ring-green-500"
-                />
-              </td>
-            </tr>
-          </>
-        )}
+
 
         <AlertContainer />
 

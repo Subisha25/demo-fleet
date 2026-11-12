@@ -1,6 +1,6 @@
 // src/SuperAdmin/pages/Owners/AddOwnerForm.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { UserPlus } from 'lucide-react';
 import {
   faUser,
@@ -53,6 +53,8 @@ export default function AddOwnerForm() {
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [states, setStates] = useState<IState[]>([]);
   const [cities, setCities] = useState<ICity[]>([]);
 
@@ -175,7 +177,11 @@ export default function AddOwnerForm() {
   // Form submission handler
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isSubmittingRef.current || submitting) return;
     if (!validate()) return;
+
+    isSubmittingRef.current = true;
+    setSubmitting(true);
 
     const payload = {
       vendorName: formData.name,
@@ -191,14 +197,11 @@ export default function AddOwnerForm() {
     try {
       const response = await axiosInstance.post('/emp/createVendor', payload);
 
-
       showToast('Owner added successfully!', 'success');
       navigate('/vendors/list');
-
     } catch (error: any) {
       console.error('❌ Error:', error.response?.data || error.message);
 
-      // backend la already owner name/email duplicate error throw panniduchuna
       if (error.response?.status === 400 && error.response?.data?.message) {
         if (error.response.data.message.toLowerCase().includes("already")) {
           showToast('Owner with this name/email already exists. Try a different one.', 'error');
@@ -208,6 +211,9 @@ export default function AddOwnerForm() {
       } else {
         showToast('Failed to add owner. Please try again.', 'error');
       }
+    } finally {
+      isSubmittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -362,9 +368,16 @@ export default function AddOwnerForm() {
             />
           </div>
 
-          <div className="mt-6 text-right">
-            <CommonButton type="submit" variant="success" className="px-6 py-2">
-              Save
+          <div className="mt-8 text-right">
+            <CommonButton
+              type="submit"
+              variant="primary"
+              loading={submitting}
+              loadingText="Saving Owner..."
+              disabled={submitting}
+              className="px-8 py-3 shadow-md"
+            >
+              Save Owner
             </CommonButton>
           </div>
         </form>

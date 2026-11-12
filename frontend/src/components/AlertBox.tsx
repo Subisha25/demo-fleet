@@ -1,6 +1,7 @@
 // alertbox.tsx
-import React from "react";
+import React, { useState, useRef } from "react";
 import toast, { Toaster } from "react-hot-toast";
+import LoadingButton from "./LoadingButton";
 import deleteGif from "./delete.gif";
 import restoreGif from "./restore.gif";
 
@@ -12,31 +13,32 @@ export const showToast = (message: string, type: ToastType = "success") => {
       toast.success(message, {
         id: message,
         position: "top-right",
-        duration: 2000,
+        duration: 3000,
       });
       break;
     case "error":
       toast.error(message, {
         id: message,
         position: "top-right",
-        duration: 2000,
+        duration: 4000,
       });
       break;
     case "info":
       toast(message, {
         id: message,
         position: "top-right",
-        duration: 2000,
+        duration: 3000,
       });
       break;
     case "warn":
       toast(message, {
         id: message,
         position: "top-right",
-        duration: 2000,
+        duration: 3500,
         style: {
-          background: "#facc15",
-          color: "#000",
+          background: "#fef3c7",
+          color: "#92400e",
+          border: "1px solid #fde68a",
         },
       });
       break;
@@ -58,8 +60,9 @@ interface ActionModalProps {
   isOpen: boolean;
   type: PopupType;
   onClose: () => void;
-  onConfirm?: () => void;
+  onConfirm?: () => void | Promise<void>;
   itemName?: string;
+  loading?: boolean;
 }
 
 export const ActionModal: React.FC<ActionModalProps> = ({
@@ -68,84 +71,131 @@ export const ActionModal: React.FC<ActionModalProps> = ({
   onClose,
   onConfirm,
   itemName,
+  loading = false,
 }) => {
+  const [internalLoading, setInternalLoading] = useState(false);
+  const isExecutingRef = useRef(false);
+
   if (!isOpen) return null;
+
+  const isProcessing = loading || internalLoading;
 
   let title = "";
   let gifSrc = "";
   let showConfirmButtons = false;
   let confirmButtonText = "OK";
+  let loadingText = "Processing...";
+  let confirmVariant: "danger" | "success" | "primary" = "danger";
 
   if (type === "confirm-delete") {
-    title = `Are you sure you want to delete?`;
+    title = itemName
+      ? `Are you sure you want to delete ${itemName}?`
+      : `Are you sure you want to delete?`;
     gifSrc = deleteGif;
     showConfirmButtons = true;
     confirmButtonText = "Yes, Delete";
+    loadingText = "Deleting...";
+    confirmVariant = "danger";
   } else if (type === "confirm-restore") {
-    title = `Are you sure you want to restore ${itemName}?`;
+    title = `Are you sure you want to restore ${itemName || 'this item'}?`;
     gifSrc = restoreGif;
     showConfirmButtons = true;
     confirmButtonText = "Yes, Restore";
+    loadingText = "Restoring...";
+    confirmVariant = "success";
   } else if (type === "confirm-permanent-delete") {
-    title = `Warning: Are you sure you want to permanently delete ${itemName}?`;
+    title = `Warning: Are you sure you want to permanently delete ${itemName || 'this item'}?`;
     gifSrc = deleteGif;
     showConfirmButtons = true;
     confirmButtonText = "Yes, Permanently Delete";
+    loadingText = "Deleting...";
+    confirmVariant = "danger";
   } else if (type === "delete-success") {
     title = "Deleted successfully!";
     gifSrc = deleteGif;
   } else if (type === "restore-success") {
     title = "Restored successfully!";
     gifSrc = restoreGif;
-  }else if (type === "confirm-cancel") {
-  title = "Are you sure you want to cancel?";
-  gifSrc = deleteGif; // or use a neutral gif if you want
-  showConfirmButtons = true;
-  confirmButtonText = "Yes, Cancel";
-}
+  } else if (type === "confirm-cancel") {
+    title = "Are you sure you want to cancel?";
+    gifSrc = deleteGif;
+    showConfirmButtons = true;
+    confirmButtonText = "Yes, Cancel";
+    loadingText = "Cancelling...";
+    confirmVariant = "danger";
+  }
+
+  const handleConfirmClick = async () => {
+    if (isExecutingRef.current || isProcessing) return;
+    if (!onConfirm) {
+      onClose();
+      return;
+    }
+
+    isExecutingRef.current = true;
+    setInternalLoading(true);
+
+    try {
+      const res = onConfirm();
+      if (res && typeof (res as Promise<any>).then === "function") {
+        await res;
+      }
+      onClose();
+    } catch (err) {
+      // Keep modal open or toast error on failure
+    } finally {
+      isExecutingRef.current = false;
+      setInternalLoading(false);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center">
-      <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-sm p-6 text-center">
+    <div
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center border border-slate-200">
         {gifSrc && (
           <img
             src={gifSrc}
             alt="status"
-            className="w-23 h-23 mx-auto animate-bounce mb-2"
+            className="w-20 h-20 mx-auto mb-3 object-contain"
           />
         )}
-        <h2 className="text-lg font-semibold mb-4">{title}</h2>
+        <h2 className="text-base font-bold text-slate-900 mb-5 leading-snug">
+          {title}
+        </h2>
 
         {showConfirmButtons ? (
-          <div className="flex justify-center gap-4">
-            <button
+          <div className="flex justify-center gap-3">
+            <LoadingButton
               onClick={onClose}
-              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+              disabled={isProcessing}
+              variant="secondary"
+              size="sm"
             >
-              No
-            </button>
-            <button
-              onClick={() => {
-                onConfirm?.();
-                onClose();
-              }}
-              className={`px-4 py-2 text-white rounded ${
-                type === "confirm-delete" ||
-                type === "confirm-permanent-delete"
-                  ? "bg-red-600 hover:bg-red-700"
-                  : "bg-green-600 hover:bg-green-700"
-              }`}
+              Cancel
+            </LoadingButton>
+            <LoadingButton
+              onClick={handleConfirmClick}
+              loading={isProcessing}
+              loadingText={loadingText}
+              variant={confirmVariant}
+              size="sm"
             >
               {confirmButtonText}
-            </button>
+            </LoadingButton>
           </div>
         ) : (
-          <button
+          <LoadingButton
             onClick={onClose}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            variant="primary"
+            size="sm"
+            className="w-full"
           >
             OK
-          </button>
+          </LoadingButton>
         )}
       </div>
     </div>

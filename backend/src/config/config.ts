@@ -47,6 +47,11 @@ const config = {
   app: {
     loginLink: process.env.LOGIN_LINK,
   },
+  notifications: {
+    notification_mock_mode: process.env.NOTIFICATION_MOCK_MODE !== "false",
+    email_mock_mode: process.env.EMAIL_MOCK_MODE === "true" || (process.env.EMAIL_MOCK_MODE === undefined && process.env.NOTIFICATION_MOCK_MODE !== "false") || process.env.NODE_ENV === "test",
+    sms_mock_mode: process.env.SMS_MOCK_MODE === "true" || (process.env.SMS_MOCK_MODE === undefined && process.env.NOTIFICATION_MOCK_MODE !== "false") || process.env.NODE_ENV === "test",
+  },
   sendmail: {
     smtp_server: process.env.SMTP_SERVER || process.env.SMTP_HOST || "",
     smtp_email: process.env.SMTP_EMAIL_ADDRESS || process.env.SMTP_USER || "",

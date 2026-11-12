@@ -5,6 +5,7 @@ import { ROOT_TENANT_ID } from '../context/tenantContext';
 import { encryptSmsApiKey, decryptSmsApiKey, maskApiKey } from '../utils/cryptoUtils';
 import { normalizePhoneNumberForSms } from './smsServices';
 import { NotificationLog } from '../models/notificationLog';
+import { isSmsMockMode } from '../utils/mockModes';
 
 /**
  * Pre-approved telecom DLT templates matching Indian carrier regulations under header GRCCAB.
@@ -365,7 +366,7 @@ export async function validateTenantSmsConnection(tenantId: string): Promise<{
   const verifiedAt = new Date();
 
   // Safety Mock Check: In mock mode, validate syntax & configuration without remote HTTP requests
-  if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
+  if (isSmsMockMode()) {
     const mockDetails = {
       mock: true,
       senderId: decrypted.senderId,
@@ -493,7 +494,7 @@ export async function sendTenantTestSms(
   }
 
   // Safety mock mode check
-  if (process.env.NOTIFICATION_MOCK_MODE === 'true' || process.env.NODE_ENV === 'test') {
+  if (isSmsMockMode()) {
     const mockId = `mock_test_${Date.now()}`;
     await NotificationLog.create({
       channel: 'SMS',

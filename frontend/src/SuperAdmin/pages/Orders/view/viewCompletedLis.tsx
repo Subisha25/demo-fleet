@@ -1217,7 +1217,6 @@ const ViewCompletedList: React.FC = () => {
             <h2 className="font-semibold text-orange-600 border-b pb-2 mb-3">🏢 Company Details</h2>
             <p><b>Company Name:</b> {mCompany?.companyName || m?.companyName || "-"}</p>
             <p><b>Company Address:</b> {mCompany?.companyAddress || "-"}</p>
-            <p><b>Manager Email:</b> {mCompany?.managerEmail || "-"}</p>
             <p><b>GST No:</b> {mCompany?.gstNo || "-"}</p>
           </div>
 

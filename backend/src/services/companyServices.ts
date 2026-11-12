@@ -346,10 +346,13 @@ export const updateCompany = async (req: any, res: Response) => {
       managerEmail: normalizedManagers.join(", "),
       seoUrl: finalSeoUrl,
       allowTax: allowTax ?? company.allowTax,
-      needEmail: needEmailBoolean,
+      needEmail:
+        needEmail !== undefined
+          ? (needEmail === "true" || needEmail === true)
+          : (company.needEmail ?? true),
       gstNo: gstNo ?? company.gstNo,
       companyAddress: companyAddress ?? company.companyAddress,
-       managerApproval: managerApproval ?? company.managerApproval,
+      managerApproval: false,
       startTime: startTime || company.startTime,
       closeTime: closeTime || company.closeTime,
       companyCode: companyCode || company.companyCode,

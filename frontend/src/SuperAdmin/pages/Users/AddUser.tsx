@@ -1,4 +1,4 @@
-import React, { useState, FormEvent, useEffect } from "react";
+import React, { useState, FormEvent, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import PageLayout from "../../../components/PageLayout";
 import CommonButton from "../../../components/CommonButton";
@@ -38,11 +38,6 @@ export default function AddUser() {
   const [presentAddress, setPresentAddress] = useState("");
   const [pinCode, setPinCode] = useState("");
   const [loadingPincode, setLoadingPincode] = useState(false);
-  const [isManager, setIsManager] = useState(false);
-const [userId, setUserId] = useState("");
-const [managerId, setManagerId] = useState("");
-const [managerEmail, setManagerEmail] = useState("");
-const [costCenter, setCostCenter] = useState("");
   const navigate = useNavigate();
 
   const [countries, setCountries] = useState<ICountry[]>([]);
@@ -50,6 +45,7 @@ const [costCenter, setCostCenter] = useState("");
   const [cities, setCities] = useState<ICity[]>([]);
 
   const [submitting, setSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const fetchPincode = async (cityName: string, stateName: string) => {
     try {
@@ -182,13 +178,6 @@ const [costCenter, setCostCenter] = useState("");
       return;
     }
 
-    if (managerEmail.trim()) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(managerEmail.trim())) {
-        showToast("Please enter a valid manager email address.", "error");
-        return;
-      }
-    }
     try {
       const check = await axiosInstance.get(`/user/getAllUsers`, {
         params: { email: email.trim() },
@@ -237,8 +226,11 @@ const [costCenter, setCostCenter] = useState("");
       return;
     }
 
+    if (isSubmittingRef.current || submitting) return;
+    isSubmittingRef.current = true;
+    setSubmitting(true);
+
     try {
-      setSubmitting(true);
       const payload = {
         username: username.trim(),
         email: email.trim(),
@@ -255,11 +247,6 @@ const [costCenter, setCostCenter] = useState("");
         isDeleted: 0,
         status: "active",
         isConfirmed: 1,
-        isManager,
-         danfossuserId: userId,
-  managerId,
-  managerEmail,
-   costCenter 
       };
 
       const response = await axiosInstance.post("/auth/createUser", payload);
@@ -278,8 +265,6 @@ const [costCenter, setCostCenter] = useState("");
         setAddress("");
         setPresentAddress("");
         setPinCode("");
-        setIsManager(false);
-        setCostCenter("");
 
         setTimeout(() => navigate("/users/list"), 1000);
       } else {
@@ -292,6 +277,7 @@ const [costCenter, setCostCenter] = useState("");
         showToast("Network error. Please try again.", "error");
       }
     } finally {
+      isSubmittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -453,61 +439,9 @@ const [costCenter, setCostCenter] = useState("");
                     </option>
                   ))}
                 </select>
-
-                {companyId && (
-                  <div className="flex items-center mt-2">
-                    <input
-                      type="checkbox"
-                      id="isManager"
-                      checked={isManager}
-                      onChange={(e) => setIsManager(e.target.checked)}
-                      className="mr-2"
-                    />
-                    <label htmlFor="isManager" className="text-gray-700">
-                      Is Manager
-                    </label>
-                  </div>
-                )}
               </div>
-{companyId && (
-  <>
-    <InputBox
-      label="Employee / User ID"
-      name="danfossuserId"
-      placeholder="Enter Employee / User ID"
-      value={userId}
-      onChange={(name, value) => setUserId(value)}
-      icon={faUser}
-    />
 
-    <InputBox
-      label="Manager ID"
-      name="managerId"
-      placeholder="Enter Manager ID"
-      value={managerId}
-      onChange={(name, value) => setManagerId(value)}
-      icon={faUser}
-    />
 
-    <InputBox
-      label="Manager Email"
-      name="managerEmail"
-      type="email"
-      placeholder="Enter Manager Email"
-      value={managerEmail}
-      onChange={(name, value) => setManagerEmail(value)}
-      icon={faEnvelope}
-    />
-     <InputBox
-      label="Cost Center"
-      name="costCenter"
-      placeholder="Enter Cost Center"
-      value={costCenter}
-      onChange={(name, value) => setCostCenter(value)}
-      icon={faHashtag}
-    />
-  </>
-)}
               <InputBox
                 label={<>Permanent Address</>}
                 name="address"
@@ -542,11 +476,15 @@ const [costCenter, setCostCenter] = useState("");
 
             <div className="flex justify-end pt-4">
               <CommonButton
-                text={submitting ? "Saving..." : "Submit"}
                 type="submit"
-                variant="success"
+                variant="primary"
+                loading={submitting}
+                loadingText="Saving User..."
                 disabled={loadingPincode || submitting}
-              />
+                className="px-8 py-3 shadow-md"
+              >
+                Save User
+              </CommonButton>
             </div>
           </form>
         </div>

@@ -254,7 +254,6 @@ const handleConfirm = async () => {
             <p><strong>User Name:</strong> {order.user?.username}</p>
             <p><strong>Email:</strong> {order.user?.email}</p>
             <p><strong>Phone:</strong> {order.user?.mobile}</p>
-            <p><strong>Manager:</strong> {order.user?.company?.managerEmail}</p>
           </div>
         </div>
 

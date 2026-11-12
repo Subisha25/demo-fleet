@@ -1023,6 +1023,7 @@ export const getFleetDashboardOverview = async (req: Request, res: Response) => 
           status: isSuspended ? 'SUSPENDED' : isGracePeriod ? 'PAST_DUE' : sub.status,
           currentPeriodStart: sub.currentPeriodStart,
           currentPeriodEnd: sub.currentPeriodEnd,
+          billingCycle: sub.billingCycle || 'MONTHLY',
           daysRemaining,
           isRenewalWarning: isAllFleets ? false : isRenewalWarning,
           isGracePeriod: isAllFleets ? false : isGracePeriod,
@@ -1032,23 +1033,28 @@ export const getFleetDashboardOverview = async (req: Request, res: Response) => 
         quotas: {
           vehicles: {
             current: vehicleCount,
-            limit: isAllFleets ? 999999 : limits.vehicles,
-            percent: isAllFleets ? 100 : Math.min(100, Math.round((vehicleCount / limits.vehicles) * 100)),
+            limit: isAllFleets ? 999999 : (limits.vehicles === -1 ? 'Unlimited' : limits.vehicles),
+            percent: isAllFleets ? 100 : (limits.vehicles === -1 ? 0 : Math.min(100, Math.round((vehicleCount / limits.vehicles) * 100))),
           },
           drivers: {
             current: driverCount,
-            limit: isAllFleets ? 999999 : limits.drivers,
-            percent: isAllFleets ? 100 : Math.min(100, Math.round((driverCount / limits.drivers) * 100)),
+            limit: isAllFleets ? 999999 : (limits.drivers === -1 ? 'Unlimited' : limits.drivers),
+            percent: isAllFleets ? 100 : (limits.drivers === -1 ? 0 : Math.min(100, Math.round((driverCount / limits.drivers) * 100))),
           },
           companies: {
             current: companyCount,
-            limit: isAllFleets ? 999999 : limits.companies,
-            percent: isAllFleets ? 100 : Math.min(100, Math.round((companyCount / limits.companies) * 100)),
+            limit: isAllFleets ? 999999 : (limits.companies === -1 ? 'Unlimited' : limits.companies),
+            percent: isAllFleets ? 100 : (limits.companies === -1 ? 0 : Math.min(100, Math.round((companyCount / limits.companies) * 100))),
           },
           employees: {
             current: employeeCount,
-            limit: isAllFleets ? 999999 : (limits.employees || 25),
-            percent: isAllFleets ? 100 : Math.min(100, Math.round((employeeCount / (limits.employees || 25)) * 100)),
+            limit: isAllFleets ? 999999 : (limits.employees === -1 ? 'Unlimited' : (limits.employees || 25)),
+            percent: isAllFleets ? 100 : (limits.employees === -1 ? 0 : Math.min(100, Math.round((employeeCount / (limits.employees || 25)) * 100))),
+          },
+          trips: {
+            current: totalBookings,
+            limit: isAllFleets ? 999999 : (limits.trips === -1 ? 'Unlimited' : limits.trips),
+            percent: isAllFleets ? 100 : (limits.trips === -1 ? 0 : Math.min(100, Math.round((totalBookings / limits.trips) * 100))),
           },
         },
         pipeline: {

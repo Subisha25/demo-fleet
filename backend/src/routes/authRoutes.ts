@@ -35,9 +35,18 @@ router.post('/send-otp', sendOTP);
 router.post('/verify-otp', verifyOTPLogin);
 router.post('/resend-otp', resendOTP);
 
-router.put('/forgetPassword', forgetPassword);
+// Forgot Password Flow (CamelCase & Kebab-case REST Aliases)
 router.post('/forgetPasswordSendOtp', forgetPasswordSendOtp);
+router.post('/forgot-password/send-otp', forgetPasswordSendOtp);
+
 router.post('/verifyOtpPassword', verifyOtpPassword);
+router.post('/forgot-password/verify-otp', verifyOtpPassword);
+
+router.put('/forgetPassword', forgetPassword);
+router.post('/forgetPassword', forgetPassword);
+router.put('/forgot-password/reset', forgetPassword);
+router.post('/forgot-password/reset', forgetPassword);
+
 router.put('/changePassword', changePassword);
 
 export default router;

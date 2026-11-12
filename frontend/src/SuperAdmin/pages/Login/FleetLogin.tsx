@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, Shield, MapPin, AlertCircle, ArrowLeft, Building2 } from 'lucide-react';
 import axiosInstance from '../../../utils/axiosInstance';
@@ -33,6 +33,7 @@ export default function FleetLogin() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
@@ -87,8 +88,10 @@ export default function FleetLogin() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || submitting) return;
     if (!validate() || !fleet) return;
 
+    isSubmittingRef.current = true;
     setSubmitting(true);
     setErrorMessage('');
 
@@ -137,6 +140,7 @@ export default function FleetLogin() {
       const msg = err.response?.data?.message || 'Authentication failed. Please verify your email and password.';
       setErrorMessage(msg);
     } finally {
+      isSubmittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -144,9 +148,9 @@ export default function FleetLogin() {
   // Safe Loading State
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAF8F5] flex flex-col items-center justify-center p-4">
-        <div className="w-12 h-12 border-4 border-[#C04E24]/20 border-t-[#C04E24] rounded-full animate-spin mb-4" />
-        <p className="text-xs font-bold text-[#5C5752] uppercase tracking-wider">Loading Fleet Portal...</p>
+      <div className="min-h-screen bg-[#F8F8FC] flex flex-col items-center justify-center p-4">
+        <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4" />
+        <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Loading Fleet Portal...</p>
       </div>
     );
   }

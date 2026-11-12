@@ -22,7 +22,7 @@ export class OTP extends Model {
   otpId!: string;
 
   @Column({
-    type: DataType.STRING(6),
+    type: DataType.STRING(255),
     allowNull: true,
   })
   otp?: string;
@@ -31,15 +31,33 @@ export class OTP extends Model {
     type: DataType.UUID,
     allowNull: false,
   })
-  loginId!: string; // Can be userId, vendorId, or driverId
+  loginId!: string; // Can be userId, vendorId, or employeeId
 
-  
-  // ✅ Add this new column for 2Factor session ID
+  // 2Factor session ID
   @Column({
     type: DataType.STRING(100),
     allowNull: true,
   })
   sessionId?: string;
+
+  @Column({
+    type: DataType.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
+  })
+  attempts?: number;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true,
+  })
+  verifiedAt?: Date;
+
+  @Column({
+    type: DataType.STRING(255),
+    allowNull: true,
+  })
+  resetToken?: string;
 
   @Column({
     type: DataType.DATE,

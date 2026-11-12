@@ -7,6 +7,8 @@ process.env.NODE_ENV = 'test';
 
 import axios from 'axios';
 import bcrypt from 'bcrypt';
+import { Security } from '../utils/Security';
+import config from '../config/config';
 import { Employee } from '../models/employee';
 import { ROOT_TENANT_ID } from '../context/tenantContext';
 import { getSuperAdminEmail, getSuperAdminPhone, sendNotification } from '../services/notificationService';
@@ -63,24 +65,29 @@ async function runTests() {
   };
 
   await assert('Authenticate as SuperAdmin to get valid JWT token', async () => {
-    // Try login or generate token using login API or root user credentials
-    const loginRes = await axios.post(`${BASE_URL}/auth/login`, {
-      email: rootAdmin.email,
-      password: process.env.SUPERADMIN_DEFAULT_PASSWORD || 'Admin@123',
-    }).catch(async () => {
-      // If password differs, reset to known password temporarily for test
-      const salt = await bcrypt.genSalt(10);
-      const hashed = await bcrypt.hash('TestAdmin@123', salt);
-      await rootAdmin.update({ password: hashed });
-      return axios.post(`${BASE_URL}/auth/login`, {
+    let token = '';
+    try {
+      const loginRes = await axios.post(`${BASE_URL}/auth/login`, {
         email: rootAdmin.email,
-        password: 'TestAdmin@123',
+        password: process.env.SUPERADMIN_DEFAULT_PASSWORD || 'Admin@123',
       });
-    });
+      token = loginRes.data?.token || loginRes.data?.accessToken;
+    } catch {
+      // Direct token generation if password differs - strictly preserves user's database password
+      token = Security.generateJwtToken(
+        {
+          userId: rootAdmin.employeeId,
+          roles: rootAdmin.role,
+          tenantId: rootAdmin.tenantId,
+          email: rootAdmin.email,
+        },
+        config.security.jwtSecret,
+        config.security.accessTokenExpiry
+      );
+    }
 
-    const token = loginRes.data?.token || loginRes.data?.accessToken;
     if (!token) {
-      throw new Error(`Login failed: ${JSON.stringify(loginRes.data)}`);
+      throw new Error('Could not obtain SuperAdmin token');
     }
     superAdminToken = token;
     authHeaders.headers.Authorization = `Bearer ${token}`;
@@ -237,36 +244,34 @@ async function runTests() {
   });
 
   await assert('PUT /api/user/profile/password changes password with correct current password and reverts cleanly', async () => {
-    const res = await axios.put(
-      `${BASE_URL}/user/profile/password`,
-      {
-        currentPassword: 'TestAdmin@123',
-        newPassword: 'SuperTempPass@2026',
-      },
-      authHeaders
-    );
-    if (!res.data.success) {
-      throw new Error(`Password change failed: ${JSON.stringify(res.data)}`);
-    }
-
-    // Verify new password works
     await rootAdmin.reload();
-    const matchNew = await bcrypt.compare('SuperTempPass@2026', rootAdmin.password);
-    if (!matchNew) {
-      throw new Error('New password was not hashed and persisted properly in DB');
-    }
+    const savedOriginalHash = rootAdmin.password;
+    try {
+      // Set known temporary hash for this isolated assertion
+      const tempHash = await bcrypt.hash('TestAdmin@123', 10);
+      await rootAdmin.update({ password: tempHash });
 
-    // Revert back cleanly to TestAdmin@123
-    const revertRes = await axios.put(
-      `${BASE_URL}/user/profile/password`,
-      {
-        currentPassword: 'SuperTempPass@2026',
-        newPassword: 'TestAdmin@123',
-      },
-      authHeaders
-    );
-    if (!revertRes.data.success) {
-      throw new Error(`Password revert failed: ${JSON.stringify(revertRes.data)}`);
+      const res = await axios.put(
+        `${BASE_URL}/user/profile/password`,
+        {
+          currentPassword: 'TestAdmin@123',
+          newPassword: 'SuperTempPass@2026',
+        },
+        authHeaders
+      );
+      if (!res.data.success) {
+        throw new Error(`Password change failed: ${JSON.stringify(res.data)}`);
+      }
+
+      // Verify new password works
+      await rootAdmin.reload();
+      const matchNew = await bcrypt.compare('SuperTempPass@2026', rootAdmin.password);
+      if (!matchNew) {
+        throw new Error('New password was not hashed and persisted properly in DB');
+      }
+    } finally {
+      // Always restore user's original database password
+      await rootAdmin.update({ password: savedOriginalHash });
     }
   });
 

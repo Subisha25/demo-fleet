@@ -558,7 +558,7 @@
 
 
 //remove vehicle type field
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Country, State, City, ICountry, IState, ICity } from "country-state-city";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -627,6 +627,8 @@ const AddDriverForm: React.FC = () => {
   const [cities, setCities] = useState<ICity[]>([]);
   const [loadingPincode, setLoadingPincode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const navigate = useNavigate();
 
@@ -828,6 +830,10 @@ const AddDriverForm: React.FC = () => {
       return;
     }
 
+    if (isSubmittingRef.current || submitting) return;
+    isSubmittingRef.current = true;
+    setSubmitting(true);
+
     const payload = {
       driverName: formData.name,
       password: formData.password,
@@ -870,6 +876,9 @@ const AddDriverForm: React.FC = () => {
       } else {
         showToast("Network error. Please try again.", "error");
       }
+    } finally {
+      isSubmittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -1107,8 +1116,10 @@ const AddDriverForm: React.FC = () => {
             <CommonButton
               type="submit"
               variant="primary"
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition"
-              disabled={loadingPincode}
+              loading={submitting}
+              loadingText="Saving Driver..."
+              disabled={loadingPincode || submitting}
+              className="px-8 py-3 shadow-md"
             >
               Save Driver
             </CommonButton>

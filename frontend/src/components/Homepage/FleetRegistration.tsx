@@ -88,16 +88,24 @@ export default function FleetRegistration() {
   } | null>(null);
 
   useEffect(() => {
-    // Read plan from query param if available (?plan=BASIC)
+    // Read plan and billing from query params if available (?plan=BASIC&billing=annual)
     const params = new URLSearchParams(location.search);
     const planParam = params.get('plan')?.toUpperCase();
-    if (planParam && PLANS[planParam]) {
-      setFormData((prev) => ({
-        ...prev,
-        requestedPlanTier: planParam as any,
-        fleetSize: planParam === 'BASIC' ? '1-15' : planParam === 'PRO' ? '16-75' : '76+',
-      }));
-    }
+    const billingParam = params.get('billing')?.toUpperCase();
+    const validBilling =
+      billingParam === 'ANNUAL' ? 'ANNUAL' : billingParam === 'MONTHLY' ? 'MONTHLY' : undefined;
+
+    setFormData((prev) => {
+      let updated = { ...prev };
+      if (planParam && PLANS[planParam]) {
+        updated.requestedPlanTier = planParam as any;
+        updated.fleetSize = planParam === 'BASIC' ? '1-15' : planParam === 'PRO' ? '16-75' : '76+';
+      }
+      if (validBilling) {
+        updated.billingCycle = validBilling;
+      }
+      return updated;
+    });
   }, [location.search]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {

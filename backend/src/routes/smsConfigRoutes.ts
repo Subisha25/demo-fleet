@@ -108,7 +108,8 @@ router.post(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const tenantId = resolveTenantId(req);
-      const { phone, confirmRealSms } = req.body;
+      const phone = req.body.phone || req.body.phoneNumber || req.body.destinationPhone;
+      const confirmRealSms = Boolean(req.body.confirmRealSms);
 
       if (!confirmRealSms) {
         return res.status(400).json({

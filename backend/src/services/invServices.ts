@@ -1290,7 +1290,7 @@ export const cancelInvoice = async (req: any, res: Response) => {
     // -----------------------------
     // 📧 Send Email to User only
     // -----------------------------
-    let needEmail = false;
+    let needEmail = true;
     let companyName;
 
     if (booking.user?.companyId) {
@@ -1298,7 +1298,7 @@ export const cancelInvoice = async (req: any, res: Response) => {
         booking.user.companyId,
         { attributes: ["needEmail"] }
       );
-      needEmail = company?.needEmail === true;
+      needEmail = company ? company.needEmail !== false : true;
       companyName = company?.companyName;
     }
 
@@ -1579,10 +1579,10 @@ export const resendClosePendingInvoiceEmail = async (req: any, res: Response) =>
     const payLink = `${BASE_URL}/invoice/user-invoice-details/${b.userId}`;
 
     // ✅ needEmail logic (same as your createClosePending)
-    let needEmail = false;
+    let needEmail = true;
     if (b?.user?.companyId) {
       const company = await Company.findByPk(b.user.companyId, { attributes: ["needEmail"] });
-      needEmail = company?.needEmail === true;
+      needEmail = company ? company.needEmail !== false : true;
     }
 
     if (!needEmail) {

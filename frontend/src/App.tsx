@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import ScrollToTop from './components/ScrollToTop';
 import { AuthProvider } from './context/AuthContext';
 import { TenantProvider } from './context/TenantContext';
 import PrivateRoute, { SuperAdminRoute } from './routes/PrivateRoutes';
@@ -353,7 +354,8 @@ const App: React.FC = () => {
     <AuthProvider>
       <TenantProvider>
         <BrowserRouter>
-        <Routes>
+          <ScrollToTop />
+          <Routes>
           {/* Public Website Routes & Aliases */}
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />

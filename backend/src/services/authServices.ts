@@ -1,5 +1,6 @@
 import { Request, Response, Router } from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { Company,Employee, Vendor } from '../models';
 import { Security } from '../utils/Security';
 import config from '../config/config';
@@ -9,6 +10,7 @@ import { OTP } from '../models/otp';
 import { USERS } from "../utils/costants";
 import { Op } from 'sequelize';
 import { sendEmailFromTemplate, fetchAllEmailConfs } from "../services/emailConfServices";
+import { sendNotification } from './notificationService';
 const { ROLES } = USERS;
 import { normalizeManagerEmails } from '../utils/email';
 import { ROOT_TENANT_ID, getTenantContext } from '../context/tenantContext';
@@ -95,11 +97,13 @@ export const empRegister = async (req: Request, res: Response) => {
   }
 };
 export const empLogin = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const email = (req.body.email || '').trim().toLowerCase();
+  const password = typeof req.body.password === 'string' ? req.body.password : '';
 
   try {
-    // const normalEmail = email.toLowerCase();
-    // const normalpass = password.toLowerCase();
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
 
     // 🔹 1️⃣ Check if it's an employee
     const employee = await Employee.findOne({ where: { email } });
@@ -447,7 +451,8 @@ if (existingUserByMobile) {
 };
 
 export const userLogin = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const email = (req.body.email || '').trim().toLowerCase();
+  const password = typeof req.body.password === 'string' ? req.body.password : '';
   
   try {
     // Validate input
@@ -519,7 +524,9 @@ export const userLogin = async (req: Request, res: Response) => {
 };
 
 export const CompanyLogin = async (req: Request, res: Response) => {
-  const { email, password, seoUrl } = req.body;
+  const email = (req.body.email || '').trim().toLowerCase();
+  const password = typeof req.body.password === 'string' ? req.body.password : '';
+  const seoUrl = (req.body.seoUrl || '').trim();
 
   try {
     if (!email || !password || !seoUrl) {
@@ -609,8 +616,14 @@ export const CompanyLogin = async (req: Request, res: Response) => {
 
 // Existing vendor login
 export const vendorLogin = async (req: Request, res: Response) => {
-  const { email, password, fcm_token } = req.body;
+  const email = (req.body.email || '').trim().toLowerCase();
+  const password = typeof req.body.password === 'string' ? req.body.password : '';
+  const { fcm_token } = req.body;
   try {
+    if (!email || !password) {
+      res.status(400).json({ message: 'Email and password are required' });
+      return;
+    }
     const vendor = await Vendor.findOne({ where: { email } });
     if (!vendor) {
         res.status(404).json({ message: 'vendor not found' });
@@ -698,31 +711,29 @@ export const sendOTP = async (req: Request, res: Response) => {
       return;
     }
 
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate cryptographic 6-digit OTP
+    const rawOtp = crypto.randomInt(100000, 1000000).toString();
+    const storedOtp = hashOtp(rawOtp, userResult.userId);
 
     // Delete any existing OTP for this user
-    // await OTP.destroy({
-    //   where: {
-    //     id: userResult.userId
-    //   }
-    // });
+    await OTP.destroy({
+      where: { loginId: userResult.userId }
+    });
 
-    // Create new OTP record
+    // Create new OTP record with hashed OTP
     await OTP.create({
-      otp,
-      id: userResult.userId,
+      otp: storedOtp,
+      loginId: userResult.userId,
+      attempts: 0,
       expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes expiry
     });
 
-    // Here you would integrate with SMS service to send OTP
-    // For now, we'll just log it (remove this in production)
-    console.log(`OTP for ${mobile}: ${otp}`);
+    console.log(`[AuthServices] OTP dispatch initiated for mobile: ${mobile.slice(-4).padStart(mobile.length, '*')}`);
 
     res.status(200).json({
       success: true,
       message: 'OTP sent successfully',
-     role: userResult.role,
+      role: userResult.role,
     });
 
   } catch (error: any) {
@@ -759,11 +770,12 @@ export const verifyOTPLogin = async (req: Request, res: Response) => {
       return;
     }
 
-    // Find and verify OTP
+    // Find and verify OTP (support both hashed and legacy raw OTP)
+    const hashedOtp = hashOtp(otp, userResult.userId);
     const otpRecord = await OTP.findOne({
       where: {
-        id: userResult.userId,
-        otp: otp,
+        loginId: userResult.userId,
+        otp: { [Op.in]: [hashedOtp, otp] },
         expiresAt: {
           [Op.gt]: new Date()
         }
@@ -842,31 +854,28 @@ export const resendOTP = async (req: Request, res: Response) => {
       return;
     }
 
-    // Generate new 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate new cryptographic 6-digit OTP
+    const rawOtp = crypto.randomInt(100000, 1000000).toString();
+    const storedOtp = hashOtp(rawOtp, userResult.userId);
 
     // Delete any existing OTP for this user
     await OTP.destroy({
-      where: {
-        id: userResult.userId
-      }
+      where: { loginId: userResult.userId }
     });
 
-    // Create new OTP record
+    // Create new OTP record with hashed OTP
     await OTP.create({
-      otp,
-      id: userResult.userId,
+      otp: storedOtp,
+      loginId: userResult.userId,
+      attempts: 0,
       expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes expiry
     });
 
-    // Here you would integrate with SMS service to send OTP
-    console.log(`Resent OTP for ${mobile}: ${otp}`);
+    console.log(`[AuthServices] Resent OTP dispatch initiated for mobile: ${mobile.slice(-4).padStart(mobile.length, '*')}`);
 
     res.status(200).json({
       success: true,
       message: 'OTP resent successfully',
-      // Remove this in production
-      otp: otp
     });
 
   } catch (error: any) {
@@ -879,54 +888,94 @@ export const resendOTP = async (req: Request, res: Response) => {
   }
 };
 
-const findUserByEmail = async (email: string) => {
-  // Check in User table
-  let user;
-  user = await User.findOne({ where: { email } });
+export interface AccountLookupResult {
+  accountType: 'employee' | 'vendor' | 'user';
+  userId: string;
+  user: any;
+  email: string;
+  username: string;
+  role?: string;
+  tenantId?: string;
+  fleetName?: string;
+  userData: {
+    id: string;
+    username: string;
+    email: string;
+    mobile?: string;
+    role?: string;
+    companyId?: string;
+  };
+}
+
+export const hashOtp = (otp: string, loginId: string): string => {
+  return crypto.createHash('sha256').update(`${loginId}:${otp}`).digest('hex');
+};
+
+export const findUserByEmail = async (rawEmail: string): Promise<AccountLookupResult | null> => {
+  const email = (rawEmail || '').trim().toLowerCase();
+  if (!email) return null;
+
+  // 1. Check Employee table first (Platform SuperAdmins, Fleet Admins, Staff/Drivers)
+  const emp = await Employee.findOne({ where: { email } });
+  if (emp) {
+    return {
+      accountType: 'employee',
+      userId: emp.employeeId,
+      user: emp,
+      email: emp.email,
+      username: emp.username,
+      role: emp.role,
+      tenantId: emp.tenantId,
+      userData: {
+        id: emp.employeeId,
+        username: emp.username,
+        email: emp.email,
+        mobile: emp.phno,
+        role: emp.role,
+      },
+    };
+  }
+
+  // 2. Check Vendor table
+  const vendor = await Vendor.findOne({ where: { email } });
+  if (vendor) {
+    return {
+      accountType: 'vendor',
+      userId: vendor.vendorId,
+      user: vendor,
+      email: vendor.email,
+      username: vendor.vendorName,
+      role: vendor.role,
+      tenantId: vendor.tenantId,
+      userData: {
+        id: vendor.vendorId,
+        username: vendor.vendorName,
+        email: vendor.email,
+        mobile: vendor.phno,
+        role: vendor.role,
+      },
+    };
+  }
+
+  // 3. Check User table (Corporate Employees / End Users)
+  const user = await User.findOne({ where: { email } });
   if (user) {
     return {
-      user,
+      accountType: 'user',
       userId: user.userId,
+      user,
+      email: user.email,
+      username: user.username,
+      role: user.role,
+      tenantId: user.tenantId,
       userData: {
         id: user.userId,
         username: user.username,
         email: user.email,
         mobile: user.mobile,
         role: user.role,
-        companyId: user.companyId
-      }
-    };
-  }
-
-  // Check in Vendor table (phno field)
-  user = await Vendor.findOne({ where: { email: email } });
-  if (user) {
-    return {
-      user,
-      userId: user.vendorId,
-      userData: {
-        id: user.vendorId,
-        username: user.vendorName,
-        email: user.email,
-        mobile: user.phno,
-        role: user.role
-      }
-    };
-  }
-
-  // Check in Drivers table (phno field)
-  user = await Employee.findOne({ where: { email: email } });
-  if (user) {
-    return {
-      user,
-      userId: user.employeeId,
-      userData: {
-        id: user.employeeId,
-        username: user.username,
-        email: user.email,
-        mobile: user.phno,
-        role: user.role
-      }
+        companyId: user.companyId,
+      },
     };
   }
 
@@ -937,153 +986,251 @@ export const forgetPasswordSendOtp = async (req: Request, res: Response) => {
   const norm = (v?: string) => (v || "").trim().toLowerCase();
   const email = norm(req.body.email);
 
-  try {
-    const emailConfigs = await fetchAllEmailConfs();
-    const otpConf = emailConfigs.find((conf: any) => conf.emailCode === "FORGET_PASSWORD_OTP");
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ success: false, message: "A valid email address is required." });
+  }
 
-    // await, and bail out (generic) if no account
+  try {
     const userResult = await findUserByEmail(email);
     if (!userResult) {
-      // Respond generically to avoid enumeration; do NOT create OTP
-      return res.status(200).json({ success: true, message: "If the email exists, an OTP has been sent." });
+      // Respond generically to prevent account enumeration
+      return res.status(200).json({ success: true, message: "If the email is registered, an OTP has been sent." });
     }
 
     // If company context is provided, verify user belongs to this specific company
     const seoUrl = (req.body.seoUrl || "").trim();
     if (seoUrl) {
       const company = await Company.findOne({ where: { seoUrl } });
-      const userCompanyId = (userResult.userData as any)?.companyId || (userResult.user as any)?.companyId;
+      const userCompanyId = (userResult.userData as any)?.companyId;
       if (!company || userCompanyId !== company.companyId) {
-        // Return generic success to avoid enumeration, but abort OTP generation
-        return res.status(200).json({ success: true, message: "If the email exists, an OTP has been sent." });
+        return res.status(200).json({ success: true, message: "If the email is registered, an OTP has been sent." });
       }
     }
 
-    const loginId = userResult.userId; // userId | vendorId | employeeId
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const loginId = userResult.userId;
 
-    // delete old rows by loginId
+    // Resend cooldown check: 60 seconds
+    const recentOtp = await OTP.findOne({
+      where: {
+        loginId,
+        createdAt: {
+          [Op.gt]: new Date(Date.now() - 60 * 1000)
+        }
+      }
+    });
+
+    if (recentOtp) {
+      return res.status(429).json({
+        success: false,
+        message: "Please wait 60 seconds before requesting a new OTP."
+      });
+    }
+
+    // Generate cryptographically secure 6-digit OTP
+    const rawOtp = crypto.randomInt(100000, 1000000).toString();
+    const hashedOtp = hashOtp(rawOtp, loginId);
+
+    // Delete any old OTP records for this loginId
     await OTP.destroy({ where: { loginId } });
 
-    //  use correct column name loginId
+    // Store hashed OTP with 5 minute expiry and 0 attempts
     await OTP.create({
-      otp,
+      otp: hashedOtp,
       loginId,
+      attempts: 0,
       expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
     });
 
-    // Send email if template exists strictly to requested user email
-    if (otpConf) {
-      await sendEmailFromTemplate(otpConf.emailCode, {
-        UserName: userResult.userData?.username ?? "User",
-        UserEmail: userResult.userData?.email ?? email,
-        OTP: otp,
+    // Optional dual-channel dispatch: Send OTP via SMS if registered phone number is available
+    const recipientPhone = userResult.userData?.mobile;
+    if (recipientPhone) {
+      try {
+        await sendNotification({
+          channel: 'SMS',
+          recipient: recipientPhone,
+          templateCode: 'FORGET_PASSWORD_OTP_SMS',
+          body: `Your FleetFlow password recovery OTP is ${rawOtp}. Valid for 5 minutes.`,
+          tenantId: userResult.tenantId || ROOT_TENANT_ID,
+          metadata: { otp: rawOtp },
+        });
+      } catch (smsErr: any) {
+        // SMS failure is non-blocking for email delivery
+        console.warn('[forgetPasswordSendOtp] Optional SMS delivery noticed:', smsErr?.message || smsErr);
+      }
+    }
+
+    // Send email using centralized sendEmailFromTemplate
+    const recipientEmail = userResult.userData?.email || email;
+    const recipientName = userResult.userData?.username || "User";
+
+    try {
+      const emailResult = await sendEmailFromTemplate("FORGET_PASSWORD_OTP", {
+        DisplayName: recipientName,
+        UserName: recipientName,
+        EmployeeEmail: recipientEmail,
+        UserEmail: recipientEmail,
+        OTP: rawOtp,
+        tenantId: userResult.tenantId || ROOT_TENANT_ID,
         WEB_SITE_NAME: "www.fleetflow.com",
         WEB_SITE_EMAIL: "support@fleetflow.com",
         CONTACT_NO: "+91 90000 00000",
       });
+
+      // Verify that provider didn't reject the message
+      if (emailResult && emailResult.rejected && emailResult.rejected.length > 0 && emailResult.rejected.includes(recipientEmail)) {
+        await OTP.destroy({ where: { loginId } });
+        return res.status(502).json({
+          success: false,
+          message: "Email provider rejected message delivery. Please contact support."
+        });
+      }
+    } catch (sendErr: any) {
+      // If delivery failed, delete OTP record to maintain security
+      await OTP.destroy({ where: { loginId } });
+      console.error("[forgetPasswordSendOtp] Failed to deliver OTP email:", sendErr?.message || sendErr);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send OTP email. Please verify your email configuration or try again later."
+      });
     }
-    console.log("otp",otp);
-    return res.status(200).json({ success: true, message: "If the email exists, an OTP has been sent." });
+
+    // Success response without exposing raw OTP
+    return res.status(200).json({
+      success: true,
+      message: "If the email is registered, an OTP has been sent."
+    });
   } catch (error: any) {
-    console.error("forgetPasswordSendOtp error:", error);
+    console.error("forgetPasswordSendOtp error:", error?.message || error);
     return res.status(500).json({ success: false, message: "Error sending OTP" });
   }
 };
 
 export const verifyOtpPassword = async (req: Request, res: Response) => {
-  const { email, otp } = req.body;
+  const norm = (v?: string) => (v || "").trim().toLowerCase();
+  const email = norm(req.body.email);
+  const rawOtp = String(req.body.otp || "").trim();
 
   try {
-    if (!email || !otp) {
+    if (!email || !rawOtp) {
       return res.status(400).json({ success: false, message: "Email and OTP are required." });
     }
 
-    // Find the account (to get loginId)
     const userResult = await findUserByEmail(email);
     if (!userResult) {
-      return res.status(400).json({ success: false, message: "Invalid OTP." });
+      return res.status(400).json({ success: false, message: "Invalid OTP or email." });
     }
 
     const loginId = userResult.userId;
-
-    // Find OTP record
     const record = await OTP.findOne({ where: { loginId } });
     if (!record) {
-      return res.status(400).json({ success: false, message: "Invalid OTP." });
+      return res.status(400).json({ success: false, message: "Invalid or expired OTP." });
     }
 
     // Check expiry
     if (new Date(record.expiresAt) < new Date()) {
       await OTP.destroy({ where: { loginId } });
-      return res.status(400).json({ success: false, message: "OTP expired." });
+      return res.status(400).json({ success: false, message: "OTP has expired. Please request a new one." });
     }
 
-    // Match OTP
-    if (record.otp !== otp) {
-      return res.status(400).json({ success: false, message: "Invalid OTP." });
+    // Check verification attempts (max 5)
+    const currentAttempts = (record.attempts || 0) + 1;
+    if (currentAttempts > 5) {
+      await OTP.destroy({ where: { loginId } });
+      return res.status(429).json({
+        success: false,
+        message: "Too many failed attempts. Please request a new OTP."
+      });
+    }
+    await record.update({ attempts: currentAttempts });
+
+    // Compare hashed OTP (with legacy plaintext fallback support)
+    const expectedHash = hashOtp(rawOtp, loginId);
+    const isMatch = record.otp === expectedHash || record.otp === rawOtp;
+
+    if (!isMatch) {
+      const remaining = 5 - currentAttempts;
+      return res.status(400).json({
+        success: false,
+        message: remaining > 0
+          ? `Invalid OTP. ${remaining} attempt(s) remaining.`
+          : "Invalid OTP. Maximum attempts reached. Please request a new OTP."
+      });
     }
 
-    // Mark OTP as verified (clear it)
-    await OTP.update({ otp: null }, { where: { loginId } });
+    // Generate single-use reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    await record.update({
+      otp: null,
+      resetToken,
+      verifiedAt: new Date(),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes to reset password
+    });
 
-    return res.status(200).json({ success: true, message: "OTP verified successfully." });
+    return res.status(200).json({
+      success: true,
+      message: "OTP verified successfully.",
+      resetToken
+    });
   } catch (error: any) {
-    console.error("verifyOtpPassword error:", error);
+    console.error("verifyOtpPassword error:", error?.message || error);
     return res.status(500).json({ success: false, message: "Error verifying OTP" });
   }
 };
 
-
 export const forgetPassword = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const norm = (v?: string) => (v || "").trim().toLowerCase();
+  const email = norm(req.body.email);
+  const password = req.body.password || req.body.newPassword;
+  const resetToken = req.body.resetToken;
 
   try {
     if (!email || !password) {
-      return res.status(400).json({ success: false, message: "Email and password are required." });
+      return res.status(400).json({ success: false, message: "Email and new password are required." });
     }
 
-    // Find account to get loginId
+    if (typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ success: false, message: "Password must be at least 6 characters." });
+    }
+
     const userResult = await findUserByEmail(email);
     if (!userResult) {
-      return res.status(200).json({ success: true, message: "No matching email found." });
+      return res.status(400).json({ success: false, message: "No matching account found." });
     }
 
     const loginId = userResult.userId;
-
-    // Check verified OTP marker
     const marker = await OTP.findOne({ where: { loginId } });
-    if (!marker || marker.otp !== null || new Date(marker.expiresAt) < new Date()) {
-      return res.status(400).json({ success: false, message: "OTP not verified or expired." });
+
+    // Check verification status and expiration
+    if (!marker || marker.otp !== null || !marker.verifiedAt || new Date(marker.expiresAt) < new Date()) {
+      return res.status(400).json({ success: false, message: "OTP not verified or reset window has expired." });
     }
 
-    // Hash and update password
+    // Verify resetToken if provided
+    if (resetToken && marker.resetToken && marker.resetToken !== resetToken) {
+      return res.status(403).json({ success: false, message: "Invalid or forged password reset token." });
+    }
+
+    // Hash new password
     const hashedPassword = await bcrypt.hash(password, 10);
-    let updated = 0;
 
-    const [emp] = await Employee.update({ password: hashedPassword }, { where: { email } });
-    updated += emp;
-
-    if (!updated) {
-      const [usr] = await User.update({ password: hashedPassword }, { where: { email } });
-      updated += usr;
+    // Update the exact matched record based on accountType
+    if (userResult.accountType === 'employee') {
+      await Employee.update({ password: hashedPassword }, { where: { employeeId: loginId } });
+    } else if (userResult.accountType === 'vendor') {
+      await Vendor.update({ password: hashedPassword }, { where: { vendorId: loginId } });
+    } else if (userResult.accountType === 'user') {
+      await User.update({ password: hashedPassword }, { where: { userId: loginId } });
     }
 
-    if (!updated) {
-      const [ven] = await Vendor.update({ password: hashedPassword }, { where: { email } });
-      updated += ven;
-    }
-
-    // Delete OTP after use
+    // Destroy OTP marker immediately so it cannot be reused
     await OTP.destroy({ where: { loginId } });
 
-    if (!updated) {
-      return res.status(200).json({ success: true, message: "No matching email found." });
-    }
-
-    return res.status(200).json({ success: true, message: "Password changed successfully." });
+    return res.status(200).json({
+      success: true,
+      message: "Password updated successfully. You can now login."
+    });
   } catch (error: any) {
-    console.error("forgetPassword error:", error);
+    console.error("forgetPassword error:", error?.message || error);
     return res.status(500).json({ success: false, message: "Error updating password" });
   }
 };

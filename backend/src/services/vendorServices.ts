@@ -19,7 +19,7 @@ import { User } from "../models/user";
 import { formatDateTime,formatToIST } from '../utils/formatDateTime';
 import moment from "moment-timezone";
 import bcrypt from 'bcrypt';
-import { dispatchAuditedSms } from './smsServices';
+import { dispatchAuditedSms, validateMobileRecipient, validateEmailRecipient } from './smsServices';
 import { sendSmsNotifications } from '../utils/smsNotifications';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
@@ -146,14 +146,14 @@ const company = await Company.findOne({ where:  { companyId: userData?.companyId
     );
       console.log("need email.",booking?.user?.company?.needEmail);
       
-       let needEmail = false;
+       let needEmail = true;
       
           if (user?.companyId) {
             const company = await Company.findByPk(
               user.companyId,
               { attributes: ["needEmail"] }
             );
-            needEmail = company?.needEmail === true;
+            needEmail = company ? company.needEmail !== false : true;
           }
    if(needEmail && shouldSendSms === true)
           {
@@ -328,10 +328,10 @@ export const confirmBookingforWeb = async (req: any, res: Response) => {
     const shouldSendSms = !!pickupMoment && pickupMoment.isValid() && pickupMoment.isAfter(now);
 
     // Company needEmail
-    let needEmail = false;
+    let needEmail = true;
     if (user?.companyId) {
       const company = await Company.findByPk(user.companyId, { attributes: ["needEmail"] });
-      needEmail = company?.needEmail === true;
+      needEmail = company ? company.needEmail !== false : true;
     }
 
     // ✅ EMAIL
@@ -611,11 +611,12 @@ export const createDriver = async (req: any, res: Response) => {
       return res.status(400).json({ message: 'Driver name is required', field: 'driverName' });
     }
 
-    if (!phno || !String(phno).trim()) {
-      return res.status(400).json({ message: 'Phone number is required', field: 'phno' });
+    // Validate phone number format and dummy protection
+    const phoneValidation = validateMobileRecipient(phno);
+    if (!phoneValidation.valid) {
+      return res.status(400).json({ message: phoneValidation.error || 'Please provide a valid 10-digit mobile number', field: 'phno' });
     }
-
-    const cleanPhone = String(phno).trim();
+    const cleanPhone = phoneValidation.normalizedPhone;
 
     // Check active driver with same phone in this fleet
     const existing = await Drivers.unscoped().findOne({
@@ -628,7 +629,11 @@ export const createDriver = async (req: any, res: Response) => {
     // Check email if provided
     let cleanEmail: string | null = null;
     if (driverEmail && String(driverEmail).trim() !== '') {
-      cleanEmail = String(driverEmail).trim();
+      const emailValidation = validateEmailRecipient(driverEmail);
+      if (!emailValidation.valid) {
+        return res.status(400).json({ message: emailValidation.error || 'Please provide a valid email address', field: 'driverEmail' });
+      }
+      cleanEmail = emailValidation.normalizedEmail;
       const existingEmail = await Drivers.unscoped().findOne({
         where: { driverEmail: cleanEmail, tenantId, isDeleted: false }
       });
@@ -740,6 +745,7 @@ export const createDriver = async (req: any, res: Response) => {
         message: `Welcome to FleetFlow Fleet, ${driver.driverName}! Your driver account is active. Mobile: ${cleanPhone}.`,
         referenceEntity: 'DRIVER',
         referenceId: driver.driverId,
+        tenantId,
         metadata: { driverId: driver.driverId, driverName: driver.driverName }
       });
       smsSent = smsRes.success;

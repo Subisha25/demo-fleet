@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import PageLayout from "../../../../components/PageLayout";
 import axiosInstance from "../../../../utils/axiosInstance";
@@ -62,11 +62,14 @@ const [loading, setLoading] = useState(false);
  
 
   const [deleting, setDeleting] = useState(false);
+  const isDeletingRef = useRef(false);
 
   const confirmDelete = async () => {
-    if (!selectedCompany || deleting) return;
+    if (!selectedCompany || deleting || isDeletingRef.current) return;
+    isDeletingRef.current = true;
+    setDeleting(true);
+
     try {
-      setDeleting(true);
       await axiosInstance.delete(`/company/companyDelete/${selectedCompany.companyId}`);
       showToast("Company moved to trash successfully!", "success");
       setDeletePopupOpen(false);
@@ -78,6 +81,7 @@ const [loading, setLoading] = useState(false);
       const msg = error?.response?.data?.message || "Error deleting company";
       showToast(msg, "error");
     } finally {
+      isDeletingRef.current = false;
       setDeleting(false);
     }
   };
@@ -214,11 +218,18 @@ const [loading, setLoading] = useState(false);
                 <CommonButton
                   onClick={() => setDeletePopupOpen(false)}
                   variant="secondary"
+                  disabled={deleting}
                 >
                   Cancel
                 </CommonButton>
-                <CommonButton onClick={confirmDelete} variant="danger">
-                  Confirm
+                <CommonButton
+                  onClick={confirmDelete}
+                  variant="danger"
+                  loading={deleting}
+                  loadingText="Deleting..."
+                  disabled={deleting}
+                >
+                  Confirm Delete
                 </CommonButton>
               </div>
             </div>

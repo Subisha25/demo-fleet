@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, FormEvent } from "react";
+import React, { useEffect, useState, FormEvent, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import PageLayout from "../../../../components/PageLayout";
 import InputBox, { getFormStore } from "../../../../components/InputBox";
@@ -46,16 +46,15 @@ export default function AddCompany() {
   const [vehicleRules, setVehicleRules] = useState<VehicleBookingRule[]>([]);
   const [rulesLoading, setRulesLoading] = useState(false);
 const [companyName, setCompanyName] = useState("");
-  // ✅ Add checkbox states
-  const [needEmail, setNeedEmail] = useState<boolean>(false);
+  // Allow Tax checkbox state
   const [allowTax, setAllowTax] = useState<boolean>(false);
-// Manager Approval checkbox state (configurable for all corporate clients)
-  const [managerApproval, setManagerApproval] = useState<boolean>(false);
   // Edit modal state
   const [editOpen, setEditOpen] = useState(false);
   const [editRow, setEditRow] = useState<VehicleBookingRule | null>(null);
   const [editPriorMinutes, setEditPriorMinutes] = useState<string>("");
   const [editSaving, setEditSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
@@ -147,6 +146,7 @@ useEffect(() => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || submitting) return;
 
     const form = getFormStore();
 
@@ -155,32 +155,32 @@ useEffect(() => {
       return;
     }
 
-    if (!form.managerEmails || form.managerEmails.trim() === "") {
-      showToast("Manager Email(s) are required", "warn");
+    if (!form.companyCode || form.companyCode.trim() === "") {
+      showToast("Company Code is required", "warn");
       return;
     }
 
-    const emailList = form.managerEmails.split(/[,;\s]+/).filter(Boolean);
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const invalidEmails = emailList.filter((email: string) => !emailRegex.test(email));
-    if (invalidEmails.length > 0) {
-      showToast(
-        `Invalid email(s): ${invalidEmails.join(", ")}. Example: billing@fleetflow.com`,
-        "warn"
-      );
-      return;
+    if (form.managerEmails && form.managerEmails.trim() !== "") {
+      const emailList = form.managerEmails.split(/[,;\s]+/).filter(Boolean);
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const invalidEmails = emailList.filter((email: string) => !emailRegex.test(email));
+      if (invalidEmails.length > 0) {
+        showToast(
+          `Invalid email(s): ${invalidEmails.join(", ")}. Example: billing@fleetflow.com`,
+          "warn"
+        );
+        return;
+      }
     }
+
+    isSubmittingRef.current = true;
+    setSubmitting(true);
 
     try {
       const formData = new FormData();
       formData.append("companyName", form.companyName.trim());
-      formData.append("managerEmail", form.managerEmails.trim());
-if (!form.companyCode || form.companyCode.trim() === "") {
-  showToast("Company Code is required", "warn");
-  return;
-}
-
-formData.append("companyCode", form.companyCode.trim());
+      formData.append("managerEmail", (form.managerEmails || "").trim());
+      formData.append("companyCode", form.companyCode.trim());
 
       if (form.seoUrl && form.seoUrl.trim() !== "") {
         formData.append("seoUrl", form.seoUrl.trim());
@@ -190,15 +190,14 @@ formData.append("companyCode", form.companyCode.trim());
       if (form.gstNo && form.gstNo.trim() !== "") {
         formData.append("gstNo", form.gstNo.trim());
       }
-if (form.companyAddress && form.companyAddress.trim() !== "") {
-  formData.append("companyAddress", form.companyAddress.trim());
-}
+      if (form.companyAddress && form.companyAddress.trim() !== "") {
+        formData.append("companyAddress", form.companyAddress.trim());
+      }
 
-      // ✅ Send allowTax as "Yes" or "No" from state
+      // Send allowTax as "Yes" or "No" from state
       formData.append("allowTax", allowTax ? "Yes" : "No");
-
-      // ✅ Send needEmail from state
-      formData.append("needEmail", needEmail ? "true" : "false");
+      formData.append("needEmail", "false");
+      formData.append("managerApproval", "false");
       formData.append(
         "bookingRules",
         JSON.stringify(
@@ -210,8 +209,6 @@ if (form.companyAddress && form.companyAddress.trim() !== "") {
         )
       );
 
-// ✅ Send managerApproval as true/false
-formData.append("managerApproval", managerApproval ? "true" : "false");
       if (companyLogo) formData.append("companyLogo", companyLogo);
 
       await axiosInstance.post("/emp/createCompany", formData, {
@@ -221,7 +218,11 @@ formData.append("managerApproval", managerApproval ? "true" : "false");
       showToast("Company saved successfully!", "success");
       navigate("/master/company/list");
     } catch (error: any) {
-      showToast("Already exists. Please try again.", "warn");
+      const msg = error?.response?.data?.message || "Failed to save company. Please try again.";
+      showToast(msg, "error");
+    } finally {
+      isSubmittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -233,9 +234,12 @@ formData.append("managerApproval", managerApproval ? "true" : "false");
 
         <form onSubmit={handleSubmit} className="space-y-12">
           {/* Company Info */}
-<div className="bg-white py-4 px-4 rounded-lg shadow-sm">            <h2 className="text-xl font-semibold text-[#025A64] flex items-center gap-2 py-3 underline">
-              <FontAwesomeIcon icon={faBuilding} />
-              Company Info
+<div className="bg-white py-4 px-4 rounded-xl border border-slate-200 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 py-3 border-b border-slate-100 mb-4">
+              <span className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-sm">
+                <FontAwesomeIcon icon={faBuilding} />
+              </span>
+              <span>Company Information</span>
             </h2>
 
 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
@@ -273,13 +277,13 @@ formData.append("managerApproval", managerApproval ? "true" : "false");
   <InputBox
     label={
       <span>
-        Manager Emails <span className="text-red-500">*</span>
+        Corporate / Manager Emails (Optional)
       </span>
     }
     name="managerEmails"
    isTextarea
     icon={faEnvelope}
-    placeholder="Enter manager email(s)"
+    placeholder="Enter manager email(s) (optional)"
   />
 
   <span className="text-xs text-gray-500 mt-1">
@@ -333,33 +337,7 @@ formData.append("managerApproval", managerApproval ? "true" : "false");
                 </label>
               </div>
 
-              {/* ✅ Need Email checkbox with state */}
-              <div className="w-full">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={needEmail}
-                    onChange={(e) => setNeedEmail(e.target.checked)}
-                    className="w-4 h-4"
-                  />
-                  <span className="font-medium">Need Email</span>
-                </label>
-              </div>
 
-              {/* Manager Approval checkbox - available for all corporate clients */}
-              <div className="w-full">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={managerApproval}
-                    onChange={(e) => setManagerApproval(e.target.checked)}
-                    className="w-4 h-4"
-                  />
-                  <span className="font-medium">
-                    Manager Approval Required
-                  </span>
-                </label>
-              </div>
               
             </div>
           </div>
@@ -388,9 +366,15 @@ formData.append("managerApproval", managerApproval ? "true" : "false");
           </div>
 
           {/* Save Button */}
-          <div className="flex justify-end">
-            <CommonButton type="submit" variant="success" className="px-8 py-3">
-              Save
+          <div className="flex justify-end pt-4">
+            <CommonButton
+              type="submit"
+              variant="primary"
+              loading={submitting}
+              loadingText="Saving Company..."
+              className="px-8 py-3 shadow-md"
+            >
+              Save Company
             </CommonButton>
           </div>
         </form>

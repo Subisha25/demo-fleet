@@ -21,7 +21,7 @@ import { sendNotification } from "../utils/sendNotification";
 import { sendEmailFromTemplate } from "../services/emailConfServices";
 import { fetchAllEmailConfs } from "../services/emailConfServices";
 import config from '../config/config';
-import { sendTransactionalSms, dispatchAuditedSms, sanitizeDltLocationString } from './smsServices';
+import { sendTransactionalSms, dispatchAuditedSms, sanitizeDltLocationString, validateMobileRecipient } from './smsServices';
 import {normalizeManagerEmails } from '../utils/email';
 import { sendSmsNotifications } from '../utils/smsNotifications';
 
@@ -187,6 +187,7 @@ export const createBookingForWeb = async (req: any, res: Response) => {
       driverTripStatus,
       managerEmail,
       createdBy,
+      companyId: user?.companyId || req.body.companyId || null,
       tenantId,
     });
 
@@ -257,29 +258,30 @@ for (const email of managerEmails) {
   autoApproveIfNoAction(booking.bookingId);
 }
     // Include vehicle info
-    const includeArray = [];
+    const includeArray: any[] = [];
     if (vehicleId) {
       includeArray.push({
         model: Vehicle,
-        include: [{ model: VehicleType }],
+        required: false,
+        include: [{ model: VehicleType, required: false }],
       });
-    } else {
-      includeArray.push({ model: VehicleType });
+    } else if (vehicleTypeId) {
+      includeArray.push({ model: VehicleType, required: false });
     }
 
-    const bookingWithDetails = await Booking.findByPk(booking.bookingId, {
+    const bookingWithDetails = (await Booking.findByPk(booking.bookingId, {
       include: includeArray,
-    });
+    })) || booking;
 //console.log("copamnyyy ",bookingWithDetails?.user?.company?.needEmail);
 
- let needEmail = false;
+ let needEmail = true;
 
     if (user?.companyId) {
       const company = await Company.findByPk(
         user.companyId,
         { attributes: ["needEmail"] }
       );
-      needEmail = company?.needEmail === true;
+      needEmail = company ? company.needEmail !== false : true;
     }
    // console.log("need ",needEmail);
  const pickupMoment = booking && booking.bookingDate
@@ -588,29 +590,30 @@ for (const email of managerEmails) {
   autoApproveIfNoAction(booking.bookingId);
 }
     // Include vehicle info
-    const includeArray = [];
+    const includeArray: any[] = [];
     if (vehicleId) {
       includeArray.push({
         model: Vehicle,
-        include: [{ model: VehicleType }],
+        required: false,
+        include: [{ model: VehicleType, required: false }],
       });
-    } else {
-      includeArray.push({ model: VehicleType });
+    } else if (vehicleTypeId) {
+      includeArray.push({ model: VehicleType, required: false });
     }
 
-    const bookingWithDetails = await Booking.findByPk(booking.bookingId, {
+    const bookingWithDetails = (await Booking.findByPk(booking.bookingId, {
       include: includeArray,
-    });
+    })) || booking;
 //console.log("copamnyyy ",bookingWithDetails?.user?.company?.needEmail);
 
- let needEmail = false;
+ let needEmail = true;
 
     if (user?.companyId) {
       const company = await Company.findByPk(
         user.companyId,
         { attributes: ["needEmail"] }
       );
-      needEmail = company?.needEmail === true;
+      needEmail = company ? company.needEmail !== false : true;
     }
    // console.log("need ",needEmail);
  const pickupMoment = booking && booking.bookingDate
@@ -833,19 +836,20 @@ const formattedPickupDateForEmail = moment(dateTimeString, "YYYY-MM-DD HH:mm:ss"
 
 
     // --- Include Vehicle / VehicleType ---
-    const includeArray = [];
+    const includeArray: any[] = [];
     if (vehicleId) {
       includeArray.push({
         model: Vehicle,
-        include: [{ model: VehicleType }],
+        required: false,
+        include: [{ model: VehicleType, required: false }],
       });
-    } else {
-      includeArray.push({ model: VehicleType });
+    } else if (vehicleTypeId) {
+      includeArray.push({ model: VehicleType, required: false });
     }
 
-const bookingWithDetails = await Booking.findByPk(booking.bookingId, {
-  include: includeArray,
-});
+    const bookingWithDetails = (await Booking.findByPk(booking.bookingId, {
+      include: includeArray,
+    })) || booking;
 
 try {
   const getVendor = await VehicleMaster.findOne({
@@ -886,14 +890,14 @@ try {
     // 📧 Send Email to User
     // -----------------------------
     
- let needEmail = false;
+ let needEmail = true;
 
     if (user?.companyId) {
       const company = await Company.findByPk(
         user.companyId,
         { attributes: ["needEmail"] }
       );
-      needEmail = company?.needEmail === true;
+      needEmail = company ? company.needEmail !== false : true;
     }
 //      if(needEmail)
 //           {
@@ -947,7 +951,7 @@ else {
 }
 
     // 🔹 Get email template code dynamically
-const bookingWithVehicle = await Booking.findByPk(booking.bookingId);
+const bookingWithVehicle = (await Booking.findByPk(booking.bookingId)) || booking;
 
 //sms block
 
@@ -1136,13 +1140,13 @@ export const getAllPendingBooking = async (req: Request, res: Response) => {
         {
           model: User,
           as: "user",
-          required: true,
-           attributes: ["userId", "username", "mobile"], 
+          required: false,
+          attributes: ["userId", "username", "mobile"], 
           include: [
             {
               model: Company,
               as: "company",
-              required: true,
+              required: false,
               attributes: ["companyId", "managerApproval", "companyName"]
             }
           ]
@@ -1151,26 +1155,11 @@ export const getAllPendingBooking = async (req: Request, res: Response) => {
       order: [["createdAt", "DESC"]]
     });
 
-    // Filtering based on company approval
-// Filtering based on company approval 
-// Filtering based on company approval 
-    // Filtering based on company approval 
-const filteredBookings = bookings.filter((booking: any) => {
-  const company = booking?.user?.company;
-  if (!company) return false;
-
-  const confirmStatus = Number(booking.confirmStatus);
-  const bookingStatus = Number(booking.bookingStatus);
-
-  // Company requires manager approval
-  if (company.managerApproval) {
-    // Only after manager approval (0,1)
-    return confirmStatus === 0 && bookingStatus === 1;
-  } else {
-    // No manager approval required → vendor pending (0,0)
-    return confirmStatus === 0 && bookingStatus === 0;
-  }
-});
+    // All pending confirmation bookings
+    const filteredBookings = bookings.filter((booking: any) => {
+      const confirmStatus = Number(booking.confirmStatus);
+      return confirmStatus === 0;
+    });
 
 
     // Format response
@@ -1309,13 +1298,7 @@ export const createCompany = async (req: any, res: Response) => {
     }
 
     //  normalize/split and store as array
-    const managerEmails: string[] = normalizeManagerEmails(managerEmail);
-
-    if (!managerEmails.length) {
-      return res
-        .status(400)
-        .json({ message: "Please provide at least one manager email." });
-    }
+    const managerEmails: string[] = managerEmail ? normalizeManagerEmails(managerEmail) : [];
 
     const finalSeoUrl = await generateUniqueCompanySlug(seoUrl || companyName || "company");
 
@@ -1342,31 +1325,33 @@ export const createCompany = async (req: any, res: Response) => {
       employeeId: resolvedEmployeeId,
       companyLogo,
       domainName,
-      managerEmail: managerEmails.join(', '), // stored as array/JSON column
+      managerEmail: managerEmails.length ? managerEmails.join(', ') : '', // stored as array/JSON column
       seoUrl: finalSeoUrl,
       gstNo,
       allowTax,
-      needEmail,
+      needEmail: req.body.needEmail !== undefined ? (req.body.needEmail === 'true' || req.body.needEmail === true) : true,
       userId: resolvedUserId,
       startTime,
       closeTime,
       companyCode,
       priorMinutes,
       companyAddress, 
-      managerApproval,
+      managerApproval: false,
       tenantId,
       isDeleted: 0,
       createdAt: new Date()
     });
 
+    if (managerEmails.length > 0) {
       await User.update(
-      { companyManager: 1, isManager: 1 },
-      {
-        where: {
-          email: managerEmails
+        { companyManager: 1, isManager: 1 },
+        {
+          where: {
+            email: managerEmails
+          }
         }
-      }
-    ); 
+      );
+    } 
 
     return res
       .status(201)
@@ -1477,20 +1462,23 @@ export const confirmPendingOrderCountWeb = async (req: any, res: Response) => {
         : { tenantId };
 
     const bookings = await Booking.findAll({
-      where: { ...tenantCondition },
+      where: {
+        confirmStatus: '0',
+        ...tenantCondition
+      },
       include: [
         { model: Vehicle, required: false },
         { model: VehicleType, required: false },
         {
           model: User,
           as: "user",
-          required: true,
+          required: false,
           include: [
             {
               model: Company,
               as: "company",
-              required: true,
-              attributes: ["companyId", "managerApproval"]
+              required: false,
+              attributes: ["companyId", "managerApproval", "companyName"]
             }
           ]
         }
@@ -1498,21 +1486,9 @@ export const confirmPendingOrderCountWeb = async (req: any, res: Response) => {
       order: [['createdAt', 'DESC']]
     });
 
-    // 🔹 Apply same filtering logic as getAllPendingBooking
     const filteredBookings = bookings.filter((booking: any) => {
-      const company = booking?.user?.company;
-      if (!company) return false;
-
       const confirmStatus = Number(booking.confirmStatus);
-      const bookingStatus = Number(booking.bookingStatus);
-
-      if (company.managerApproval) {
-        // After manager approval → waiting for vendor approval
-        return confirmStatus === 0 && bookingStatus === 1;
-      } else {
-        // No manager approval → directly vendor pending
-        return confirmStatus === 0 && bookingStatus === 0;
-      }
+      return confirmStatus === 0;
     });
 
     const count = filteredBookings.length;
@@ -1927,14 +1903,14 @@ export const confirmBookingByManager = async (req: any, res: Response) => {
           console.error("Notification send error:", error);
         }
         //send mail 
-        let needEmail = false;
+        let needEmail = true;
 
 if (userDetail?.companyId) {
   const company = await Company.findByPk(
    userDetail?.companyId,
     { attributes: ["needEmail"] }
   );
-  needEmail = company?.needEmail === true;
+  needEmail = company ? company.needEmail !== false : true;
 }
 
 console.log("cancel needEmail:", needEmail);
@@ -2437,10 +2413,6 @@ async function sendSMSForDanManager(
     console.log("manageremail ",managerMobile);
        const bookingUser = await User.findByPk(booking.userId);
     console.log("user name in send sms ",bookingUser?.username);
-    const apiKey = process.env.TWO_FACTOR_API_KEY;
-    const senderId = process.env.TWO_FACTOR_SENDER_ID;
-
-    if (!apiKey || !senderId) return;
     const shortDropPoint = sanitizeDltLocationString(booking.dropPoint || '');
     const shortPickup = sanitizeDltLocationString(booking.pickupArea || '');
 
@@ -2456,9 +2428,10 @@ async function sendSMSForDanManager(
         shortPickup,
         shortDropPoint,
       ],
-      message: `Grace Cabs Alert: Booking ${booking.bookingCode} for ${bookingUser?.username || 'Customer'}. Pickup: ${shortPickup}, Drop: ${shortDropPoint}.`,
+      message: `FleetFlow Alert: Booking ${booking.bookingCode} for ${bookingUser?.username || 'Customer'}. Pickup: ${shortPickup}, Drop: ${shortDropPoint}.`,
       referenceEntity: 'BOOKING',
       referenceId: String(booking.bookingId || booking.id || ''),
+      tenantId: booking.tenantId || undefined,
     });
 
   } catch (err: any) {
@@ -2552,9 +2525,6 @@ export const rejectBookingByManager = async (req: any, res: Response) => {
 
       console.log("user in cancel booking:  ",user);
       if(user?.mobile){
-              const apiKey =  process.env.TWO_FACTOR_API_KEY;
-        const senderId =  process.env.TWO_FACTOR_SENDER_ID;
-        const templateName = "ManagerCancelBooking";
         const shortDropPoint = sanitizeDltLocationString(booking.dropPoint || '');
         const shortPickup = sanitizeDltLocationString(booking.pickupArea || '');
 
@@ -2568,9 +2538,10 @@ export const rejectBookingByManager = async (req: any, res: Response) => {
             shortPickup,
             shortDropPoint,
           ],
-          message: `Grace Cabs: Booking ${booking.bookingCode} cancelled by manager. Pickup: ${shortPickup}, Drop: ${shortDropPoint}.`,
+          message: `FleetFlow: Booking ${booking.bookingCode} cancelled by manager. Pickup: ${shortPickup}, Drop: ${shortDropPoint}.`,
           referenceEntity: 'BOOKING',
           referenceId: String(booking.bookingId || booking.id || ''),
+          tenantId: booking.tenantId || undefined,
         });
       } else {
         console.log(" User mobile number not found");
@@ -2779,21 +2750,28 @@ async function sendBookingEmailToUserAuto(booking: any, userId: string) {
   }
 }
 
-async function sendBookingSMSToUser(user: any) {
+async function sendBookingSMSToUser(user: any, tenantId?: string) {
   try {
     if (!user?.mobile) {
       console.log("User mobile number not found for booking SMS");
       return;
     }
 
+    const phoneCheck = validateMobileRecipient(user.mobile);
+    if (!phoneCheck.valid) {
+      console.warn(`[sendBookingSMSToUser] Invalid user mobile: ${user.mobile} (${phoneCheck.error})`);
+      return;
+    }
+
     await dispatchAuditedSms({
-      recipient: user.mobile,
+      recipient: phoneCheck.normalizedPhone,
       templateCode: 'BOOKING_CREATED',
       templateName: 'Booking Creation',
       vars: [user.username || 'Valued Customer'],
-      message: `Grace Cabs: Hello ${user.username || 'Customer'}, your booking has been created successfully.`,
+      message: `FleetFlow: Hello ${user.username || 'Customer'}, your booking has been created successfully.`,
       referenceEntity: 'USER',
       referenceId: String(user.userId || ''),
+      tenantId: tenantId || user.tenantId || undefined,
     });
   } catch (err: any) {
     console.error("SMS send error in sendBookingSMSToUser:", err?.message);
