@@ -47,7 +47,7 @@ const Header: React.FC = () => {
   const fleetName = currentTenant?.displayName || currentTenant?.name || 'Fleet Mobility Portal';
   const fleetLogo = currentTenant?.brandingTokens?.logoUrl || currentTenant?.logoUrl;
   const getFleetInitials = (name?: string, code?: string) => {
-    if (code && code.trim().length > 0 && code !== 'FF' && code !== 'ALL') {
+    if (code && code.trim().length > 0 && code !== 'FF' && code !== 'CZ' && code !== 'ALL') {
       return code.trim().slice(0, 3).toUpperCase();
     }
     if (!name) return 'FL';
@@ -162,9 +162,9 @@ const Header: React.FC = () => {
               {fleetInitials}
             </div>
           )}
-          <span className="font-bold tracking-tight text-base sm:text-lg text-gray-900 truncate max-w-xs" title={isSuperAdmin ? 'FleetFlow SaaS' : fleetName}>
+          <span className="font-bold tracking-tight text-base sm:text-lg text-gray-900 truncate max-w-xs" title={isSuperAdmin ? 'CABZ SaaS' : fleetName}>
             {isSuperAdmin
-              ? 'FleetFlow SaaS'
+              ? 'CABZ SaaS'
               : fleetName}
           </span>
         </div>

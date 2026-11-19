@@ -65,6 +65,23 @@ type OutState = {
   minimumKmPerDay: NumMap;
 };
 
+export interface PublicVehicleItem {
+  vehicleMasterId?: string;
+  vehicleId?: string;
+  vehicleTypeId?: string;
+  vehicleModelName: string;
+  vehicleNumber?: string;
+  vehicleType: string;
+  seatCapacity: number;
+  vehicleImg?: any;
+}
+
+type PublicState = {
+  perKm: NumMap;
+  seatCapacity: NumMap;
+  isActive: Record<string, boolean>;
+};
+
 type PopupType = "confirm-delete";
 
 const safePkgs = (p: any) => {
@@ -99,7 +116,7 @@ const mergeVehicleTypes = (master: string[], record: string[]) => {
 const ListPackage: React.FC = () => {
   const [company, setCompany] = useState("");
   const [type, setType] = useState<
-    "Out Station" | "Local City Use" | "Monthly Bookings" | ""
+    "Out Station" | "Local City Use" | "Monthly Bookings" | "Public Booking" | ""
   >("");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [records, setRecords] = useState<PackageDataItem[]>([]);
@@ -128,6 +145,13 @@ const ListPackage: React.FC = () => {
     driverBattaPerDay: {},
     minimumKmPerDay: {},
   });
+
+  const [publicState, setPublicState] = useState<PublicState>({
+    perKm: {},
+    seatCapacity: {},
+    isActive: {},
+  });
+  const [publicVehicles, setPublicVehicles] = useState<PublicVehicleItem[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState<PopupType>("confirm-delete");
@@ -321,6 +345,50 @@ if (type === "Monthly Bookings") {
     extraHour,
   });
 }
+
+    if (type === "Public Booking") {
+      const perKm: any = {};
+      const isActive: any = {};
+      const loadedVehicles: PublicVehicleItem[] = [];
+
+      const rawVehicles = pkgs?.vehicles;
+      if (Array.isArray(rawVehicles)) {
+        rawVehicles.forEach((v: any) => {
+          const key = v.vehicleMasterId || v.vehicleId || v.vehicleModelName || v.vehicleType;
+          perKm[key] = Number(v.perKm ?? v.amountPerKm ?? 0);
+          isActive[key] = v.isActive !== false;
+          loadedVehicles.push({
+            vehicleMasterId: v.vehicleMasterId,
+            vehicleId: v.vehicleId,
+            vehicleTypeId: v.vehicleTypeId,
+            vehicleModelName: v.vehicleModelName || v.vehicleType,
+            vehicleNumber: v.vehicleNumber || "",
+            vehicleType: v.vehicleType || "Cab",
+            seatCapacity: Number(v.seatCapacity || 4),
+            vehicleImg: v.vehicleImg,
+          });
+        });
+      } else if (rawVehicles && typeof rawVehicles === "object") {
+        Object.entries(rawVehicles).forEach(([k, v]: [string, any]) => {
+          const key = v.vehicleMasterId || v.vehicleId || v.vehicleModelName || k;
+          perKm[key] = Number(v.perKm ?? v.amountPerKm ?? 0);
+          isActive[key] = v.isActive !== false;
+          loadedVehicles.push({
+            vehicleMasterId: v.vehicleMasterId,
+            vehicleId: v.vehicleId,
+            vehicleTypeId: v.vehicleTypeId,
+            vehicleModelName: v.vehicleModelName || k,
+            vehicleNumber: v.vehicleNumber || "",
+            vehicleType: v.vehicleType || k,
+            seatCapacity: Number(v.seatCapacity || 4),
+            vehicleImg: v.vehicleImg,
+          });
+        });
+      }
+
+      setPublicVehicles(loadedVehicles);
+      setPublicState({ perKm, seatCapacity: {}, isActive });
+    }
   };
 
   // ✅ Monthly dynamic add/remove helpers
@@ -381,7 +449,7 @@ const handleRemoveMonthlyRow = (pkgId: string) => {
     try {
       const master = await fetchMasterVehicleTypes();
       const res = await axiosInstance.get("/packageData/getAllPackageData", {
-        params: { companyId: company, packageType: type },
+        params: { companyId: company, packageType: type === "Public Booking" ? "PUBLIC_BOOKING" : type },
       });
 
       const list: PackageDataItem[] = (res.data?.data || []).filter(
@@ -460,6 +528,25 @@ const handleRemoveMonthlyRow = (pkgId: string) => {
       return { packageDefinitions, vehicles };
     }
 
+    if (type === "Public Booking") {
+      const vehiclesPayload: any[] = [];
+      publicVehicles.forEach((v) => {
+        const key = v.vehicleMasterId || v.vehicleId || v.vehicleModelName || v.vehicleType;
+        vehiclesPayload.push({
+          vehicleMasterId: v.vehicleMasterId || null,
+          vehicleId: v.vehicleId || null,
+          vehicleTypeId: v.vehicleTypeId || null,
+          vehicleModelName: v.vehicleModelName,
+          vehicleNumber: v.vehicleNumber || "",
+          vehicleType: v.vehicleType,
+          seatCapacity: v.seatCapacity, // Authoritative READ-ONLY seat capacity
+          perKm: Number(publicState.perKm?.[key] ?? 0),
+          isActive: publicState.isActive?.[key] !== false,
+        });
+      });
+      return { vehicles: vehiclesPayload };
+    }
+
     const vehicles: any = {};
     vehicleTypes.forEach((v) => {
       vehicles[v] = {
@@ -478,7 +565,7 @@ const handleRemoveMonthlyRow = (pkgId: string) => {
     try {
       const payload = {
         companyId: company,
-        packageType: type,
+        packageType: type === "Public Booking" ? "PUBLIC_BOOKING" : type,
         packages: buildPayload(),
       };
 
@@ -579,6 +666,16 @@ const handleRemoveMonthlyRow = (pkgId: string) => {
                     disabled={loading}
                   />
                   <span className="ml-2">Monthly Bookings</span>
+                </label>
+
+                <label>
+                  <input
+                    type="radio"
+                    checked={type === "Public Booking"}
+                    onChange={() => setType("Public Booking")}
+                    disabled={loading}
+                  />
+                  <span className="ml-2 font-semibold text-blue-700">Public Booking</span>
                 </label>
               </div>
             </div>
@@ -975,6 +1072,102 @@ const handleRemoveMonthlyRow = (pkgId: string) => {
                   </tr>
                 </tbody>
               </table>
+            )}
+
+            {/* ✅ PUBLIC BOOKING */}
+            {type === "Public Booking" && (
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-gray-200 mb-4 gap-2">
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>
+                      Public Booking Packages (Per-KM Rate)
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Per-kilometre rates applied on public customer ride bookings based on actual fleet vehicle records.
+                    </p>
+                  </div>
+                  <span className="text-xs px-2.5 py-1 bg-blue-50 text-blue-700 font-semibold rounded-full border border-blue-200 self-start">
+                    {publicVehicles.length} Registered {publicVehicles.length === 1 ? 'Vehicle' : 'Vehicles'}
+                  </span>
+                </div>
+
+                <table className="border min-w-[700px] text-center w-full">
+                  <thead>
+                    <tr className="bg-gray-100 text-gray-700 text-sm">
+                      <th className="border px-4 py-3 text-left">Vehicle Model & Registration</th>
+                      <th className="border px-4 py-3 text-left">Vehicle Type</th>
+                      <th className="border px-4 py-3 w-40">Seat Capacity</th>
+                      <th className="border px-4 py-3 w-52">Per KM Rate (₹)</th>
+                      <th className="border px-4 py-3 w-36">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {publicVehicles.map((v) => {
+                      const key = v.vehicleMasterId || v.vehicleId || v.vehicleModelName || v.vehicleType;
+                      return (
+                        <tr key={key} className="hover:bg-gray-50 text-sm">
+                          <td className="border px-4 py-3 font-semibold text-gray-800 text-left">
+                            <div className="font-bold text-gray-900">{v.vehicleModelName}</div>
+                            {v.vehicleNumber && (
+                              <div className="text-xs text-gray-500 font-mono mt-0.5">{v.vehicleNumber}</div>
+                            )}
+                          </td>
+                          <td className="border px-4 py-3 text-left">
+                            <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-xs font-semibold">
+                              {v.vehicleType}
+                            </span>
+                          </td>
+                          <td className="border px-4 py-3">
+                            {/* READ-ONLY AUTHORITATIVE SEAT CAPACITY */}
+                            <span className="inline-flex items-center px-3 py-1 bg-gray-100 border border-gray-300 rounded-md font-bold text-gray-800 text-sm">
+                              {v.seatCapacity} Seats
+                            </span>
+                          </td>
+                          <td className="border px-4 py-3">
+                            <div className="flex items-center justify-center gap-1">
+                              <span className="text-gray-500 font-bold">₹</span>
+                              <input
+                                type="number"
+                                min="1"
+                                step="0.5"
+                                value={publicState.perKm?.[key] ?? 0}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value) || 0;
+                                  setPublicState((prev) => ({
+                                    ...prev,
+                                    perKm: { ...prev.perKm, [key]: val },
+                                  }));
+                                }}
+                                className="w-24 border border-gray-300 rounded px-2 py-1 text-center font-bold text-gray-800 bg-white"
+                              />
+                              <span className="text-xs text-gray-500">/ KM</span>
+                            </div>
+                          </td>
+                          <td className="border px-4 py-3">
+                            <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={publicState.isActive?.[key] !== false}
+                                onChange={(e) => {
+                                  setPublicState((prev) => ({
+                                    ...prev,
+                                    isActive: { ...prev.isActive, [key]: e.target.checked },
+                                  }));
+                                }}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                              />
+                              <span className={`text-xs font-semibold ${publicState.isActive?.[key] !== false ? "text-green-700" : "text-gray-400"}`}>
+                                {publicState.isActive?.[key] !== false ? "Active" : "Disabled"}
+                              </span>
+                            </label>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </>
             )}
 
             <div className="flex items-center justify-end gap-2 mt-4">

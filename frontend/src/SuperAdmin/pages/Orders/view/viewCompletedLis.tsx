@@ -1031,6 +1031,24 @@ const ViewCompletedList: React.FC = () => {
 
   const BASE_URL = config.baseurl.apibaseurl;
 
+  const isPublicBooking =
+    (orderData as any)?.bookingCreatedBy === "PUBLIC_BOOKING" ||
+    (orderData as any)?.preferredType === "PUBLIC_BOOKING" ||
+    (orderData?.pickupPoint && orderData.pickupPoint.toLowerCase().includes("public")) ||
+    (orderData as any)?.behalfOfName ||
+    ((orderData as any)?.notes && typeof (orderData as any).notes === "string" && (orderData as any).notes.includes("PUBLIC_BOOKING"));
+
+  const packageSnapshot = useMemo(() => {
+    try {
+      const n = (orderData as any)?.notes;
+      if (!n) return null;
+      const parsed = typeof n === "string" ? JSON.parse(n) : n;
+      return parsed?.packageSnapshot || null;
+    } catch {
+      return null;
+    }
+  }, [orderData]);
+
   const formatDateTime = (isoString: string | null | undefined) => {
     if (!isoString) return "-";
     const date = new Date(isoString);
@@ -1349,7 +1367,14 @@ const ViewCompletedList: React.FC = () => {
         {/* Order + User */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div className="border p-4 rounded">
-            <h2 className="font-semibold text-orange-600 border-b pb-2 mb-3">📝 Order Details</h2>
+            <div className="flex items-center justify-between border-b pb-2 mb-3">
+              <h2 className="font-semibold text-orange-600">📝 Order Details</h2>
+              {isPublicBooking && (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                  PUBLIC BOOKING
+                </span>
+              )}
+            </div>
             <p><b>Order Number:</b> {orderData?.bookingCode || "-"}</p>
             <p><b>Order Date:</b> {orderData?.bookingDate ? new Date(orderData.bookingDate).toLocaleString() : "-"}</p>
             <p><b>Payment Mode:</b> {payment?.paymentMode || "-"}</p>
@@ -1357,12 +1382,29 @@ const ViewCompletedList: React.FC = () => {
           </div>
 
           <div className="border p-4 rounded">
-            <h2 className="font-semibold text-orange-600 border-b pb-2 mb-3">👤 User Details</h2>
-            <p><b>Company Name:</b> {orderData?.user?.company?.companyName || "-"}</p>
-            <p><b>User Name:</b> {orderData?.user?.username || "-"}</p>
-            <p><b>Email Address:</b> {orderData?.user?.email || "-"}</p>
-            <p><b>Phone Number:</b> {orderData?.user?.mobile || "-"}</p>
-            <p><b>Address:</b> {orderData?.user?.userAddress || "-"}</p>
+            <h2 className="font-semibold text-orange-600 border-b pb-2 mb-3">
+              {isPublicBooking ? "👤 Passenger / Customer Details" : "👤 User Details"}
+            </h2>
+            {isPublicBooking && (
+              <div className="flex items-center gap-2 mb-1 text-sm">
+                <b>Fleet Name:</b>
+                {(orderData as any)?.tenant?.logo && (
+                  <img
+                    src={(orderData as any).tenant.logo}
+                    alt="Fleet Logo"
+                    className="h-6 w-auto max-w-[80px] object-contain rounded inline-block"
+                  />
+                )}
+                <span>{(orderData as any)?.tenant?.name || "-"}</span>
+              </div>
+            )}
+            <p><b>Company Name:</b> {orderData?.user?.company?.companyName || (orderData as any)?.company?.companyName || packageSnapshot?.companyName || "-"}</p>
+            <p><b>{isPublicBooking ? "Passenger Name:" : "User Name:"}</b> {orderData?.user?.username || (orderData as any)?.behalfOfName || packageSnapshot?.customerName || "-"}</p>
+            <p><b>Email Address:</b> {orderData?.user?.email || packageSnapshot?.customerEmail || "-"}</p>
+            <p><b>Phone Number:</b> {orderData?.user?.mobile || (orderData as any)?.behalfOfPhone || packageSnapshot?.customerPhone || "-"}</p>
+            {!isPublicBooking && (
+              <p><b>Address:</b> {orderData?.user?.userAddress || "-"}</p>
+            )}
           </div>
         </div>
 
@@ -1371,30 +1413,50 @@ const ViewCompletedList: React.FC = () => {
           <div className="border p-4 rounded">
             <h2 className="font-semibold text-orange-600 border-b pb-2 mb-3">📅 Booking Details</h2>
             <p><b>Pickup Date and Time:</b> {formatDateTime(invoice?.pickupDate || null)}</p>
-            <p><b>Pickup City:</b> {orderData?.pickupCity || "-"}</p>
-            <p><b>Pickup Area:</b> {orderData?.pickupArea || "-"}</p>
-            <p><b>Pickup Point:</b> {orderData?.pickupPoint || "-"}</p>
+            {!isPublicBooking && (
+              <>
+                <p><b>Pickup City:</b> {orderData?.pickupCity || "-"}</p>
+                <p><b>Pickup Area:</b> {orderData?.pickupArea || "-"}</p>
+              </>
+            )}
+            <p><b>{isPublicBooking ? "Pickup Location:" : "Pickup Point:"}</b> {orderData?.pickupPoint || "-"}</p>
+            <p><b>Drop Point:</b> {(orderData as any)?.dropPoint || orderData?.pickupPoint || "-"}</p>
+            <p><b>Travel Package:</b> {isPublicBooking ? "PUBLIC BOOKING" : (orderData?.pickupPoint || "-")}</p>
             <p><b>Vehicle Type:</b> {orderData?.vehicleType?.vehicleType || vm?.vehicleType || "-"}</p>
           </div>
 
           <div className="border p-4 rounded">
             <h2 className="font-semibold text-orange-600 border-b pb-2 mb-3">🚗 Package Details</h2>
-            <p><b>Package Name:</b> {invoice?.selectedPackageData?.label || "-"}</p>
-            <p><b>Kilo Meter:</b> {invoice?.selectedPackageData?.kms || "-"}</p>
-            <p><b>Hour(s):</b> {invoice?.selectedPackageData?.hours || "-"}</p>
-            <p><b>Plan Amount:</b> ₹{planAmount.toFixed(2)}</p>
-
-            {veh?.vehicleImg?.length ? (
-              <img
-                src={`${BASE_URL}/uploads/vehicleImg/${veh.vehicleImg[0]}`}
-                alt={veh?.vehicleName || "Vehicle"}
-                className="mt-3 w-52 h-40 object-cover rounded-md shadow-sm"
-              />
+            {isPublicBooking ? (
+              <>
+                <p><b>Package Name:</b> PUBLIC BOOKING</p>
+                <p><b>Agreed Rate / KM:</b> {packageSnapshot?.amountPerKm || packageSnapshot?.perKmRate || packageSnapshot?.perKmAmount || (orderData as any)?.ratePerKm ? `₹${packageSnapshot?.amountPerKm || packageSnapshot?.perKmRate || packageSnapshot?.perKmAmount || (orderData as any)?.ratePerKm}/km` : "-"}</p>
+                <p><b>Actual Billable KM:</b> {invoice?.garageKms || (invoice as any)?.guestKms || "-"} KM</p>
+                <p><b>Package Amount:</b> ₹{Number(invoice?.packageAmount || (isPublicBooking ? ((Number(invoice?.garageKms || (invoice as any)?.guestKms || 0)) * Number(packageSnapshot?.amountPerKm || packageSnapshot?.perKmRate || (invoice?.selectedPackageData as any)?.amount || 0)) : planAmount) || 0).toFixed(2)}</p>
+              </>
             ) : (
-              <div className="mt-3 rounded border w-52 h-40 bg-gray-200 flex items-center justify-center text-gray-500">
-                No Image
-              </div>
+              <>
+                <p><b>Package Name:</b> {invoice?.selectedPackageData?.label || "-"}</p>
+                <p><b>Kilo Meter:</b> {invoice?.selectedPackageData?.kms || "-"}</p>
+                <p><b>Hour(s):</b> {invoice?.selectedPackageData?.hours || "-"}</p>
+                <p><b>Plan Amount:</b> ₹{planAmount.toFixed(2)}</p>
+              </>
             )}
+
+            <img
+              src={
+                veh?.vehicleImg?.length
+                  ? (veh.vehicleImg[0].startsWith("http")
+                      ? veh.vehicleImg[0]
+                      : `${BASE_URL}/uploads/vehicleImg/${veh.vehicleImg[0]}`)
+                  : "/images/default_car.svg"
+              }
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "/images/default_car.svg";
+              }}
+              alt={veh?.vehicleName || "Vehicle"}
+              className="mt-3 w-52 h-40 object-cover rounded-md shadow-sm border border-gray-100"
+            />
           </div>
         </div>
 

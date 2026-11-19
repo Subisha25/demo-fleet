@@ -1,5 +1,5 @@
 // src/SuperAdmin/pages/Orders/ViewClosePendingOrder.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axiosInstance from "../../../../utils/axiosInstance";
 import PageLayout from "../../../../components/PageLayout";
@@ -53,6 +53,26 @@ const dropdownRef = useRef<HTMLDivElement | null>(null);
 const [selectedVehicleLabel, setSelectedVehicleLabel] = useState(""); // show text in input
 
   const navigate = useNavigate();
+
+  const isPublicBooking = Boolean(
+    order && (
+      order?.bookingCreatedBy === "PUBLIC_BOOKING" ||
+      order?.preferredType === "PUBLIC_BOOKING" ||
+      order?.remarks?.toLowerCase().includes("public") ||
+      !order?.userId
+    )
+  );
+
+  const publicNotesSnapshot = useMemo(() => {
+    try {
+      const raw = order?.notes;
+      if (!raw) return null;
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      return parsed?.packageSnapshot || null;
+    } catch {
+      return null;
+    }
+  }, [order]);
 
   // ✅ Fetch order details
   const fetchOrder = async (id: string) => {
@@ -272,89 +292,209 @@ const handleConfirm = async () => {
           </button>
         </div>
 
-        {/* Order + User */}
-        <div className="grid md:grid-cols-2 gap-6 mb-6">
-          <div>
-            <h3 className="text-lg font-semibold mb-2 border-b pb-1 flex items-center gap-2">
-              <FontAwesomeIcon icon={faFileInvoice} className="text-blue-600" />
-              Order Details
-            </h3>
-            <p><strong>Order Number:</strong> #{order.bookingCode}</p>
-            <p><strong>Order Date:</strong> {new Date(order.bookingDate).toLocaleDateString()}</p>
-            <p>
-              <strong>Status:</strong>{" "}
-              {order.confirmStatus === "0" ? (
-                <span className="text-red-600 font-medium">Pending</span>
-              ) : (
-                <span className="text-green-600 font-medium">Not Paid</span>
-              )}
-            </p>
-          </div>
+        {isPublicBooking ? (
+          <>
+            {/* Public Booking: Order + User */}
+            <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div className="p-4 border rounded-xl shadow-xs bg-white">
+                <h3 className="text-lg font-semibold mb-3 border-b pb-1 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faFileInvoice} className="text-blue-600" />
+                  Order Details
+                </h3>
+                <div className="space-y-1.5 text-sm">
+                  <p><strong>Booking Number:</strong> #{order.bookingCode}</p>
+                  <p><strong>Booking Date:</strong> {new Date(order.bookingDate).toLocaleDateString()}</p>
+                  <p>
+                    <strong>Booking Type:</strong>{" "}
+                    <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-purple-100 text-purple-800 border border-purple-200">
+                      PUBLIC BOOKING
+                    </span>
+                  </p>
+                  <p>
+                    <strong>Status:</strong>{" "}
+                    {order.confirmStatus === "0" ? (
+                      <span className="text-amber-600 font-semibold">Pending Confirmation</span>
+                    ) : (
+                      <span className="text-green-600 font-semibold">Confirmed</span>
+                    )}
+                  </p>
+                </div>
+              </div>
 
-          <div>
-            <h3 className="text-lg font-semibold mb-2 border-b pb-1 flex items-center gap-2">
-              <FontAwesomeIcon icon={faUser} className="text-purple-600" />
-              User Details
-            </h3>
-            <p><strong>Company Name:</strong> {order.user?.company?.companyName}</p>
-            <p><strong>User Name:</strong> {order.user?.username}</p>
-            <p><strong>Email:</strong> {order.user?.email}</p>
-            <p><strong>Phone:</strong> {order.user?.mobile}</p>
-          </div>
-        </div>
+              <div className="p-4 border rounded-xl shadow-xs bg-white">
+                <h3 className="text-lg font-semibold mb-3 border-b pb-1 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faUser} className="text-purple-600" />
+                  Company & Passenger Details
+                </h3>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex items-center gap-2">
+                    <strong>Fleet Name:</strong>
+                    {order.tenant?.logo && (
+                      <img
+                        src={order.tenant.logo}
+                        alt="Fleet Logo"
+                        className="h-6 w-auto max-w-[80px] object-contain rounded inline-block"
+                      />
+                    )}
+                    <span>{order.tenant?.name || "Fleet Operations"}</span>
+                  </div>
+                  <p><strong>Company Name:</strong> {order.company?.companyName || order.user?.company?.companyName || publicNotesSnapshot?.companyName || "-"}</p>
+                  <p><strong>Passenger Name:</strong> {order.user?.username || order.behalfOfName || publicNotesSnapshot?.customerName || "-"}</p>
+                  <p><strong>Email:</strong> {order.user?.email || publicNotesSnapshot?.customerEmail || "-"}</p>
+                  <p><strong>Phone:</strong> {order.user?.mobile || order.behalfOfPhone || "-"}</p>
+                </div>
+              </div>
+            </div>
 
-{/* Booking + Vehicle */}
-<div className="grid md:grid-cols-2 gap-6 mb-6">
-  <div>
-    <h3 className="text-lg font-semibold mb-2 border-b pb-1 flex items-center gap-2">
-      <FontAwesomeIcon icon={faCalendarAlt} className="text-green-600" />
-      Booking Details
-    </h3>
+            {/* Public Booking: Booking + Vehicle */}
+            <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div className="p-4 border rounded-xl shadow-xs bg-white">
+                <h3 className="text-lg font-semibold mb-3 border-b pb-1 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faCalendarAlt} className="text-green-600" />
+                  Booking & Route Details
+                </h3>
+                <div className="space-y-1.5 text-sm">
+                  <p>
+                    <strong>Travel Package:</strong>{" "}
+                    <span className="font-bold text-purple-700">PUBLIC BOOKING</span>
+                  </p>
+                  <p><strong>Pickup Location:</strong> {order.pickupPoint || "-"}</p>
+                  <p><strong>Drop Location:</strong> {order.dropPoint || "-"}</p>
+                  <p>
+                    <strong>Pickup Date & Time:</strong>{" "}
+                    {new Date(order.bookingDate).toLocaleDateString()} {order.bookingTime || ""}
+                  </p>
+                  <p><strong>Passenger Count:</strong> {order.travellersCount || 1} Passengers</p>
+                  <p>
+                    <strong>Agreed Per KM Rate:</strong>{" "}
+                    <span className="font-bold text-emerald-700">
+                      ₹{publicNotesSnapshot?.amountPerKm ?? publicNotesSnapshot?.perKmRate ?? order.ratePerKm ?? 0} / km
+                    </span>
+                  </p>
+                </div>
+              </div>
 
-    <p><strong>Travel Package:</strong> {order.pickupPoint || "-"}</p>
-    <p><strong>Pickup City:</strong> {order.pickupCity || "-"}</p>
-    <p><strong>Pickup Point:</strong> {order.pickupArea || "-"}</p>
-    <p><strong>Drop Point:</strong> {order.dropPoint || "-"}</p>
+              <div className="p-4 border rounded-xl shadow-xs bg-white">
+                <h3 className="text-lg font-semibold mb-3 border-b pb-1 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faCar} className="text-orange-600" />
+                  Vehicle Details
+                </h3>
+                <div className="space-y-1.5 text-sm">
+                  <p>
+                    <strong>Model:</strong>{" "}
+                    {order?.vehicleMaster?.vehicleModelName ||
+                      order?.vehicleMaster?.vehicle?.vehicleName ||
+                      order?.vehicle?.vehicleName ||
+                      "-"}
+                  </p>
+                  <p>
+                    <strong>Type:</strong>{" "}
+                    {order?.vehicleMaster?.vehicleType || order?.vehicleType?.vehicleType || "-"}
+                  </p>
+                  <p>
+                    <strong>Number:</strong> {order?.vehicleMaster?.vehicleNumber || "-"}
+                  </p>
+                  <p>
+                    <strong>Seat Capacity:</strong>{" "}
+                    <span className="font-bold text-blue-700">
+                      {order?.vehicleType?.seatCapacity || order?.vehicleMaster?.vehicleTypes?.seatCapacity || 4} Seats
+                    </span>
+                  </p>
+                  <p>
+                    <strong>Owner:</strong>{" "}
+                    {order?.vehicleMaster?.vendor?.vendorName ||
+                      order?.vehicleMaster?.vendorName ||
+                      "-"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Regular Order + User */}
+            <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-2 border-b pb-1 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faFileInvoice} className="text-blue-600" />
+                  Order Details
+                </h3>
+                <p><strong>Order Number:</strong> #{order.bookingCode}</p>
+                <p><strong>Order Date:</strong> {new Date(order.bookingDate).toLocaleDateString()}</p>
+                <p>
+                  <strong>Status:</strong>{" "}
+                  {order.confirmStatus === "0" ? (
+                    <span className="text-red-600 font-medium">Pending</span>
+                  ) : (
+                    <span className="text-green-600 font-medium">Not Paid</span>
+                  )}
+                </p>
+              </div>
 
-    {/* ✅ FIXED: Vehicle Type path */}
-    <p>
-      <strong>Vehicle Type:</strong>{" "}
-      {order?.vehicleType?.vehicleType || order?.vehicleMaster?.vehicleType || "-"}
-    </p>
-  </div>
+              <div>
+                <h3 className="text-lg font-semibold mb-2 border-b pb-1 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faUser} className="text-purple-600" />
+                  User Details
+                </h3>
+                <p><strong>Company Name:</strong> {order.user?.company?.companyName}</p>
+                <p><strong>User Name:</strong> {order.user?.username}</p>
+                <p><strong>Email:</strong> {order.user?.email}</p>
+                <p><strong>Phone:</strong> {order.user?.mobile}</p>
+              </div>
+            </div>
 
-  <div>
-    <h3 className="text-lg font-semibold mb-2 border-b pb-1 flex items-center gap-2">
-      <FontAwesomeIcon icon={faCar} className="text-orange-600" />
-      Vehicle Details
-    </h3>
+            {/* Regular Booking + Vehicle */}
+            <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-2 border-b pb-1 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faCalendarAlt} className="text-green-600" />
+                  Booking Details
+                </h3>
 
-    {/* ✅ FIXED: vehicleMaster direct */}
-    <p>
-      <strong>Model:</strong>{" "}
-      {order?.vehicleMaster?.vehicleModelName ||
-        order?.vehicleMaster?.vehicle?.vehicleName ||
-        "-"}
-    </p>
+                <p><strong>Travel Package:</strong> {order.pickupPoint || "-"}</p>
+                <p><strong>Pickup City:</strong> {order.pickupCity || "-"}</p>
+                <p><strong>Pickup Point:</strong> {order.pickupArea || "-"}</p>
+                <p><strong>Drop Point:</strong> {order.dropPoint || "-"}</p>
 
-    <p>
-      <strong>Type:</strong>{" "}
-      {order?.vehicleMaster?.vehicleType || order?.vehicleType?.vehicleType || "-"}
-    </p>
+                <p>
+                  <strong>Vehicle Type:</strong>{" "}
+                  {order?.vehicleType?.vehicleType || order?.vehicleMaster?.vehicleType || "-"}
+                </p>
+              </div>
 
-    <p>
-      <strong>Number:</strong>{" "}
-      {order?.vehicleMaster?.vehicleNumber || "-"}
-    </p>
+              <div>
+                <h3 className="text-lg font-semibold mb-2 border-b pb-1 flex items-center gap-2">
+                  <FontAwesomeIcon icon={faCar} className="text-orange-600" />
+                  Vehicle Details
+                </h3>
 
-    <p>
-      <strong>Owner:</strong>{" "}
-      {order?.vehicleMaster?.vendor?.vendorName ||
-        order?.vehicleMaster?.vendorName ||
-        "-"}
-    </p>
-  </div>
-</div>
+                <p>
+                  <strong>Model:</strong>{" "}
+                  {order?.vehicleMaster?.vehicleModelName ||
+                    order?.vehicleMaster?.vehicle?.vehicleName ||
+                    "-"}
+                </p>
+
+                <p>
+                  <strong>Type:</strong>{" "}
+                  {order?.vehicleMaster?.vehicleType || order?.vehicleType?.vehicleType || "-"}
+                </p>
+
+                <p>
+                  <strong>Number:</strong>{" "}
+                  {order?.vehicleMaster?.vehicleNumber || "-"}
+                </p>
+
+                <p>
+                  <strong>Owner:</strong>{" "}
+                  {order?.vehicleMaster?.vendor?.vendorName ||
+                    order?.vehicleMaster?.vendorName ||
+                    "-"}
+                </p>
+              </div>
+            </div>
+          </>
+        )}
 
 
 

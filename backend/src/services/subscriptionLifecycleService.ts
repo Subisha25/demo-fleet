@@ -70,7 +70,7 @@ export async function runSubscriptionLifecycleEvaluation() {
           channel: 'EMAIL',
           recipient: recipientEmail,
           templateCode: 'SUBSCRIPTION_RENEWAL_REMINDER',
-          subject: `Reminder: Your FleetFlow Fleet Subscription Renews in ${Math.max(1, diffDays)} Days`,
+          subject: `Reminder: Your CABZ Fleet Subscription Renews in ${Math.max(1, diffDays)} Days`,
           body: `Dear Fleet Administrator,\n\nYour ${sub.planTier} fleet subscription for ${sub.tenant?.name || 'your fleet'} is scheduled to expire on ${end.toDateString()} (in ${Math.max(1, diffDays)} day(s)).\n\nPlan Tier: ${sub.planTier}\nBilling Cycle: ${(sub as any).billingCycle || 'MONTHLY'}\nAmount Due: ₹${(sub as any).agreedPrice || 349}\n\nPlease renew promptly to maintain uninterrupted dispatch operations, driver tracking, and billing services.\n\nRenew your plan online at: /billing/checkout`,
           referenceEntity: 'SUBSCRIPTION',
           referenceId: sub.subscriptionId,

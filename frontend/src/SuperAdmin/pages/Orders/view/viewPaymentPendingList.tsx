@@ -80,6 +80,7 @@ interface ClosePending {
   closependingId: string;
   pickupDate: string;
   garageKms: number;
+  guestKms?: number;
   usageHours:string;
   garageOpenDateTime: string;
   garageCloseDateTime: string;
@@ -262,6 +263,24 @@ const [deletingMonthly, setDeletingMonthly] = useState(false);
   }, [monthlyData]);
 
   const BASE_URL = config.baseurl.apibaseurl;
+
+  const isPublicBooking =
+    (booking as any)?.bookingCreatedBy === "PUBLIC_BOOKING" ||
+    (booking as any)?.preferredType === "PUBLIC_BOOKING" ||
+    (booking?.pickupPoint && booking.pickupPoint.toLowerCase().includes("public")) ||
+    (booking as any)?.behalfOfName ||
+    ((booking as any)?.notes && typeof (booking as any).notes === "string" && (booking as any).notes.includes("PUBLIC_BOOKING"));
+
+  const packageSnapshot = useMemo(() => {
+    try {
+      const n = (booking as any)?.notes;
+      if (!n) return null;
+      const parsed = typeof n === "string" ? JSON.parse(n) : n;
+      return parsed?.packageSnapshot || null;
+    } catch {
+      return null;
+    }
+  }, [booking]);
 
   // ---------------- Fetch ----------------
   useEffect(() => {
@@ -793,9 +812,16 @@ const tailRows = [
             {/* Order Details & User Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="border border-gray-300 rounded-lg p-4 space-y-2">
-                <div className="flex items-center text-xl font-semibold text-gray-800 mb-2">
-                  <FontAwesomeIcon icon={faReceipt} className="mr-2 text-purple-500" />
-                  <h2>Order Details</h2>
+                <div className="flex items-center justify-between text-xl font-semibold text-gray-800 mb-2">
+                  <div className="flex items-center">
+                    <FontAwesomeIcon icon={faReceipt} className="mr-2 text-purple-500" />
+                    <h2>Order Details</h2>
+                  </div>
+                  {isPublicBooking && (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                      PUBLIC BOOKING
+                    </span>
+                  )}
                 </div>
                 <div className="text-sm text-gray-700 space-y-1">
                   <p><span className="font-medium text-gray-800">Order Number:</span> {booking.bookingCode || "-"}</p>
@@ -814,14 +840,41 @@ const tailRows = [
               <div className="border border-gray-300 rounded-lg p-4 space-y-2">
                 <div className="flex items-center text-xl font-semibold text-gray-800 mb-2">
                   <FontAwesomeIcon icon={faUser} className="mr-2 text-blue-500" />
-                  <h2>User Details</h2>
+                  <h2>{isPublicBooking ? "Passenger / Customer Details" : "User Details"}</h2>
                 </div>
                 <div className="text-sm text-gray-700 space-y-1">
-                  <p><span className="font-medium text-gray-800">Company Name:</span> {booking.user?.company?.companyName || "-"}</p>
-                  <p><span className="font-medium text-gray-800">User Name:</span> {booking.user?.username || "-"}</p>
-                  <p><span className="font-medium text-gray-800">Email Address:</span> {booking.user?.email || "-"}</p>
-                  <p><span className="font-medium text-gray-800">Phone Number:</span> {booking.user?.mobile || "-"}</p>
-                  <p><span className="font-medium text-gray-800">Address:</span> {booking.user?.userAddress || "-"}</p>
+                  {isPublicBooking && (
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-800">Fleet Name:</span>
+                      {(booking as any)?.tenant?.logo && (
+                        <img
+                          src={(booking as any).tenant.logo}
+                          alt="Fleet Logo"
+                          className="h-6 w-auto max-w-[80px] object-contain rounded inline-block"
+                        />
+                      )}
+                      <span>{(booking as any)?.tenant?.name || "-"}</span>
+                    </div>
+                  )}
+                  <p>
+                    <span className="font-medium text-gray-800">Company Name:</span>{" "}
+                    {booking.user?.company?.companyName || (booking as any)?.company?.companyName || packageSnapshot?.companyName || "-"}
+                  </p>
+                  <p>
+                    <span className="font-medium text-gray-800">{isPublicBooking ? "Passenger Name:" : "User Name:"}</span>{" "}
+                    {booking.user?.username || (booking as any)?.behalfOfName || packageSnapshot?.customerName || "-"}
+                  </p>
+                  <p>
+                    <span className="font-medium text-gray-800">Email Address:</span>{" "}
+                    {booking.user?.email || packageSnapshot?.customerEmail || "-"}
+                  </p>
+                  <p>
+                    <span className="font-medium text-gray-800">Phone Number:</span>{" "}
+                    {booking.user?.mobile || (booking as any)?.behalfOfPhone || packageSnapshot?.customerPhone || "-"}
+                  </p>
+                  {!isPublicBooking && (
+                    <p><span className="font-medium text-gray-800">Address:</span> {booking.user?.userAddress || "-"}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -835,18 +888,28 @@ const tailRows = [
                 </div>
                 <div className="text-sm text-gray-700 space-y-1">
                   <p><span className="font-medium text-gray-800">Pickup Date and Time:</span> {formatToCustom(booking.bookingDate || "-")}</p>
-                  <p><span className="font-medium text-gray-800">Pickup City:</span> {booking.pickupCity || "-"}</p>
-                  <p><span className="font-medium text-gray-800">Pickup Point:</span> {booking.pickupArea || "-"}</p>
+                  {!isPublicBooking && (
+                    <>
+                      <p><span className="font-medium text-gray-800">Pickup City:</span> {booking.pickupCity || "-"}</p>
+                      <p><span className="font-medium text-gray-800">Pickup Point:</span> {booking.pickupArea || "-"}</p>
+                    </>
+                  )}
+                  <p><span className="font-medium text-gray-800">{isPublicBooking ? "Pickup Location:" : "Drop Point:"}</span> {booking.pickupPoint || "-"}</p>
                   <p><span className="font-medium text-gray-800">Drop Point:</span> {booking.dropPoint || "-"}</p>
-                  <p><span className="font-medium text-gray-800">Travel Package:</span> {booking.pickupPoint || "-"}</p>
+                  <p><span className="font-medium text-gray-800">Travel Package:</span> {isPublicBooking ? "PUBLIC BOOKING" : (booking.pickupPoint || "-")}</p>
 
-                  {/* ✅ FIXED */}
                   <p>
                     <span className="font-medium text-gray-800">Vehicle:</span>{" "}
                     {(booking.vehicleType?.vehicleType || vm?.vehicleType || "-")}
                     {" - "}
                     {(vm?.vehicleNumber || "-")}
                   </p>
+                  {isPublicBooking && (
+                    <p>
+                      <span className="font-medium text-gray-800">Driver:</span>{" "}
+                      {(booking as any)?.driver?.driverName || (booking.driver as any)?.driverName || "-"}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -857,24 +920,38 @@ const tailRows = [
                 </div>
 
                 <div className="flex items-center space-x-4">
-                  {/* ✅ FIXED IMAGE SOURCE */}
                   <img
                     src={
                       veh?.vehicleImg?.[0]
-                        ? `${BASE_URL}/uploads/vehicleImg/${veh.vehicleImg[0]}`
-                        : "https://via.placeholder.com/150"
+                        ? (veh.vehicleImg[0].startsWith("http")
+                            ? veh.vehicleImg[0]
+                            : `${BASE_URL}/uploads/vehicleImg/${veh.vehicleImg[0]}`)
+                        : "/images/default_car.svg"
                     }
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/images/default_car.svg";
+                    }}
                     alt={veh?.vehicleName || "Vehicle"}
-                    className="w-24 h-24 object-cover rounded-md shadow-sm"
+                    className="w-24 h-24 object-cover rounded-md shadow-sm border border-gray-100"
                   />
 
                   <div className="text-sm text-gray-700 space-y-1">
-                    <p><span className="font-medium text-gray-800">Vehicle Name:</span> {veh?.vehicleName || "-"}</p>
-                    <p><span className="font-medium text-gray-800">Kilo Meters:</span> {closePending?.garageKms || "-"} Km</p>
-                    <p><span className="font-medium text-gray-800">Hours:</span> {usageGarageDuration}</p>
-                    <p><span className="font-medium text-gray-800">Plan Amount:</span> ₹ {Number(closePending?.packageAmount || 0).toFixed(2)}</p>
-                    <p><span className="font-medium text-gray-800">Package :</span> {(closePending?.selectedPackageData as any)?.label || "-"}</p>
-                    <p><span className="font-medium text-gray-800">Package Type:</span> {(closePending?.selectedPackageData as any)?.packageType || "-"}</p>
+                    <p><span className="font-medium text-gray-800">Vehicle Name:</span> {veh?.vehicleName || vm?.vehicleModelName || "-"}</p>
+                    <p><span className="font-medium text-gray-800">Kilo Meters:</span> {closePending?.garageKms || closePending?.guestKms || "-"} Km</p>
+                    {isPublicBooking ? (
+                      <>
+                        <p><span className="font-medium text-gray-800">Agreed Rate / KM:</span> {packageSnapshot?.amountPerKm || packageSnapshot?.perKmRate || packageSnapshot?.perKmAmount || (booking as any)?.ratePerKm ? `₹${packageSnapshot?.amountPerKm || packageSnapshot?.perKmRate || packageSnapshot?.perKmAmount || (booking as any)?.ratePerKm}/km` : "-"}</p>
+                        <p><span className="font-medium text-gray-800">Package Amount:</span> ₹ {Number(closePending?.packageAmount || (isPublicBooking ? ((Number(closePending?.garageKms || closePending?.guestKms || 0)) * Number(packageSnapshot?.amountPerKm || packageSnapshot?.perKmRate || (closePending?.selectedPackageData as any)?.amount || 0)) : 0)).toFixed(2)}</p>
+                        <p><span className="font-medium text-gray-800">Package Type:</span> PUBLIC BOOKING</p>
+                      </>
+                    ) : (
+                      <>
+                        <p><span className="font-medium text-gray-800">Hours:</span> {usageGarageDuration}</p>
+                        <p><span className="font-medium text-gray-800">Plan Amount:</span> ₹ {Number(closePending?.packageAmount || 0).toFixed(2)}</p>
+                        <p><span className="font-medium text-gray-800">Package :</span> {(closePending?.selectedPackageData as any)?.label || "-"}</p>
+                        <p><span className="font-medium text-gray-800">Package Type:</span> {(closePending?.selectedPackageData as any)?.packageType || "-"}</p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -897,11 +974,13 @@ const tailRows = [
         rows.push({ label, value: n, sign, isBold });
       };
 
-      add("Package Amount", closePending.packageAmount, "+");
+      const pkgAmt = Number(closePending.packageAmount) || (isPublicBooking ? ((Number(closePending.garageKms || closePending.guestKms || 0)) * Number(packageSnapshot?.amountPerKm || packageSnapshot?.perKmRate || (closePending?.selectedPackageData as any)?.amount || 0)) : 0);
+      add("Package Amount", pkgAmt, "+");
       add("Extra Driver Beta", closePending.extraDriverBeta, "+");
       add("Additional Kms Amount", closePending.additionalKmsAmount, "+");
       add("Additional Hours Amount", closePending.additionalHoursAmount, "+");
-      add("Total Amount", closePending.totalAmount, "+", true);
+      const baseTotAmt = Number(closePending.totalAmount) || (pkgAmt + Number(closePending.additionalKmsAmount || 0) + Number(closePending.additionalHoursAmount || 0) + Number(closePending.extraDriverBeta || 0) + Number(closePending.extraCharges || 0) - Number(closePending.discountAmount || 0));
+      add("Total Amount", baseTotAmt, "+", true);
       add("Total Tax Amount", closePending.totalTaxAmount, "+");
 
       // ✅ Extra charges breakup (NO TOTAL ROW)

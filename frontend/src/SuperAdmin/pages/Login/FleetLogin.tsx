@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, Shield, MapPin, AlertCircle, ArrowLeft, Building2 } from 'lucide-react';
 import axiosInstance from '../../../utils/axiosInstance';
 import { useAuth } from '../../../context/AuthContext';
+import config from '../../../config/config';
 
 interface FleetPublicProfile {
   tenantId: string;
@@ -28,6 +29,17 @@ export default function FleetLogin() {
   const [fleet, setFleet] = useState<FleetPublicProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [logoError, setLogoError] = useState(false);
+
+  const resolveLogoUrl = (url?: string | null) => {
+    if (!url || typeof url !== 'string') return null;
+    const trimmed = url.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) return trimmed;
+    const base = (config?.baseurl?.apibaseurl || '').replace(/\/+$/, '');
+    const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    return `${base}${cleanPath}`;
+  };
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -52,7 +64,7 @@ export default function FleetLogin() {
         if (res.data?.success && res.data?.fleet) {
           setFleet(res.data.fleet);
           // Set dynamic browser title to fleet's branded portal
-          document.title = `${res.data.fleet.displayName || res.data.fleet.name} — Fleet Login | FleetFlow`;
+          document.title = `${res.data.fleet.displayName || res.data.fleet.name} — Fleet Login | CABZ`;
         } else {
           setNotFound(true);
         }
@@ -161,9 +173,9 @@ export default function FleetLogin() {
       <div className="min-h-screen bg-[#FAF8F5] flex flex-col justify-between p-6">
         <header className="max-w-4xl mx-auto w-full flex items-center justify-between">
           <Link to="/" className="inline-flex items-center gap-2 text-xs font-bold text-[#5C5752] hover:text-[#C04E24] transition">
-            <ArrowLeft size={14} /> Back to FleetFlow Platform
+            <ArrowLeft size={14} /> Back to CABZ Platform
           </Link>
-          <span className="text-[11px] font-bold text-[#7A7570] uppercase tracking-wider">FleetFlow SaaS</span>
+          <span className="text-[11px] font-bold text-[#7A7570] uppercase tracking-wider">CABZ SaaS</span>
         </header>
 
         <main className="max-w-md mx-auto w-full bg-white rounded-2xl border border-[#E0DAD1] p-8 shadow-xl text-center my-8">
@@ -172,7 +184,7 @@ export default function FleetLogin() {
           </div>
           <h1 className="text-xl font-bold text-[#1C1A18] mb-2">Fleet Operator Not Found</h1>
           <p className="text-xs text-[#5C5752] leading-relaxed mb-6">
-            The unique fleet login address <span className="font-mono text-[#C04E24] font-semibold">/{slug}</span> does not match any active fleet operator on the FleetFlow Mobility Platform.
+            The unique fleet login address <span className="font-mono text-[#C04E24] font-semibold">/{slug}</span> does not match any active fleet operator on the CABZ Mobility Platform.
           </p>
           <div className="space-y-2">
             <Link
@@ -185,13 +197,13 @@ export default function FleetLogin() {
               to="/"
               className="w-full inline-flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E0DAD1] hover:bg-[#FAF8F5] text-xs font-bold text-[#5C5752] transition"
             >
-              Return to FleetFlow Homepage
+              Return to CABZ Homepage
             </Link>
           </div>
         </main>
 
         <footer className="text-center text-[11px] text-[#7A7570] max-w-4xl mx-auto w-full">
-          Powered by FleetFlow Mobility Platform &bull; Enterprise Cloud Tenant Isolation
+          Powered by CABZ Mobility Platform &bull; Enterprise Cloud Tenant Isolation
         </footer>
       </div>
     );
@@ -209,7 +221,7 @@ export default function FleetLogin() {
           to="/"
           className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-purple-600 transition"
         >
-          <ArrowLeft size={14} /> FleetFlow Platform
+          <ArrowLeft size={14} /> CABZ Platform
         </Link>
         <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 uppercase tracking-wider">
           Dedicated Fleet Portal
@@ -231,18 +243,19 @@ export default function FleetLogin() {
 
           {/* Fleet Identity Header */}
           <div className="text-center mb-6 pt-2">
-            {fleet.logoUrl ? (
+            {fleet.logoUrl && resolveLogoUrl(fleet.logoUrl) && !logoError ? (
               <img
-                src={fleet.logoUrl}
+                src={resolveLogoUrl(fleet.logoUrl)!}
                 alt={`${fleet.displayName || fleet.name} Logo`}
+                onError={() => setLogoError(true)}
                 className="h-16 max-w-[200px] w-auto mx-auto object-contain mb-3 p-1 rounded-lg border border-[#E0DAD1]/50 bg-white shadow-sm"
               />
             ) : (
               <div
-                className="w-16 h-16 rounded-2xl text-white font-black text-2xl flex items-center justify-center mx-auto mb-3 shadow-md"
+                className="w-16 h-16 rounded-2xl text-white font-black text-xl tracking-wider flex items-center justify-center mx-auto mb-3 shadow-md border-2 border-white/20"
                 style={{ backgroundColor: primaryBrandColor }}
               >
-                {(fleet.displayName || fleet.name).charAt(0).toUpperCase()}
+                {(fleet.displayName || fleet.name).trim().slice(0, 2).toUpperCase()}
               </div>
             )}
 
@@ -377,15 +390,15 @@ export default function FleetLogin() {
         </div>
       </main>
 
-      {/* Secondary FleetFlow Platform Attribution */}
+      {/* Secondary CABZ Platform Attribution */}
       <footer className="text-center py-4 text-xs text-slate-500 max-w-4xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-slate-200">
         <div className="flex items-center gap-2">
-          <span className="font-extrabold text-slate-900 tracking-tight">FleetFlow</span>
+          <span className="font-extrabold text-slate-900 tracking-tight">CABZ</span>
           <span>&bull;</span>
-          <span>Approved Mobility Platform</span>
+          <span>Smart Fleet Mobility</span>
         </div>
         <div className="text-[11px] text-slate-500">
-          Powered by FleetFlow &bull; All Rights Reserved
+          Powered by CABZ &bull; All Rights Reserved
         </div>
       </footer>
     </div>

@@ -1,7 +1,7 @@
 {
-  "short_name": "FleetFlow",
-  "name": "FleetFlow Mobility Cloud Platform",
-  "description": "Enterprise multi-tenant fleet operations, corporate cab billing, live driver dispatch, and digital trip sheet management.",
+  "short_name": "CABZ",
+  "name": "CABZ – Smart Fleet Mobility",
+  "description": "Enterprise multi-tenant smart fleet operations, corporate cab billing, live driver dispatch, and digital trip sheet management.",
   "icons": [
     {
       "src": "favicon.ico",

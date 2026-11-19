@@ -59,32 +59,54 @@ const ListCancelOrder: React.FC = () => {
   const enrichCancelled = async (items: CancelledOrder[]): Promise<CancelledOrder[]> => {
     return Promise.all(
       items.map(async (order) => {
+        let snap: any = null;
         try {
-          const userRes = await axiosInstance.get(`/user/${order.userId}`);
-          const user = userRes.data?.data;
-          const companyId = user?.companyId;
+          const rawNotes = (order as any).notes;
+          const parsed = typeof rawNotes === "string" ? JSON.parse(rawNotes) : rawNotes;
+          snap = parsed?.packageSnapshot || null;
+        } catch {}
 
-          let companyName = "-";
-          if (companyId) {
-            const companyRes = await axiosInstance.get(`/company/getCompanyById/${companyId}`);
-            companyName = companyRes.data?.data?.companyName || "-";
+        try {
+          let userName = (order as any).user?.username || (order as any).behalfOfName || snap?.customerName || "-";
+          let companyName = (order as any).company?.companyName || (order as any).user?.company?.companyName || snap?.companyName || "-";
+          let emailAddress = (order as any).user?.email || snap?.customerEmail || (order as any).behalfOfPhone || "-";
+
+          if (order.userId) {
+            try {
+              const userRes = await axiosInstance.get(`/user/${order.userId}`);
+              const user = userRes.data?.data;
+              if (user) {
+                userName = user.username || userName;
+                emailAddress = user.email || emailAddress;
+                if (user.companyId && companyName === "-") {
+                  const companyRes = await axiosInstance.get(`/company/getCompanyById/${user.companyId}`);
+                  companyName = companyRes.data?.data?.companyName || companyName;
+                }
+              }
+            } catch {}
+          } else if ((order as any).companyId && companyName === "-") {
+            try {
+              const companyRes = await axiosInstance.get(`/company/getCompanyById/${(order as any).companyId}`);
+              companyName = companyRes.data?.data?.companyName || companyName;
+            } catch {}
           }
 
           return {
             ...order,
             pickupDate: formatToCustom(order.bookingDate),
             cancelledDate: formatToCustom(order.createdAt),
-            userName: user?.username || "-",
+            userName,
             companyName,
-            emailAddress: user?.email || "-",
+            emailAddress,
           };
         } catch {
           return {
             ...order,
             pickupDate: formatToCustom(order.bookingDate),
             cancelledDate: formatToCustom(order.createdAt),
-            userName: "-",
-            companyName: "-",
+            userName: (order as any).behalfOfName || snap?.customerName || "-",
+            companyName: (order as any).company?.companyName || snap?.companyName || "-",
+            emailAddress: snap?.customerEmail || (order as any).behalfOfPhone || "-",
           };
         }
       })

@@ -263,7 +263,7 @@ export const getSmtpConfig = async (): Promise<SmtpResolvedConfig | null> => {
     secure: Boolean(isSecure),
     user,
     pass,
-    fromName: "FleetFlow Platform",
+    fromName: "CABZ Platform",
     fromAddress: user,
   };
 };
@@ -364,8 +364,8 @@ export const sendEmailFromTemplate = async (
   try {
     const branding = await getFleetDocumentBranding(tenantId);
     brandingData = {
-      FleetName: branding.fleetName || 'FleetFlow Fleet',
-      CompanyName: branding.fleetName || 'FleetFlow Fleet',
+      FleetName: branding.fleetName || 'CABZ Fleet',
+      CompanyName: branding.fleetName || 'CABZ Fleet',
       SupportPhone: branding.contactPhone || '',
       SupportEmail: branding.contactEmail || '',
       PortalTitle: branding.portalTitle || 'Fleet Management Portal',
@@ -385,10 +385,10 @@ export const sendEmailFromTemplate = async (
     EmployeeEmail: data?.EmployeeEmail || data?.UserEmail || data?.email || "",
     UserEmail: data?.UserEmail || data?.EmployeeEmail || data?.email || "",
     OTP: data?.OTP || data?.otp || "",
-    FleetName: data?.FleetName || brandingData.FleetName || "FleetFlow",
-    CompanyName: data?.CompanyName || brandingData.CompanyName || "FleetFlow",
-    WEB_SITE_NAME: data?.WEB_SITE_NAME || "www.fleetflow.com",
-    WEB_SITE_EMAIL: data?.WEB_SITE_EMAIL || "support@fleetflow.com",
+    FleetName: data?.FleetName || brandingData.FleetName || "CABZ",
+    CompanyName: data?.CompanyName || brandingData.CompanyName || "CABZ",
+    WEB_SITE_NAME: data?.WEB_SITE_NAME || "www.cabz.com",
+    WEB_SITE_EMAIL: data?.WEB_SITE_EMAIL || "support@cabz.com",
     CONTACT_NO: data?.CONTACT_NO || "+91 90000 00000",
   };
 
@@ -428,8 +428,8 @@ export const sendEmailFromTemplate = async (
   const rawFromName = emailConf.fromName || '';
   const isGraceCabsDefault = rawFromName.toLowerCase().includes('gracecabs') || rawFromName.toLowerCase().includes('grace cabs');
   const headerFromName = (tenantId !== ROOT_TENANT_ID || isGraceCabsDefault)
-    ? (brandingData.FleetName || 'FleetFlow')
-    : (rawFromName || 'FleetFlow');
+    ? (brandingData.FleetName || 'CABZ')
+    : (rawFromName || 'CABZ');
   const headerFrom = `${headerFromName} <${smtpConfig.user}>`;
 
   // Strictly filter out any obsolete Grace Cabs customer contacts
@@ -889,11 +889,11 @@ export const previewEmailConf = async (req: any, res: Response) => {
 
     const branding = await getFleetDocumentBranding(tenantId);
     const defaultMock: Record<string, string> = {
-      FleetName: branding.fleetName || 'FleetFlow Mobility',
-      CompanyName: branding.fleetName || 'FleetFlow Mobility',
+      FleetName: branding.fleetName || 'CABZ Mobility',
+      CompanyName: branding.fleetName || 'CABZ Mobility',
       SupportPhone: branding.contactPhone || '+91 9876543210',
-      SupportEmail: branding.contactEmail || 'support@fleetflow.com',
-      PortalTitle: branding.portalTitle || 'FleetFlow Portal',
+      SupportEmail: branding.contactEmail || 'support@cabz.com',
+      PortalTitle: branding.portalTitle || 'CABZ Portal',
       Address: branding.registeredAddress || '123 Tech Park, Bangalore',
       GstNumber: branding.gstNumber || '29ABCDE1234F1Z5',
       BookingCode: 'BK-2026-9041',
@@ -906,20 +906,20 @@ export const previewEmailConf = async (req: any, res: Response) => {
       InvoiceNumber: 'INV-2026-0042',
       TotalAmount: '3,540.00',
       Password: '••••••••••••',
-      LoginUrl: 'https://fleetflow.com/adminlogin',
-      CompanySeoUrl: 'https://fleetflow.com/portal/tech-corp',
-      ActivationUrl: 'https://fleetflow.com/activate-account?token=act_sample_token',
+      LoginUrl: 'https://cabz.com/adminlogin',
+      CompanySeoUrl: 'https://cabz.com/portal/tech-corp',
+      ActivationUrl: 'https://cabz.com/activate-account?token=act_sample_token',
       PlanTier: 'PRO',
       BillingCycle: 'ANNUAL',
       AgreedPrice: '3,560',
       DaysRemaining: '2',
       ExpiryDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toDateString(),
       RenewalAmount: '3,560',
-      RenewalUrl: 'https://fleetflow.com/admin/billing/checkout',
+      RenewalUrl: 'https://cabz.com/admin/billing/checkout',
       RejectionReason: 'Incomplete business registration documentation.',
       TransactionReference: 'TXN_TEST_998822',
       PeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toDateString(),
-      DashboardUrl: 'https://fleetflow.com/dashboard',
+      DashboardUrl: 'https://cabz.com/dashboard',
       ...mockData,
     };
 

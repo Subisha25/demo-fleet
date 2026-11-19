@@ -14,9 +14,27 @@ interface VehicleType {
   vehicleTypeId: string;
   vehicleType: string;
   bookingType?: string;
+  seatCapacity?: number;
+}
+
+export interface PublicVehicleItem {
+  vehicleMasterId?: string;
+  vehicleId?: string;
+  vehicleTypeId?: string;
+  vehicleModelName: string;
+  vehicleNumber?: string;
+  vehicleType: string;
+  seatCapacity: number;
+  vehicleImg?: any;
 }
 
 type NumMap = Record<string, number>;
+
+type PublicState = {
+  perKm: NumMap;
+  seatCapacity: NumMap;
+  isActive: Record<string, boolean>;
+};
 
 type LocalPackageDef = {
   id: string;
@@ -81,10 +99,12 @@ const DEFAULT_MONTHLY_PACKAGES: MonthlyPackageDef[] = [
 const AddPackage: React.FC = () => {
   const [company, setCompany] = useState("");
   const [type, setType] = useState<
-    "Out Station" | "Local City Use" | "Monthly Bookings" | ""
+    "Out Station" | "Local City Use" | "Monthly Bookings" | "Public Booking" | ""
   >("");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [vehicleTypes, setVehicleTypes] = useState<string[]>([]);
+  const [rawVehicleTypes, setRawVehicleTypes] = useState<VehicleType[]>([]);
+  const [publicVehicles, setPublicVehicles] = useState<PublicVehicleItem[]>([]);
   const [showDetails, setShowDetails] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -106,6 +126,12 @@ const AddPackage: React.FC = () => {
     perKm: {},
     driverBattaPerDay: {},
     minimumKmPerDay: {},
+  });
+
+  const [publicState, setPublicState] = useState<PublicState>({
+    perKm: {},
+    seatCapacity: {},
+    isActive: {},
   });
 
   useEffect(() => {
@@ -179,6 +205,20 @@ const AddPackage: React.FC = () => {
     });
   };
 
+  const initPublicForVehicles = (vehicles: PublicVehicleItem[]) => {
+    const perKm: NumMap = {};
+    const isActive: Record<string, boolean> = {};
+
+    vehicles.forEach((v) => {
+      const key = v.vehicleMasterId || v.vehicleId || v.vehicleModelName || v.vehicleType;
+      perKm[key] = 0;
+      isActive[key] = true;
+    });
+
+    setPublicState({ perKm, seatCapacity: {}, isActive });
+    setPublicVehicles(vehicles);
+  };
+
   const handleGetPackage = async () => {
     if (!company || !type) {
       showToast("Select company and package type", "warn");
@@ -189,7 +229,7 @@ const AddPackage: React.FC = () => {
     try {
       const pkgRes = await axiosInstance.post("/package/createPackage", {
         companyId: company,
-        packageType: type,
+        packageType: type === "Public Booking" ? "PUBLIC_BOOKING" : type,
       });
 
       const packageId =
@@ -199,18 +239,36 @@ const AddPackage: React.FC = () => {
         `/package/getVehicleTypesByPackageId/${packageId}`
       );
 
-      const vehicles = (vtRes.data?.data?.vehicleTypes || []).map(
+      if (type === "Public Booking") {
+        const rawVehicles: PublicVehicleItem[] = vtRes.data?.data?.vehicles || vtRes.data?.data?.vehicleTypes || [];
+        if (!rawVehicles.length) {
+          showToast("No active vehicles found in Vehicle Master. Please add vehicles first.", "warn");
+          setPublicVehicles([]);
+          setShowDetails(false);
+          return;
+        }
+
+        initPublicForVehicles(rawVehicles);
+        setShowDetails(true);
+        showToast("Fleet vehicles loaded successfully", "success");
+        return;
+      }
+
+      const rawVt: VehicleType[] = vtRes.data?.data?.vehicleTypes || [];
+      const vehicles = rawVt.map(
         (v: VehicleType) => v.vehicleType
       );
 
       if (!vehicles.length) {
         showToast("No vehicle types found for this booking type.", "warn");
         setVehicleTypes([]);
+        setRawVehicleTypes([]);
         setShowDetails(false);
         return;
       }
 
       setVehicleTypes(vehicles);
+      setRawVehicleTypes(rawVt);
 
       if (type === "Local City Use") initLocalForVehicles(vehicles);
       if (type === "Out Station") initOutForVehicles(vehicles);
@@ -296,9 +354,45 @@ const AddPackage: React.FC = () => {
         packagesPayload = { packageDefinitions, vehicles: vehiclesPayload };
       }
 
+      // ✅ PUBLIC BOOKING payload (Per-KM only, based on real Vehicle Master records)
+      if (type === "Public Booking") {
+        const vehiclesPayload: any[] = [];
+        let hasActiveRate = false;
+
+        publicVehicles.forEach((v) => {
+          const key = v.vehicleMasterId || v.vehicleId || v.vehicleModelName || v.vehicleType;
+          const rate = Number(publicState.perKm?.[key] ?? 0);
+          const active = publicState.isActive?.[key] !== false;
+
+          if (active && rate > 0) {
+            hasActiveRate = true;
+          }
+
+          vehiclesPayload.push({
+            vehicleMasterId: v.vehicleMasterId || null,
+            vehicleId: v.vehicleId || null,
+            vehicleTypeId: v.vehicleTypeId || null,
+            vehicleModelName: v.vehicleModelName,
+            vehicleNumber: v.vehicleNumber || "",
+            vehicleType: v.vehicleType,
+            seatCapacity: v.seatCapacity, // Authoritative READ-ONLY seat capacity
+            perKm: rate,
+            isActive: active,
+          });
+        });
+
+        if (!hasActiveRate) {
+          showToast("Please enter a valid Per-KM rate (> 0) for at least one active vehicle", "warn");
+          setLoading(false);
+          return;
+        }
+
+        packagesPayload = { vehicles: vehiclesPayload };
+      }
+
       await axiosInstance.post("/packageData/createPackageData", {
         companyId: company,
-        packageType: type,
+        packageType: type === "Public Booking" ? "PUBLIC_BOOKING" : type,
         packages: packagesPayload,
       });
 
@@ -365,6 +459,15 @@ const AddPackage: React.FC = () => {
                 onChange={() => setType("Monthly Bookings")}
               />
               <span>Monthly Bookings</span>
+            </label>
+
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                checked={type === "Public Booking"}
+                onChange={() => setType("Public Booking")}
+              />
+              <span className="font-semibold text-blue-700">Public Booking</span>
             </label>
           </div>
 
@@ -729,6 +832,116 @@ const AddPackage: React.FC = () => {
             >
               {loading ? "Saving..." : "Submit"}
             </button>
+          </div>
+        )}
+
+        {/* ✅ PUBLIC BOOKING (Per-KM Rate only, derived from real Vehicle Master records) */}
+        {showDetails && type === "Public Booking" && (
+          <div className="bg-white mt-6 p-4 overflow-x-auto rounded border">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-gray-200 mb-4 gap-2">
+              <div>
+                <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>
+                  Public Booking (Per-KM Pricing)
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Configure Per-KM pricing for each registered vehicle in your fleet. Seat capacities are authoritative from Vehicle records.
+                </p>
+              </div>
+              <span className="text-xs px-2.5 py-1 bg-blue-50 text-blue-700 font-semibold rounded-full border border-blue-200 self-start">
+                {publicVehicles.length} Registered {publicVehicles.length === 1 ? 'Vehicle' : 'Vehicles'}
+              </span>
+            </div>
+
+            <table className="border min-w-[700px] text-center w-full">
+              <thead>
+                <tr className="bg-gray-100 text-gray-700 text-sm">
+                  <th className="border px-4 py-3 text-left">Vehicle Model & Registration</th>
+                  <th className="border px-4 py-3 text-left">Vehicle Type</th>
+                  <th className="border px-4 py-3 w-40">Seat Capacity</th>
+                  <th className="border px-4 py-3 w-52">
+                    Per KM Rate (₹) <span className="text-red-500">*</span>
+                  </th>
+                  <th className="border px-4 py-3 w-36">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {publicVehicles.map((v) => {
+                  const key = v.vehicleMasterId || v.vehicleId || v.vehicleModelName || v.vehicleType;
+                  return (
+                    <tr key={key} className="hover:bg-gray-50 text-sm">
+                      <td className="border px-4 py-3 font-semibold text-gray-800 text-left">
+                        <div className="font-bold text-gray-900">{v.vehicleModelName}</div>
+                        {v.vehicleNumber && (
+                          <div className="text-xs text-gray-500 font-mono mt-0.5">{v.vehicleNumber}</div>
+                        )}
+                      </td>
+                      <td className="border px-4 py-3 text-left">
+                        <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-xs font-semibold">
+                          {v.vehicleType}
+                        </span>
+                      </td>
+                      <td className="border px-4 py-3">
+                        {/* READ-ONLY AUTHORITATIVE SEAT CAPACITY */}
+                        <span className="inline-flex items-center px-3 py-1 bg-gray-100 border border-gray-300 rounded-md font-bold text-gray-800 text-sm">
+                          {v.seatCapacity} Seats
+                        </span>
+                      </td>
+                      <td className="border px-4 py-3">
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="text-gray-500 font-bold">₹</span>
+                          <input
+                            type="number"
+                            min="1"
+                            step="0.5"
+                            placeholder="e.g. 14"
+                            value={publicState.perKm?.[key] || ""}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setPublicState((prev) => ({
+                                ...prev,
+                                perKm: { ...prev.perKm, [key]: val },
+                              }));
+                            }}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            className="w-24 border border-gray-300 rounded px-2 py-1 text-center font-bold text-gray-800 bg-white"
+                          />
+                          <span className="text-xs text-gray-500">/ KM</span>
+                        </div>
+                      </td>
+                      <td className="border px-4 py-3">
+                        <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={publicState.isActive?.[key] !== false}
+                            onChange={(e) => {
+                              setPublicState((prev) => ({
+                                ...prev,
+                                isActive: { ...prev.isActive, [key]: e.target.checked },
+                              }));
+                            }}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                          />
+                          <span className={`text-xs font-semibold ${publicState.isActive?.[key] !== false ? "text-green-700" : "text-gray-400"}`}>
+                            {publicState.isActive?.[key] !== false ? "Active" : "Disabled"}
+                          </span>
+                        </label>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <div className="flex justify-end mt-4">
+              <button
+                disabled={loading}
+                onClick={handleSubmit}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold px-6 py-2 rounded shadow-sm transition-colors"
+              >
+                {loading ? "Saving..." : "Save Public Booking Package"}
+              </button>
+            </div>
           </div>
         )}
       </main>

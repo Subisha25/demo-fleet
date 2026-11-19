@@ -59,6 +59,16 @@ export const generatePlanSummaryPDF = async (
     maximumFractionDigits: 0,
   }).format(data.agreedPrice);
 
+  let logoBase64 = '';
+  try {
+    const logoPath = path.join(__dirname, '..', 'images', 'cabz_logo.png');
+    if (fs.existsSync(logoPath)) {
+      logoBase64 = `data:image/png;base64,${fs.readFileSync(logoPath).toString('base64')}`;
+    }
+  } catch (err) {
+    // optional logo fallback
+  }
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -176,9 +186,12 @@ export const generatePlanSummaryPDF = async (
 </head>
 <body>
   <div class="header">
-    <div>
-      <h1 class="title">SaaS Plan & Entitlement Summary</h1>
-      <div class="subtitle">FleetFlow Multi-Tenant Mobility Cloud Platform</div>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      ${logoBase64 ? `<img src="${logoBase64}" style="height: 52px; max-width: 140px; object-fit: contain;" alt="CABZ Logo" />` : ''}
+      <div>
+        <h1 class="title">SaaS Plan & Entitlement Summary</h1>
+        <div class="subtitle">CABZ Multi-Tenant Mobility Cloud Platform</div>
+      </div>
     </div>
     <div style="text-align: right;">
       <span class="badge">${data.planTier} TIER</span>
@@ -251,7 +264,7 @@ export const generatePlanSummaryPDF = async (
   </ul>
 
   <div class="footer">
-    This document constitutes the authoritative SaaS Plan Summary for ${data.fleetName} on the FleetFlow Mobility Platform.<br>
+    This document constitutes the authoritative SaaS Plan Summary for ${data.fleetName} on the CABZ Mobility Platform.<br>
     Tenant ID: ${data.tenantId} • Generated: ${new Date().toISOString()} • Confidential & Proprietary
   </div>
 </body>
@@ -274,7 +287,7 @@ export const generatePlanSummaryPDF = async (
     });
   } catch (pdfErr) {
     console.error('Puppeteer failed to render plan summary PDF, creating text fallback:', pdfErr);
-    fs.writeFileSync(filePath, Buffer.from(`FleetFlow SaaS Plan Summary for ${data.fleetName}\nPlan: ${data.planName}\nPrice: ${priceFormatted}`));
+    fs.writeFileSync(filePath, Buffer.from(`CABZ SaaS Plan Summary for ${data.fleetName}\nPlan: ${data.planName}\nPrice: ${priceFormatted}`));
   } finally {
     if (browser) await browser.close();
   }

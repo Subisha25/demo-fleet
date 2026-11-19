@@ -290,7 +290,7 @@ export default function Pricing() {
         <div className="text-center mb-12">
           <h2 className="text-3xl font-black text-[#17171D]">Frequently Asked Questions</h2>
           <p className="text-[#686875] mt-2 text-sm">
-            Everything you need to know about FleetFlow SaaS billing and provisioning.
+            Everything you need to know about CABZ SaaS billing and provisioning.
           </p>
         </div>
 

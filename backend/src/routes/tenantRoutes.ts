@@ -27,7 +27,6 @@ import {
 } from '../services/tenantService';
 import { requireThemeCustomization } from '../middleware/entitlementMiddleware';
 import { uploadFleetLogo } from '../middleware/uploadConfig';
-import { getCompanyPolicy, upsertCompanyPolicy } from '../services/policyService';
 import {
   submitFleetRegistration,
   getRegistrationRequests,
@@ -155,43 +154,6 @@ router.get('/admin/notifications/audit-logs', authMiddleware, requireSuperAdmin,
 router.get('/admin/notification-logs', authMiddleware, requireSuperAdmin, getNotificationAuditLogs);
 router.get('/notifications/audit-logs', authMiddleware, requireSuperAdmin, getNotificationAuditLogs);
 
-
-// =============================================================================
-// CORPORATE CLIENT DYNAMIC POLICY ENDPOINTS
-// =============================================================================
-const handleGetPolicy = async (req: Request, res: Response) => {
-  try {
-    const { companyId } = req.params;
-    const policy = await getCompanyPolicy(companyId);
-    return res.status(200).json({ success: true, policy, data: policy });
-  } catch (err) {
-    return res.status(500).json({ success: false, message: 'Internal Server Error' });
-  }
-};
-
-const handleUpsertPolicy = async (req: Request, res: Response) => {
-  try {
-    const { companyId } = req.params;
-    const ctx = getTenantContext();
-    const tenantId = ctx?.tenantId || ROOT_TENANT_ID;
-    const policy = await upsertCompanyPolicy(companyId, tenantId, req.body);
-    return res.status(200).json({
-      success: true,
-      message: 'Company policy updated successfully.',
-      policy,
-      data: policy,
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, message: 'Internal Server Error' });
-  }
-};
-
-router.get('/policy/:companyId', authMiddleware, handleGetPolicy);
-router.get('/policies/:companyId', authMiddleware, handleGetPolicy);
-router.put('/policy/:companyId', authMiddleware, handleUpsertPolicy);
-router.put('/policies/:companyId', authMiddleware, handleUpsertPolicy);
-router.post('/policy/:companyId', authMiddleware, handleUpsertPolicy);
-router.post('/policies/:companyId', authMiddleware, handleUpsertPolicy);
 
 // =============================================================================
 // SAAS PLAN MANAGEMENT (Platform SuperAdmin)

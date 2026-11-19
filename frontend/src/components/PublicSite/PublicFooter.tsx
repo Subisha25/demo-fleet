@@ -43,7 +43,7 @@ export default function PublicFooter() {
               </li>
               <li>
                 <Link to="/about" className="text-gray-400 hover:text-white transition-colors">
-                  About FleetFlow
+                  About CABZ
                 </Link>
               </li>
               <li>
@@ -130,7 +130,7 @@ export default function PublicFooter() {
 
         {/* Bottom Legal Bar */}
         <div className="mt-12 pt-8 border-t border-[#1E1E26] flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-gray-500">
-          <p>© {currentYear} FleetFlow Technologies Inc. All rights reserved.</p>
+          <p>© {currentYear} CABZ Mobility Technologies. All rights reserved.</p>
           <div className="flex flex-wrap items-center gap-6">
             <Link to="/terms" className="hover:text-gray-300 transition-colors">
               Terms of Service

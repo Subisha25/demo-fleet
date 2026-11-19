@@ -41,7 +41,6 @@ const menu: MenuItem[] = [
       { label: 'Registration Queue', path: '/tenants/registrations', icon: faClipboardCheck },
       { label: 'SaaS Plans', path: '/tenants/plans', icon: faCrown },
       { label: 'Provision Tenant', path: '/tenants/add', icon: faPlus },
-      { label: 'Corporate Policies', path: '/tenants/policies', icon: faClipboardList },
       { label: 'Subscription & Billing', path: '/admin/billing', icon: faReceipt },
       { label: 'Subscription Reports', path: '/admin/billing/reports', icon: faReceipt },
       { label: 'Notification Logs', path: '/admin/notifications/audit', icon: faBell },
@@ -164,6 +163,15 @@ const menu: MenuItem[] = [
       { label: 'Cancelled Order', path: '/orders/cancelled', icon: faTimesCircle },
     ],
   },
+  {
+    label: 'Bookings',
+    icon: faCalendarAlt,
+    children: [
+      { label: 'Monthly Booking', path: '/booking/monthlybooking', icon: faCalendarCheck },
+      { label: 'OnCall Booking', path: '/booking/oncallinvoice', icon: faReceipt },
+      { label: 'Monthly Report', path: '/booking/monthlyreport', icon: faFileAlt },
+    ],
+  },
 
 
   {
@@ -218,7 +226,7 @@ const Sidebar: React.FC = () => {
   const isSuperAdmin = role === 'superadmin';
   const isInspecting = Boolean(localStorage.getItem('inspectingTenantId'));
 
-  const tenantName = localStorage.getItem('tenantName') || 'FleetFlow Operator';
+  const tenantName = localStorage.getItem('tenantName') || 'CABZ Operator';
 
   const isPlatformSuperAdmin = isSuperAdmin && !isInspecting;
   const fleetName = currentTenant?.displayName || currentTenant?.name || tenantName || 'Fleet Mobility';
@@ -243,6 +251,19 @@ const Sidebar: React.FC = () => {
       prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
     );
   };
+
+  React.useEffect(() => {
+    menu.forEach((item) => {
+      if (item.children) {
+        const hasActiveChild = item.children.some(
+          (c) => c.path === location.pathname || (c.children && c.children.some((sc) => sc.path === location.pathname))
+        );
+        if (hasActiveChild) {
+          setOpenDropdown((prev) => (prev.includes(item.label) ? prev : [...prev, item.label]));
+        }
+      }
+    });
+  }, [location.pathname]);
 
   const superAdminConfigurationItem: MenuItem = {
     label: 'Configuration',
@@ -275,8 +296,8 @@ const Sidebar: React.FC = () => {
         <div className="flex items-center gap-3">
           {collapsed ? (
             isPlatformSuperAdmin ? (
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-700 flex items-center justify-center font-black text-white text-lg shadow-md shadow-purple-900/30">
-                FF
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-700 flex items-center justify-center font-black text-white text-base shadow-md shadow-purple-900/30">
+                CZ
               </div>
             ) : fleetLogo ? (
               <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 p-1 flex items-center justify-center shadow-md overflow-hidden relative">
@@ -340,7 +361,7 @@ const Sidebar: React.FC = () => {
         {!collapsed && (
           <div className="mt-2.5 pt-2.5 border-t border-[#1F1F2E] flex items-center justify-between">
             <span className="text-xs font-semibold text-gray-200 truncate max-w-[150px]">
-              {isPlatformSuperAdmin ? 'FleetFlow SaaS Platform' : fleetName}
+              {isPlatformSuperAdmin ? 'CABZ SaaS Platform' : fleetName}
             </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-950/70 text-purple-300 border border-purple-700/50 uppercase tracking-wider">
               {isPlatformSuperAdmin ? 'Platform Admin' : `${currentTenant?.planTier || 'PRO'} Plan`}
@@ -478,7 +499,7 @@ const Sidebar: React.FC = () => {
       <div className="p-3 bg-[#0B0B0F] border-t border-[#1F1F2E] flex items-center justify-between">
         {!collapsed && (
           <div className="text-[11px] text-gray-500 font-medium">
-            <span>FleetFlow SaaS v2.5</span>
+            <span>CABZ SaaS v2.5</span>
           </div>
         )}
         <button

@@ -118,7 +118,7 @@ export default function ActivateAccount() {
             </div>
             <h1 className="text-2xl font-extrabold tracking-tight">Activate Operator Account</h1>
             <p className="text-xs sm:text-sm text-[#E2E8F0] mt-1">
-              Secure single-use onboarding for verified FleetFlow fleet operators.
+              Secure single-use onboarding for verified CABZ fleet operators.
             </p>
           </div>
 

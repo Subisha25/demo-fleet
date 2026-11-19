@@ -174,10 +174,10 @@ export default function Footer() {
               <div className="flex items-center gap-2 mt-1">
                 <img src={IconMail} className="w-6 h-6" />
                 <a
-                  href="mailto:support@fleetflow.com"
+                  href="mailto:support@cabz.com"
                   className="hover:text-yellow-300 transition tab-small-text"
                 >
-                  support@fleetflow.com
+                  support@cabz.com
                 </a>
               </div>
             </div>
@@ -270,7 +270,7 @@ export default function Footer() {
 
         {/* COPY RIGHT SECTION */}
         <div className="text-center text-[12px] sm:text-[14px] opacity-80">
-          © {new Date().getFullYear()} FleetFlow. All Rights Reserved.
+          © {new Date().getFullYear()} CABZ. All Rights Reserved.
         </div>
 
       </div>

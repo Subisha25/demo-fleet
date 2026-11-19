@@ -34,7 +34,6 @@ import { MonthlyInvoiceItems } from './monthlyInvoiceItems';
 import { Tenant } from './tenant';
 import { TenantSubscription } from './tenantSubscription';
 import { TenantUsageMeter } from './tenantUsageMeter';
-import { CompanyPolicy } from './companyPolicy';
 import { TenantRegistrationRequest } from './tenantRegistrationRequest';
 import { TenantActivationToken } from './tenantActivationToken';
 import { TenantInitialAllowance } from './tenantInitialAllowance';
@@ -53,7 +52,6 @@ const connectDB = async () => {
     await Tenant.sync();
     await TenantSubscription.sync({ alter: true });
     await TenantUsageMeter.sync();
-    await CompanyPolicy.sync();
     await TenantRegistrationRequest.sync();
     await TenantActivationToken.sync();
     await SubscriptionInvoice.sync();
@@ -252,7 +250,7 @@ const connectDB = async () => {
 export { sequelize, connectDB, Employee, Company, Drivers,Vehicle,Vendor,User, Booking, Invoice, EmailConfiguration,
   VehicleType, Tax, Pickuparea, Pickupcity, VehicleMaster,OTP,PaymentMode,Payment,orderSummery,Package,PackageData,Configuration,
   ClosePending, BookingSequence, PaymentSequence, InvoiceSequence, ShortLink, MonthlyBookingSequence, MapCount, OnCallInvoice,
-  OnCallInvoiceItems, MonthlyInvoice, MonthlyInvoiceItems, Tenant, TenantSubscription, TenantUsageMeter, CompanyPolicy,
+  OnCallInvoiceItems, MonthlyInvoice, MonthlyInvoiceItems, Tenant, TenantSubscription, TenantUsageMeter,
   TenantRegistrationRequest, TenantActivationToken, TenantInitialAllowance, SubscriptionInvoice, NotificationLog, SaaSPlan, SmsTemplate,
   TenantSmsConfig
 };

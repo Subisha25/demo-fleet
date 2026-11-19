@@ -37,17 +37,35 @@ router.get("/dropdown/models", authMiddleware, async (req: any, res: Response) =
       ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
       : { tenantId };
 
+  const { vehicleTypeId } = req.query;
+  const whereClause: any = { isDeleted: false, ...tenantCondition };
+  if (vehicleTypeId) {
+    whereClause.vehicleTypeId = vehicleTypeId;
+  }
+
   const rows = await Vehicle.findAll({
-    where: { isDeleted: false, ...tenantCondition },
+    where: whereClause,
     attributes: ["vehicleId", "vehicleName", "vehicleTypeId"],
+    order: [["vehicleName", "ASC"]],
   });
 
+  // Deduplicate by vehicleName per vehicleTypeId to avoid duplicate dropdown options
+  const seen = new Set<string>();
+  const deduplicated: any[] = [];
+  for (const r of rows) {
+    const key = `${r.vehicleTypeId || ''}__${(r.vehicleName || '').trim().toLowerCase()}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduplicated.push({
+        id: r.vehicleId,
+        label: r.vehicleName,
+        vehicleTypeId: r.vehicleTypeId,
+      });
+    }
+  }
+
   res.json({
-    data: rows.map(r => ({
-      id: r.vehicleId,
-      label: r.vehicleName,
-      vehicleTypeId: r.vehicleTypeId,
-    })),
+    data: deduplicated,
   });
 });
 

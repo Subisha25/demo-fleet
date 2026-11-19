@@ -104,7 +104,7 @@ const TravelHeader: React.FC = () => {
             </span>
             <span className="flex items-center">
               <span className="mr-1">✉️</span>
-              <span className="hidden lg:inline">support@fleetflow.com</span>
+              <span className="hidden lg:inline">support@cabz.com</span>
               <span className="lg:hidden">Contact</span>
             </span>
           </div>

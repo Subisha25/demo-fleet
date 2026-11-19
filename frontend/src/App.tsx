@@ -13,7 +13,6 @@ import SubscriptionRequiredModal from './components/SubscriptionRequiredModal';
 // SaaS Tenants
 import TenantList from './SuperAdmin/pages/Tenants/TenantList';
 import AddTenant from './SuperAdmin/pages/Tenants/AddTenant';
-import CompanyPolicies from './SuperAdmin/pages/Tenants/CompanyPolicies';
 import RegistrationsQueue from './SuperAdmin/pages/Tenants/RegistrationsQueue';
 import SubscriptionCheckout from './SuperAdmin/pages/Billing/SubscriptionCheckout';
 import FleetInspection from './SuperAdmin/pages/Tenants/FleetInspection';
@@ -229,7 +228,6 @@ const Layout = () => {
           <Route path="/tenants/inspect/:tenantId" element={<SuperAdminRoute><FleetInspection /></SuperAdminRoute>} />
           <Route path="/tenants/overview/:tenantId" element={<SuperAdminRoute><FleetInspection /></SuperAdminRoute>} />
           <Route path="/tenants/billing-history/:tenantId" element={<SuperAdminRoute><TenantBillingHistory /></SuperAdminRoute>} />
-          <Route path="/tenants/policies" element={<SuperAdminRoute><CompanyPolicies /></SuperAdminRoute>} />
           <Route path="/tenants/registrations" element={<SuperAdminRoute><RegistrationsQueue /></SuperAdminRoute>} />
           <Route path="/admin/registrations" element={<SuperAdminRoute><RegistrationsQueue /></SuperAdminRoute>} />
           <Route path="/admin/billing" element={<SuperAdminRoute><SubscriptionCheckout /></SuperAdminRoute>} />
@@ -386,6 +384,7 @@ const App: React.FC = () => {
 
           {/* Public Cab Booking Routes */}
           <Route path="/book" element={<PublicBookingWizard />} />
+          <Route path="/book-a-cab" element={<PublicBookingWizard />} />
           <Route path="/book-a-ride" element={<PublicBookingWizard />} />
           <Route path="/book-cab" element={<PublicBookingWizard />} />
           <Route path="/fleet/:slug/book" element={<PublicBookingWizard />} />

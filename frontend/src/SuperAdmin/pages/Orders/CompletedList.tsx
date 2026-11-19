@@ -13,13 +13,26 @@ interface CompletedOrder {
   orderDate: string;
   pickupDate: string;
   pickupPoint: string; // monthly => "Monthly Booking"
+  dropPoint?: string;
   userName: string; // monthly => companyName
+  userMobile?: string;
+  userEmail?: string;
   paymentMode: string;
   invoiceAmount: string | number;
   bookingId: string; // regular: bookingId, monthly: monthlyInvoiceId
   userId?: string;
   companyName?: string;
-  _rowType?: "regular" | "monthly";
+  fleetName?: string;
+  bookingCreatedBy?: string;
+  preferredType?: string;
+  isPublicBooking?: boolean;
+  vehicleName?: string;
+  vehicleNumber?: string;
+  driverName?: string;
+  driverPhone?: string;
+  actualKms?: number;
+  ratePerKm?: number;
+  _rowType?: "regular" | "monthly" | "public";
 }
 
 interface Company {
@@ -87,7 +100,7 @@ export default function ListCompletedOrders() {
   const [loading, setLoading] = useState<boolean>(false);
   const navigate = useNavigate();
 
-  const [viewType, setViewType] = useState<"regular" | "monthly">("regular");
+  const [viewType, setViewType] = useState<"regular" | "monthly" | "public">("regular");
 
   const [searchText, setSearchText] = useState<string>("");
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
@@ -154,7 +167,68 @@ export default function ListCompletedOrders() {
     { header: "User Name", accessor: "userName" },
     { header: "Payment Mode", accessor: "paymentMode" },
     { header: "Total Amount (Rs.)", accessor: "invoiceAmount" },
+  ];
 
+  const publicColumns: Column<CompletedOrder>[] = [
+    {
+      header: "Booking #",
+      accessor: "orderNumber",
+      render: (row) => (
+        <span
+          onClick={() => handleViewRegular(row)}
+          className="text-blue-600 hover:text-blue-800 font-bold cursor-pointer"
+        >
+          {row.orderNumber}
+        </span>
+      ),
+    },
+    { header: "Fleet", accessor: "fleetName" },
+    { header: "Company", accessor: "companyName" },
+    { header: "Passenger", accessor: "userName" },
+    { header: "Phone", accessor: "userMobile" },
+    {
+      header: "Route",
+      accessor: "pickupPoint",
+      render: (row) => (
+        <div className="text-xs">
+          <div className="font-semibold text-slate-800">{row.pickupPoint}</div>
+          <div className="text-slate-500">to {row.dropPoint || "-"}</div>
+        </div>
+      ),
+    },
+    {
+      header: "Vehicle & Driver",
+      accessor: "vehicleNumber",
+      render: (row) => (
+        <div className="text-xs">
+          <div className="font-medium text-slate-800">
+            {row.vehicleName ? `${row.vehicleName} (${row.vehicleNumber || "-"})` : row.vehicleNumber || "-"}
+          </div>
+          <div className="text-slate-500">{row.driverName || "-"}</div>
+        </div>
+      ),
+    },
+    {
+      header: "Actual KM",
+      accessor: "actualKms",
+      render: (row) => <span>{row.actualKms ? `${row.actualKms} KM` : "-"}</span>,
+    },
+    {
+      header: "Rate / KM",
+      accessor: "ratePerKm",
+      render: (row) => <span>{row.ratePerKm ? `₹${row.ratePerKm}/km` : "-"}</span>,
+    },
+    {
+      header: "Final Amount",
+      accessor: "invoiceAmount",
+      render: (row) => (
+        <span className="font-bold text-emerald-700">
+          ₹{Number(row.invoiceAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+      ),
+    },
+    { header: "Payment Mode", accessor: "paymentMode" },
+    { header: "Invoice #", accessor: "invoiceNumber" },
   ];
 
   const monthlyColumns: Column<CompletedOrder>[] = [
@@ -185,9 +259,9 @@ export default function ListCompletedOrders() {
 
       bookings = bookings.map((order: any) => ({
         ...order,
-        userId: order?.booking?.user?.userId || order.userId,
-        userName: order?.booking?.user?.userName || order.userName,
-        companyName: order?.booking?.user?.company?.companyName || order.companyName,
+        userId: order?.userId || order?.booking?.user?.userId,
+        userName: order?.userName || order?.booking?.user?.userName || "-",
+        companyName: order?.companyName || order?.booking?.user?.company?.companyName || "-",
       }));
 
       if (userId) bookings = bookings.filter((b) => b.userId === userId);
@@ -221,7 +295,8 @@ export default function ListCompletedOrders() {
         ...b,
         orderDate: formatToCustom(b.orderDate),
         pickupDate: formatToCustom(b.pickupDate),
-        _rowType: "regular",
+        invoiceAmount: b.totalAmount ?? b.invoiceAmount ?? 0,
+        _rowType: b.isPublicBooking ? "public" : "regular",
       }));
 
       setCompletedOrders(formatted);
@@ -432,6 +507,17 @@ export default function ListCompletedOrders() {
               </button>
 
               <button
+                onClick={() => setViewType("public")}
+                className={`px-4 py-2 rounded-lg font-bold text-xs transition ${
+                  viewType === "public"
+                    ? "bg-[#0f1c3f] text-white shadow-sm border border-[#0f1c3f]"
+                    : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-300"
+                }`}
+              >
+                Public Bookings
+              </button>
+
+              <button
                 onClick={() => setViewType("monthly")}
                 className={`px-4 py-2 rounded-lg font-bold text-xs transition ${
                   viewType === "monthly"
@@ -453,16 +539,24 @@ export default function ListCompletedOrders() {
           ) : viewType === "regular" ? (
             <DataTable
               columns={regularColumns}
-              data={completedOrders}
+              data={completedOrders.filter((o) => !o.isPublicBooking)}
               onView={handleViewRegular}
               onCopy={handleCopy}
-              rowsPerPage={5}
+              rowsPerPage={10}
+            />
+          ) : viewType === "public" ? (
+            <DataTable
+              columns={publicColumns}
+              data={completedOrders.filter((o) => o.isPublicBooking)}
+              onView={handleViewRegular}
+              onCopy={handleCopy}
+              rowsPerPage={10}
             />
           ) : (
             <DataTable
               columns={monthlyColumns}
               data={completedOrders}
-              rowsPerPage={5}
+              rowsPerPage={10}
               onView={handleViewMonthly}
             />
           )}

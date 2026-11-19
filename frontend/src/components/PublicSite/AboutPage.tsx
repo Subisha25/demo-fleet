@@ -31,14 +31,14 @@ export default function AboutPage() {
       <section className="bg-gradient-to-b from-[#F7F7FB] via-white to-[#F7F7FB] py-16 md:py-24 border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-4">
           <span className="inline-block px-3 py-1 rounded-full bg-[#5B3DF5]/10 text-[#5B3DF5] text-xs font-bold uppercase tracking-wider">
-            About FleetFlow
+            About CABZ
           </span>
           <h1 className="text-4xl sm:text-5xl font-black text-[#17171D] tracking-tight">
             Pioneering Corporate Transport & Fleet SaaS Excellence
           </h1>
           <p className="text-lg text-[#686875] max-w-3xl mx-auto leading-relaxed">
             Founded with a commitment to seamless enterprise mobility and expanding nationwide,
-            FleetFlow combines operational fleet management with intelligent cloud automation.
+            CABZ combines operational fleet management with intelligent cloud automation.
           </p>
         </div>
       </section>
@@ -56,7 +56,7 @@ export default function AboutPage() {
               </h2>
               <p className="text-base text-[#686875] leading-relaxed">
                 For years, corporate mobility relied on fragmented logbooks, manual odometer recordings,
-                and delayed month-end billing reconciliations. FleetFlow recognized that transport
+                and delayed month-end billing reconciliations. CABZ recognized that transport
                 operators needed more than spreadsheets—they needed an end-to-end operational operating system.
               </p>
               <p className="text-base text-[#686875] leading-relaxed">

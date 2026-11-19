@@ -36,7 +36,7 @@ dotenv.config();
 const JWT_SECRET = config.security.jwtSecret || process.env.JWT_SECRET || 'secret';
 
 const EXPECTED_PROTECTED_TABLES: Record<string, number> = {
-  employee: 2,
+  employee: 3,
   emailconfiguration: 40,
   configuration: 1,
   sms_logs: 30,

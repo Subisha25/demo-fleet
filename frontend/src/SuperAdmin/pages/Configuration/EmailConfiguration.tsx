@@ -143,8 +143,8 @@ const EmailConfiguration: React.FC = () => {
       accessor: 'fromName',
       render: (row: EmailConfig) => (
         <div className="text-xs">
-          <span className="font-semibold text-[#1C1A18]">{row.fromName || 'FleetFlow'}</span>
-          <span className="block text-[#7A7570] text-[11px]">{row.fromAddress || 'support@fleetflow.com'}</span>
+          <span className="font-semibold text-[#1C1A18]">{row.fromName || 'CABZ'}</span>
+          <span className="block text-[#7A7570] text-[11px]">{row.fromAddress || 'support@cabz.com'}</span>
         </div>
       ),
     },

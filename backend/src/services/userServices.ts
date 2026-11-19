@@ -6,7 +6,6 @@ import { Company } from '../models/company';
 import { Booking } from '../models/booking';
 import { Op } from 'sequelize';                    
 import { sendEmailFromTemplate } from "../services/emailConfServices"; 
-import { validateRegistrationAgainstPolicy } from '../services/policyService';
 import { MapCount } from '../models/mapCount';
 import XLSX from "xlsx";
 import fs from "fs";
@@ -469,20 +468,6 @@ let companyName = "";
 
     }
 
-    // Dynamic policy check for authorized email domains and custom employee formats
-    if (companyId && email) {
-      const policyValidation = await validateRegistrationAgainstPolicy(
-        companyId,
-        String(email).trim().toLowerCase(),
-        danfossuserId
-      );
-      if (!policyValidation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: policyValidation.message || "Email or Employee ID violates company policy",
-        });
-      }
-    }
     // Check for duplicate email (excluding current user)
     if (email) {
       const existingUserByEmail = await User.findOne({

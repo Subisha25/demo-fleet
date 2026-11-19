@@ -74,36 +74,59 @@ const [cancelLoading, setCancelLoading] = useState(false);
   const enrichBookings = async (bookings: ApiItem[]): Promise<ApiItem[]> => {
     return Promise.all(
       bookings.map(async (booking) => {
+        let snap: any = null;
         try {
-          const userRes = await axiosInstance.get(`/user/${booking.userId}`);
-          const user = userRes.data?.data;
-          const companyId = user?.companyId;
+          const parsed = typeof (booking as any).notes === "string" ? JSON.parse((booking as any).notes) : (booking as any).notes;
+          snap = parsed?.packageSnapshot || null;
+        } catch {}
 
-          let companyName = "-";
-          if (companyId) {
-            const companyRes = await axiosInstance.get(`/company/getCompanyById/${companyId}`);
-            companyName = companyRes.data?.data?.companyName || "-";
+        try {
+          let userName = (booking as any).user?.username || (booking as any).behalfOfName || snap?.customerName || "-";
+          let companyName = (booking as any).company?.companyName || (booking as any).user?.company?.companyName || snap?.companyName || "-";
+          let emailAddress = (booking as any).user?.email || snap?.customerEmail || (booking as any).behalfOfPhone || "-";
+
+          if (booking.userId) {
+            try {
+              const userRes = await axiosInstance.get(`/user/${booking.userId}`);
+              const user = userRes.data?.data;
+              if (user) {
+                userName = user.username || userName;
+                emailAddress = user.email || emailAddress;
+                if (user.companyId && companyName === "-") {
+                  const companyRes = await axiosInstance.get(`/company/getCompanyById/${user.companyId}`);
+                  companyName = companyRes.data?.data?.companyName || companyName;
+                }
+              }
+            } catch {}
+          } else if ((booking as any).companyId && companyName === "-") {
+            try {
+              const companyRes = await axiosInstance.get(`/company/getCompanyById/${(booking as any).companyId}`);
+              companyName = companyRes.data?.data?.companyName || companyName;
+            } catch {}
           }
 
+          const rawDate = booking.bookingDate ? booking.bookingDate.split("T")[0] : "";
+          const rawTime = booking.bookingTime || "00:00:00";
+
           return {
             ...booking,
             orderDate: formatToCustom(booking.createdAt),
-           // pickupDate: formatToCustom(booking.bookingDate),
-           pickupDate: formatToCustom(`${booking.bookingDate.split("T")[0]}T${booking.bookingTime}`),
-            userName: user?.username || "-",
+            pickupDate: rawDate ? formatToCustom(`${rawDate}T${rawTime}`) : "-",
+            userName,
             companyName,
-            emailAddress: user?.email || "-",
+            emailAddress,
           };
         } catch {
+          const rawDate = booking.bookingDate ? booking.bookingDate.split("T")[0] : "";
+          const rawTime = booking.bookingTime || "00:00:00";
+
           return {
             ...booking,
             orderDate: formatToCustom(booking.createdAt),
-           // pickupDate: formatToCustom(booking.bookingDate),
-           pickupDate: formatToCustom(`${booking.bookingDate.split("T")[0]}T${booking.bookingTime}`),
-
-            userName: "-",
-            companyName: "-",
-            emailAddress: "-",
+            pickupDate: rawDate ? formatToCustom(`${rawDate}T${rawTime}`) : "-",
+            userName: (booking as any).behalfOfName || snap?.customerName || "-",
+            companyName: (booking as any).company?.companyName || snap?.companyName || "-",
+            emailAddress: snap?.customerEmail || (booking as any).behalfOfPhone || "-",
           };
         }
       })

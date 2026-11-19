@@ -1,9 +1,12 @@
 import { Request, Response } from 'express';
 import { Package } from '../models/package';
-import { VehicleType } from '../models/vehicleType'; // Changed from Vehicle to VehicleType
+import { VehicleType } from '../models/vehicleType';
+import { VehicleMaster } from '../models/vehicleMaster';
+import { Vehicle } from '../models/vehicle';
 import { Company } from '../models/company';
 import { PackageData } from '../models';
 import { USERS } from "../utils/costants";
+import { ROOT_TENANT_ID } from '../context/tenantContext';
 const { ROLES } = USERS;
 
  export const createPackage = async (req: any, res: Response) =>  {
@@ -21,13 +24,13 @@ const { ROLES } = USERS;
       });
     }
 
-    // ✅ add Monthly Bookings
-    const validPackageTypes = ["Out Station", "Local City Use", "Monthly Bookings"];
+    // ✅ add Monthly Bookings and Public Booking
+    const validPackageTypes = ["Out Station", "Local City Use", "Monthly Bookings", "Public Booking", "PUBLIC_BOOKING"];
     if (!validPackageTypes.includes(packageType)) {
       return res.status(400).json({
         success: false,
         message:
-          'Invalid packageType. Must be "Out Station" or "Local City Use" or "Monthly Bookings"',
+          'Invalid packageType. Must be "Out Station", "Local City Use", "Monthly Bookings", or "Public Booking"',
       });
     }
 
@@ -36,7 +39,7 @@ const { ROLES } = USERS;
       return res.status(404).json({ success: false, message: "Company not found" });
     }
 
-    const newPackage = await Package.create({ companyId, packageType });
+    const newPackage = await Package.create({ companyId, packageType, tenantId: req.tenantId || company.tenantId });
     const createdPackage = await Package.findByPk(newPackage.packageId);
 
     return res.status(201).json({
@@ -211,16 +214,104 @@ export const getvehicleTypesByPackageId = async (req: any, res: Response) => {
         .json({ success: false, message: "Package not found" });
     }
 
-    // ✅ NOW: Return ALL vehicle types (no bookingType filter)
+    const comp = await Company.findByPk(packageDetails.companyId);
+    const tenantId = req.tenantId || (packageDetails as any).tenantId || comp?.tenantId;
+
+    // ✅ PUBLIC BOOKING: Return actual fleet vehicles from VehicleMaster with authoritative seatCapacity
+    if (packageDetails.packageType === "PUBLIC_BOOKING" || packageDetails.packageType === "Public Booking") {
+      const vmWhere: any = { isDeleted: 0 };
+      if (tenantId && tenantId !== ROOT_TENANT_ID) {
+        vmWhere.tenantId = tenantId;
+      }
+
+      const vehicleMasters = await VehicleMaster.findAll({
+        where: vmWhere,
+        include: [
+          { model: Vehicle, as: "vehicle", required: false },
+          { model: VehicleType, as: "vehicleTypes", required: false },
+        ],
+        order: [["vehicleModelName", "ASC"], ["vehicleNumber", "ASC"]],
+      });
+
+      let formattedVehicles: any[] = [];
+
+      if (vehicleMasters.length > 0) {
+        formattedVehicles = vehicleMasters.map((vm: any) => {
+          const vt = vm.vehicleTypes;
+          const v = vm.vehicle;
+          const seatCapacity = vt?.seatCapacity ? Number(vt.seatCapacity) : 4;
+          const vehicleImg = v?.vehicleImg || vt?.vehicleImg || null;
+
+          return {
+            vehicleMasterId: vm.vehicleMasterId,
+            vehicleId: vm.vehicleId,
+            vehicleTypeId: vm.vehicleTypeId,
+            vehicleModelName: vm.vehicleModelName || v?.vehicleName || "Vehicle",
+            vehicleNumber: vm.vehicleNumber,
+            vehicleType: vm.vehicleType || vt?.vehicleType || "Cab",
+            seatCapacity,
+            vehicleImg,
+            vendorName: vm.vendorName,
+          };
+        });
+      } else {
+        // Fallback: If no VehicleMaster records yet, load from Vehicle for this tenant
+        const vWhere: any = { isDeleted: false };
+        if (tenantId && tenantId !== ROOT_TENANT_ID) {
+          vWhere.tenantId = tenantId;
+        }
+
+        const vehicles = await Vehicle.findAll({
+          where: vWhere,
+          include: [{ model: VehicleType, required: false }],
+          order: [["vehicleName", "ASC"]],
+        });
+
+        formattedVehicles = vehicles.map((v: any) => {
+          const vt = v.vehicleType;
+          const seatCapacity = vt?.seatCapacity ? Number(vt.seatCapacity) : 4;
+          return {
+            vehicleMasterId: v.vehicleId,
+            vehicleId: v.vehicleId,
+            vehicleTypeId: v.vehicleTypeId,
+            vehicleModelName: v.vehicleName,
+            vehicleNumber: v.manufacturing || "Fleet Vehicle",
+            vehicleType: vt?.vehicleType || "Cab",
+            seatCapacity,
+            vehicleImg: v.vehicleImg || vt?.vehicleImg || null,
+          };
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Public Booking Vehicles Retrieved Successfully",
+        data: {
+          packageInfo: packageDetails,
+          vehicleTypes: formattedVehicles, // backward compat
+          vehicles: formattedVehicles,
+          totalCount: formattedVehicles.length,
+        },
+      });
+    }
+
+    // ✅ STANDARD PACKAGES (Local City Use, Out Station, Monthly Bookings):
+    // Scope by tenantId so cross-tenant vehicle types are never leaked or duplicated
+    const vtWhere: any = { isDeleted: false };
+    if (tenantId && tenantId !== ROOT_TENANT_ID) {
+      vtWhere.tenantId = tenantId;
+    }
+
     const vehicleTypes = await VehicleType.findAll({
-      where: { isDeleted: false },
+      where: vtWhere,
       order: [["vehicleType", "ASC"]],
     });
 
     const formattedVehicleTypes = vehicleTypes.map((vt: any) => ({
       vehicleTypeId: vt.vehicleTypeId,
       vehicleType: vt.vehicleType,
-      bookingType: vt.bookingType, // optional - UI ku venumna use panniko
+      bookingType: vt.bookingType,
+      seatCapacity: vt.seatCapacity || 4,
       createdAt: vt.createdAt,
     }));
 

@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Op } from 'sequelize';
 import { NotificationLog } from '../models/notificationLog';
 import { Employee } from '../models/employee';
+import { EmailConfiguration } from '../models/emailConfiguration';
 import { ROOT_TENANT_ID, getTenantContext } from '../context/tenantContext';
 import config from '../config/config';
 import { isEmailMockMode, isSmsMockMode } from '../utils/mockModes';
@@ -86,7 +87,7 @@ export function isTestOrSyntheticRecipient(recipient: string): boolean {
  * Precedence:
  * 1. Primary Source: Verified Database SuperAdmin Profile (employee table: role='superadmin', tenantId=ROOT_TENANT_ID)
  * 2. Fallback Source: SUPERADMIN_EMAIL in backend/.env
- * 3. Fail-safe: Generic platform fallback (admin@fleetflow.app)
+ * 3. Fail-safe: Generic platform fallback (admin@cabz.com)
  */
 export async function getSuperAdminEmail(): Promise<string> {
   // 1. Primary: Database SuperAdmin Employee Record
@@ -121,7 +122,7 @@ export async function getSuperAdminEmail(): Promise<string> {
     return envEmail;
   }
 
-  return 'admin@fleetflow.app';
+  return 'admin@cabz.com';
 }
 
 /**
@@ -181,6 +182,16 @@ function sanitizeMetadata(data?: Record<string, any>): Record<string, any> | nul
   }
 }
 
+function replacePlaceholders(template: string, data: Record<string, string>): string {
+  if (!template) return '';
+  return Object.keys(data).reduce((acc, key) => {
+    const val = data[key] ?? '';
+    const legacyRegex = new RegExp(`###${key}###`, 'gi');
+    const mustacheRegex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'gi');
+    return acc.replace(legacyRegex, val).replace(mustacheRegex, val);
+  }, template);
+}
+
 /**
  * Generates brand-aligned HTML emails using warm cream/terracotta aesthetics (NO BLUE).
  */
@@ -215,8 +226,8 @@ function renderBrandEmailHtml(subject: string, bodyText: string, actionUrl?: str
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
             <td>
-              <h1 style="margin: 0; color: #FFFFFF; font-size: 20px; font-weight: 800; letter-spacing: 0.5px;">FLEETFLOW</h1>
-              <p style="margin: 4px 0 0 0; color: #FBECE4; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Fleet Operations & Mobility SaaS Platform</p>
+              <h1 style="margin: 0; color: #FFFFFF; font-size: 20px; font-weight: 800; letter-spacing: 0.5px;">CABZ</h1>
+              <p style="margin: 4px 0 0 0; color: #FBECE4; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Smart Fleet Mobility Platform</p>
             </td>
           </tr>
         </table>
@@ -232,10 +243,10 @@ function renderBrandEmailHtml(subject: string, bodyText: string, actionUrl?: str
       <!-- Footer -->
       <div style="background-color: #F5F2EB; padding: 20px 30px; border-top: 1px solid #E0DAD1; text-align: center;">
         <p style="margin: 0 0 6px 0; font-size: 12px; color: #7A7570;">
-          This is an automated operational notification from FleetFlow Mobility Platform.
+          This is an automated operational notification from CABZ Mobility Platform.
         </p>
         <p style="margin: 0; font-size: 11px; color: #9B958E;">
-          Need assistance? Contact support at <a href="mailto:support@fleetflow.com" style="color: #C04E24; text-decoration: none;">support@fleetflow.com</a>
+          Need assistance? Contact support at <a href="mailto:support@cabz.com" style="color: #C04E24; text-decoration: none;">support@cabz.com</a>
         </p>
       </div>
     </div>
@@ -269,6 +280,7 @@ export async function sendNotification(options: SendNotificationOptions): Promis
   let providerStatus: 'QUEUED' | 'SENT' | 'FAILED' | 'UNCONFIGURED' | 'MOCK' = 'QUEUED';
   let providerMessageId: string | null = null;
   let errorDetails: string | null = null;
+  let resolvedSubject = subject;
 
   // Strict validation: recipient must not be empty or missing
   if (!recipient || !recipient.trim()) {
@@ -286,11 +298,44 @@ export async function sendNotification(options: SendNotificationOptions): Promis
       providerStatus: 'FAILED',
       providerMessageId: null,
       errorDetails: emptyMsg,
-      metadata: sanitizeMetadata(metadata),
+      metadata: sanitizeMetadata({
+        ...metadata,
+        subject: resolvedSubject,
+        accepted: [recipient],
+      }),
     });
     return { success: false, logId, providerStatus: 'FAILED', error: emptyMsg };
   }
 
+
+  // Strict format validation for EMAIL
+  if (channel === 'EMAIL') {
+    const cleanEmail = String(recipient || '').trim().toLowerCase();
+    const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!cleanEmail || !EMAIL_REGEX.test(cleanEmail)) {
+      const invalidMsg = `Failed: Invalid destination EMAIL recipient address: "${recipient}". Fallback rerouting to SuperAdmin is strictly prohibited.`;
+      console.warn(`[NotificationService] ${invalidMsg}`);
+      await NotificationLog.create({
+        logId,
+        channel,
+        recipient: cleanEmail || 'INVALID_EMAIL',
+        tenantId: tenantId || null,
+        templateCode,
+        referenceEntity: referenceEntity || null,
+        referenceId: referenceId || null,
+        idempotencyKey: idempotencyKey || null,
+        providerStatus: 'FAILED',
+        providerMessageId: null,
+        errorDetails: invalidMsg,
+        metadata: sanitizeMetadata({
+        ...metadata,
+        subject: resolvedSubject,
+        accepted: [recipient],
+      }),
+      });
+      return { success: false, logId, providerStatus: 'FAILED', error: invalidMsg };
+    }
+  }
 
   // Strict format validation for SMS
   let normalizedRecipient = recipient.trim();
@@ -311,7 +356,11 @@ export async function sendNotification(options: SendNotificationOptions): Promis
         providerStatus: 'FAILED',
         providerMessageId: null,
         errorDetails: invalidMsg,
-        metadata: sanitizeMetadata(metadata),
+        metadata: sanitizeMetadata({
+        ...metadata,
+        subject: resolvedSubject,
+        accepted: [recipient],
+      }),
       });
       return { success: false, logId, providerStatus: 'FAILED', error: invalidMsg };
     }
@@ -360,6 +409,58 @@ export async function sendNotification(options: SendNotificationOptions): Promis
     }
   }
 
+  // Resolve template content for email if available
+  resolvedSubject = subject;
+  let resolvedHtml = '';
+  let emailConf: EmailConfiguration | null = null;
+
+  if (channel === 'EMAIL') {
+    if (templateCode) {
+      try {
+        emailConf = await EmailConfiguration.findOne({ where: { emailCode: templateCode } });
+      } catch (confErr) {
+        console.warn(`[NotificationService] Could not query email template "${templateCode}":`, confErr);
+      }
+    }
+
+    const templateData: Record<string, string> = {
+      FleetName: metadata?.fleetName || 'CABZ',
+      CompanyName: metadata?.fleetName || 'CABZ',
+      BusinessCode: metadata?.businessCode || '',
+      OwnerName: metadata?.ownerName || 'Valued User',
+      ContactEmail: metadata?.contactEmail || recipient,
+      ContactPhone: metadata?.contactPhone || '',
+      City: metadata?.city || '',
+      State: metadata?.state || '',
+      PlanTier: metadata?.planTier || '',
+      BillingCycle: metadata?.billingCycle || '',
+      AgreedPrice: metadata?.agreedPrice != null ? String(metadata.agreedPrice) : '',
+      ActivationUrl: metadata?.activationUrl || '',
+      LoginUrl: metadata?.loginUrl || metadata?.fleetLoginUrl || '',
+      FleetLoginUrl: metadata?.fleetLoginUrl || metadata?.loginUrl || '',
+      ReviewUrl: metadata?.reviewUrl || '',
+      RejectionReason: metadata?.rejectionReason || '',
+      SupportEmail: metadata?.supportEmail || 'support@cabz.com',
+      PlanSummaryPdfUrl: metadata?.planSummaryPdfUrl || '',
+      ...metadata,
+    };
+
+    if (emailConf) {
+      if (emailConf.subject) {
+        resolvedSubject = replacePlaceholders(emailConf.subject, templateData);
+      }
+      if (emailConf.message) {
+        resolvedHtml = replacePlaceholders(emailConf.message, templateData);
+      }
+    }
+
+    if (!resolvedHtml) {
+      const actionUrl = metadata?.activationUrl || metadata?.loginUrl || metadata?.renewalUrl;
+      const actionText = metadata?.actionText;
+      resolvedHtml = renderBrandEmailHtml(resolvedSubject, body, actionUrl, actionText);
+    }
+  }
+
   // Determine whether to mock delivery (safe test / synthetic domain protection)
   let isMockMode = false;
   if (channel === 'EMAIL') {
@@ -387,16 +488,23 @@ export async function sendNotification(options: SendNotificationOptions): Promis
           console.log(`[EMAIL] Recipient: ${maskEmail(recipient)}`);
           console.log(`[EMAIL] SMTP authentication: SUCCESS`);
 
-          const actionUrl = metadata?.activationUrl || metadata?.loginUrl || metadata?.renewalUrl;
-          const actionText = metadata?.actionText;
+          const fromDisplayName = (emailConf?.fromName && emailConf.fromName !== 'No-Reply')
+            ? emailConf.fromName
+            : (smtpConfig.fromName || 'CABZ Platform');
 
-          const info = await transporter.sendMail({
-            from: `"${smtpConfig.fromName || 'FleetFlow Platform'}" <${smtpConfig.fromAddress || smtpConfig.user}>`,
-            to: recipient,
-            subject,
-            text: body,
-            html: renderBrandEmailHtml(subject, body, actionUrl, actionText),
-          });
+          const mailOptions: any = {
+            from: `"${fromDisplayName}" <${smtpConfig.fromAddress || smtpConfig.user}>`,
+            to: recipient.trim().toLowerCase(),
+            subject: resolvedSubject,
+            text: body || resolvedSubject,
+            html: resolvedHtml,
+          };
+
+          if (metadata?.attachments && Array.isArray(metadata.attachments) && metadata.attachments.length > 0) {
+            mailOptions.attachments = metadata.attachments;
+          }
+
+          const info = await transporter.sendMail(mailOptions);
 
           console.log(`[EMAIL] SMTP message accepted: SUCCESS (Message ID: ${info.messageId})`);
 
@@ -433,7 +541,7 @@ export async function sendNotification(options: SendNotificationOptions): Promis
           } else {
             const smsRes = await sendDirectSms(
               phoneCheck.normalizedPhone,
-              body || `FleetFlow Alert: ${templateCode}`,
+              body || `CABZ Alert: ${templateCode}`,
               smsTemplateName,
               undefined,
               resolvedTenantId
@@ -468,7 +576,11 @@ export async function sendNotification(options: SendNotificationOptions): Promis
       errorDetails,
       retryCount: 0,
       maxRetries: 3,
-      metadata: sanitizeMetadata(metadata),
+      metadata: sanitizeMetadata({
+        ...metadata,
+        subject: resolvedSubject,
+        accepted: [recipient],
+      }),
     });
   } catch (dbErr) {
     console.error('[NotificationService] Failed to write notification_log row:', dbErr);

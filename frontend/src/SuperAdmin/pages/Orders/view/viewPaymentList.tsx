@@ -225,11 +225,16 @@ interface OrderRowUI {
   monthlyInvoiceId?: string;
   orderDate: string;
   pickupPoint: string;
+  dropPoint?: string;
   totalAmount: number;
   invoiceNumber: string;
   invoiceAmount: number;
   discount: number;
   status: string;
+  fleetName?: string;
+  companyName?: string;
+  passengerName?: string;
+  isPublicBooking?: boolean;
   viewType: "regular" | "monthly";
 }
 
@@ -327,18 +332,31 @@ const ViewPaymentList: React.FC = () => {
       });
 
       const invoiceList = data.invoices || [];
-      const formattedOrders: OrderRowUI[] = invoiceList.map((inv: any) => ({
-        bookingCode: inv.booking?.bookingCode || "—",
-        bookingId: inv.booking?.bookingId,
-        orderDate: formatToCustom(data.createdAt),
-        pickupPoint: inv.booking?.pickupPoint || "—",
-        totalAmount: Number(inv.invoiceAmount || 0),
-        invoiceNumber: inv.invoiceNumber || "—",
-        invoiceAmount: Number(inv.invoiceAmount || 0),
-        discount: 0,
-        status: getStatusText(inv.invoiceStatus),
-        viewType: "regular",
-      }));
+      const formattedOrders: OrderRowUI[] = invoiceList.map((inv: any) => {
+        const b = inv.booking || {};
+        const isPublic =
+          b.bookingCreatedBy === "PUBLIC_BOOKING" ||
+          b.preferredType === "PUBLIC_BOOKING" ||
+          b.behalfOfName;
+
+        return {
+          bookingCode: b.bookingCode || "—",
+          bookingId: b.bookingId,
+          orderDate: formatToCustom(data.createdAt),
+          pickupPoint: b.pickupPoint || "—",
+          dropPoint: b.dropPoint || "—",
+          totalAmount: Number(inv.invoiceAmount || 0),
+          invoiceNumber: inv.invoiceNumber || "—",
+          invoiceAmount: Number(inv.invoiceAmount || 0),
+          discount: 0,
+          status: getStatusText(inv.invoiceStatus),
+          fleetName: b.tenant?.name || "—",
+          companyName: b.company?.companyName || b.user?.company?.companyName || "—",
+          passengerName: b.user?.username || b.behalfOfName || "—",
+          isPublicBooking: !!isPublic,
+          viewType: "regular",
+        };
+      });
 
       setOrders(formattedOrders);
     } catch (err) {
@@ -473,8 +491,10 @@ const ViewPaymentList: React.FC = () => {
                   <thead className="bg-gray-100 text-gray-700">
                     <tr>
                       <th className="p-2 border">Order Number</th>
+                      <th className="p-2 border">Fleet / Company</th>
+                      <th className="p-2 border">Passenger</th>
                       <th className="p-2 border">Order Date</th>
-                      <th className="p-2 border">Pickup Point</th>
+                      <th className="p-2 border">Route</th>
                       <th className="p-2 border">Total Amount (Rs.)</th>
                       <th className="p-2 border">Invoice Number</th>
                       <th className="p-2 border">Invoice Amount (Rs.)</th>
@@ -492,29 +512,44 @@ const ViewPaymentList: React.FC = () => {
                             onClick={() => handleOrderClick(o)}
                             title="Open order"
                           >
-                            {o.bookingCode}
+                            <div>{o.bookingCode}</div>
+                            {o.isPublicBooking && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-bold">
+                                PUBLIC
+                              </span>
+                            )}
                           </td>
 
-                          <td className="p-2 border">{o.orderDate}</td>
-                          <td className="p-2 border">{o.pickupPoint}</td>
-                          <td className="p-2 border">
+                          <td className="p-2 border text-left text-xs">
+                            <div className="font-semibold text-slate-800">{o.fleetName || "-"}</div>
+                            <div className="text-slate-500">{o.companyName || "-"}</div>
+                          </td>
+                          <td className="p-2 border text-xs">{o.passengerName || "-"}</td>
+                          <td className="p-2 border text-xs">{o.orderDate}</td>
+                          <td className="p-2 border text-xs text-left">
+                            <div>{o.pickupPoint}</div>
+                            {o.dropPoint && o.dropPoint !== "—" && (
+                              <div className="text-gray-400">to {o.dropPoint}</div>
+                            )}
+                          </td>
+                          <td className="p-2 border font-medium">
                             ₹{o.totalAmount.toLocaleString("en-IN")}
                           </td>
-                          <td className="p-2 border">{o.invoiceNumber}</td>
-                          <td className="p-2 border">
+                          <td className="p-2 border font-mono text-xs">{o.invoiceNumber}</td>
+                          <td className="p-2 border font-semibold text-emerald-700">
                             ₹{Number(o.invoiceAmount || 0).toLocaleString("en-IN")}
                           </td>
-                          <td className="p-2 border">
+                          <td className="p-2 border text-xs">
                             ₹{Number(o.discount || 0).toLocaleString("en-IN")}
                           </td>
-                          <td className="p-2 border text-green-600 font-medium">
+                          <td className="p-2 border text-green-600 font-medium text-xs">
                             {o.status}
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={8} className="p-4 text-center text-gray-500">
+                        <td colSpan={10} className="p-4 text-center text-gray-500">
                           No invoices linked with this payment.
                         </td>
                       </tr>

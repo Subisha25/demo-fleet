@@ -22,6 +22,7 @@ import { BookingSequence } from './booking_sequence';
 import { ClosePending } from './closepending';
 import { VehicleMaster } from './vehicleMaster';
 import { Company } from './company';
+import { Tenant } from './tenant';
 
 @Table({
   tableName: 'booking',
@@ -36,12 +37,16 @@ export class Booking extends Model {
   })
   bookingId!: string;
 
+  @ForeignKey(() => Tenant)
   @Column({
     type: DataType.UUID,
     allowNull: true,
     defaultValue: 'e7b8a1c0-0000-0000-0000-000000000001',
   })
   tenantId!: string;
+
+  @BelongsTo(() => Tenant, { as: "tenant", foreignKey: "tenantId" })
+  tenant!: Tenant;
 
   @Column(DataType.DATE)
   bookingDate!: Date;

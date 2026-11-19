@@ -42,10 +42,10 @@ export class Package extends Model {
     company!: Company;
 
     @Column({
-        type: DataType.ENUM('Out Station', 'Local City Use'),
+        type: DataType.STRING(50),
         allowNull: false
     })
-    packageType!: 'Out Station' | 'Local City Use';
+    packageType!: string;
     @Column({
         type: DataType.BOOLEAN,
         defaultValue: false,

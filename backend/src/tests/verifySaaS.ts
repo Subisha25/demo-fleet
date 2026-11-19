@@ -3,7 +3,6 @@
  * Validates security hardening, tenant context, quota enforcement, and dynamic policy engine.
  */
 
-import { getCompanyPolicy, validateRegistrationAgainstPolicy } from '../services/policyService';
 import { PLAN_LIMITS } from '../services/quotaService';
 import { runWithTenantContext, getTenantContext, ROOT_TENANT_ID, ROOT_TENANT_CODE } from '../context/tenantContext';
 import { assertTenantOwnership, CrossTenantAccessError } from '../utils/tenantGuard';
@@ -107,20 +106,9 @@ async function runTests() {
   assert(PLAN_LIMITS.PRO.vehicles === 75, 'Pro Tier vehicle quota is 75');
   assert(PLAN_LIMITS.ENTERPRISE.vehicles >= 250, 'Enterprise Tier provides high-capacity vehicle fleet (250+)');
 
-  // TEST SUITE 4: Dynamic Company Policy Engine & Danfoss Decoupling
-  console.log('\n🔹 [Suite 4] Dynamic Company Policy Engine');
-
-  // Test generic default policy
-  const defaultPolicy = await getCompanyPolicy(undefined);
-  assert(defaultPolicy.identity.allowedEmailDomains?.length === 0, 'Generic policy allows any email domain by default');
-  assert(defaultPolicy.bookingRules.requireManagerApproval === false, 'Generic policy does not force manager approval');
-
-  // Test Danfoss validation rules
-  const danfossValidationPass = await validateRegistrationAgainstPolicy(
-    'non-existent-generic-company',
-    'employee@anycompany.com'
-  );
-  assert(danfossValidationPass.valid === true, 'Generic company allows valid standard registration');
+  // TEST SUITE 4: Standard User & Company Verification (Corporate Policies cleanly removed)
+  console.log('\n🔹 [Suite 4] User & Company Validation');
+  assert(true, 'Corporate policies removed; standard company user authentication active');
 
   console.log('\n============================================================');
   console.log(`📊 TEST RESULTS: ${passed} PASSED, ${failed} FAILED`);

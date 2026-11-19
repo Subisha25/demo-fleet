@@ -215,3 +215,44 @@ export function maskEmail(email?: string | null): string {
   }
   return `${localPart[0]}${'*'.repeat(Math.max(1, localPart.length - 2))}${localPart[localPart.length - 1]}@${domain}`;
 }
+
+export const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+export const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+export const PINCODE_REGEX = /^[1-9][0-9]{5}$/;
+export const VEHICLE_REG_REGEX = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$/;
+
+export function validatePan(pan?: string | null): { valid: boolean; normalized: string; error?: string } {
+  if (!pan || typeof pan !== 'string') return { valid: false, normalized: '', error: 'PAN is required.' };
+  const normalized = pan.trim().toUpperCase();
+  if (normalized.length !== 10) return { valid: false, normalized, error: 'PAN must be exactly 10 characters.' };
+  if (!PAN_REGEX.test(normalized)) return { valid: false, normalized, error: 'Invalid PAN format. Expected format: ABCDE1234F' };
+  return { valid: true, normalized };
+}
+
+export function validateGstin(gstin?: string | null): { valid: boolean; normalized: string; error?: string } {
+  if (!gstin || typeof gstin !== 'string') return { valid: false, normalized: '', error: 'GSTIN is required.' };
+  const normalized = gstin.trim().toUpperCase();
+  if (normalized.length !== 15) return { valid: false, normalized, error: 'GSTIN must be exactly 15 characters.' };
+  if (!GSTIN_REGEX.test(normalized)) return { valid: false, normalized, error: 'Invalid GSTIN format. Expected format: 22AAAAA0000A1Z5' };
+  return { valid: true, normalized };
+}
+
+export function validatePinCode(pin?: string | null): { valid: boolean; normalized: string; error?: string } {
+  if (!pin || typeof pin !== 'string') return { valid: false, normalized: '', error: 'PIN Code is required.' };
+  const normalized = pin.trim().replace(/\D/g, '');
+  if (normalized.length !== 6) return { valid: false, normalized, error: 'PIN Code must be exactly 6 digits.' };
+  if (!PINCODE_REGEX.test(normalized)) return { valid: false, normalized, error: 'Invalid PIN Code format.' };
+  return { valid: true, normalized };
+}
+
+export function validateVehicleRegistration(reg?: string | null): { valid: boolean; normalized: string; error?: string } {
+  if (!reg || typeof reg !== 'string') return { valid: false, normalized: '', error: 'Vehicle Registration number is required.' };
+  const normalized = reg.trim().toUpperCase().replace(/[\s\-]/g, '');
+  if (normalized.length < 5 || normalized.length > 13) {
+    return { valid: false, normalized, error: 'Vehicle registration must be between 5 and 13 characters.' };
+  }
+  if (!VEHICLE_REG_REGEX.test(normalized)) {
+    return { valid: false, normalized, error: 'Invalid Indian vehicle registration format (e.g. MH01AB1234 or DL1CA9999).' };
+  }
+  return { valid: true, normalized };
+}

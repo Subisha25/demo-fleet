@@ -56,16 +56,16 @@ interface TenantContextType {
 
 const DEFAULT_ROOT_TENANT: TenantInfo = {
   tenantId: 'e7b8a1c0-0000-0000-0000-000000000001',
-  name: 'FleetFlow Fleet Operations',
-  code: 'FF',
-  subdomain: 'fleetflow',
+  name: 'CABZ Fleet Operations',
+  code: 'CZ',
+  subdomain: 'cabz',
   status: 'ACTIVE',
   planTier: 'ENTERPRISE',
   contactEmail: 'subisha2002.m@gmail.com',
   brandingTokens: {
     primaryColor: '#5B3DF5',
     secondaryColor: '#0B0B0F',
-    portalTitle: 'FleetFlow Mobility Platform',
+    portalTitle: 'CABZ Mobility Platform',
   },
   subscription: {
     planTier: 'ENTERPRISE',
@@ -89,7 +89,7 @@ const ALL_FLEETS_TENANT: TenantInfo = {
   brandingTokens: {
     primaryColor: '#5B3DF5',
     secondaryColor: '#0B0B0F',
-    portalTitle: 'FleetFlow Global Platform',
+    portalTitle: 'CABZ Global Platform',
   },
 };
 
@@ -119,11 +119,11 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const title = tenant.brandingTokens?.portalTitle || tenant.displayName || tenant.name;
     document.documentElement.style.setProperty('--primary-tenant-color', primary);
     if (tenant.tenantId === 'all' || !tenant.tenantId || tenant.tenantId === 'e7b8a1c0-0000-0000-0000-000000000001') {
-      document.title = 'FleetFlow | Enterprise Cloud Mobility & Fleet Operations Platform';
-    } else if (title && title !== 'FleetFlow') {
-      document.title = `${title} — FleetFlow`;
+      document.title = 'CABZ | Smart Fleet Mobility';
+    } else if (title && title !== 'CABZ') {
+      document.title = `${title} — CABZ`;
     } else {
-      document.title = 'FleetFlow | Enterprise Cloud Mobility & Fleet Operations Platform';
+      document.title = 'CABZ | Smart Fleet Mobility';
     }
   };
 

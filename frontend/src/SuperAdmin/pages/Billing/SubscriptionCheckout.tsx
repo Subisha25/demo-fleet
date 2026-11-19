@@ -244,7 +244,7 @@ const SubscriptionCheckout: React.FC = () => {
           </div>
 
           <h2 className="text-xl font-black tracking-tight mt-3 text-white">
-            Workspace: {currentTenant?.name || "FleetFlow Fleet Operations"}
+            Workspace: {currentTenant?.name || "CABZ Fleet Operations"}
           </h2>
           <p className="text-xs text-slate-300 mt-1">
             Authoritative multi-tenant context. Enforced backend quotas protect database integrity.

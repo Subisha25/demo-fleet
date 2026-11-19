@@ -27,11 +27,13 @@ import { Pickuparea } from '../models/pickuparea';
 import { PaymentMode } from '../models/paymentmode';
 import { VehicleType } from '../models/vehicleType';
 import { VehicleMaster } from '../models/vehicleMaster';
-import { PLAN_LIMITS, PLAN_CATALOG, getOrCreateSubscription, getTenantEntitlementsSummary } from './quotaService';
+import { PLAN_LIMITS, PLAN_CATALOG, getOrCreateSubscription, getTenantEntitlementsSummary, getPlanDefinition } from './quotaService';
+import { generatePlanSummaryPDF } from './planSummaryPdfService';
 import { sendNotification } from './notificationService';
 import { generateUniqueFleetSlug, getFleetLoginUrl } from './slugService';
 import { Security } from '../utils/Security';
 import bcrypt from 'bcrypt';
+import sequelize from '../config/dbConfig';
 import config from '../config/config';
 
 const WEB_BASE_URL = config.baseurl?.webbaseurl || 'http://localhost:3000';
@@ -115,11 +117,16 @@ const SAC_REGEX = /^[0-9]{6}$/;
 export const createTenant = async (req: Request, res: Response) => {
   try {
     const {
-      name,
-      code,
+      name: rawName,
+      fleetName,
+      code: rawCode,
+      businessCode,
+      ownerName,
       subdomain,
       customDomain,
-      planTier = 'BASIC',
+      planTier: rawPlanTier,
+      requestedPlanTier,
+      billingCycle = 'MONTHLY',
       contactEmail,
       contactPhone,
       legalName,
@@ -138,6 +145,10 @@ export const createTenant = async (req: Request, res: Response) => {
       logoUrl,
       brandingTokens,
     } = req.body;
+
+    const name = rawName || fleetName;
+    const code = rawCode || businessCode;
+    const planTier = rawPlanTier || requestedPlanTier || 'BASIC';
 
     if (!name || !code) {
       return res.status(400).json({
@@ -245,78 +256,164 @@ export const createTenant = async (req: Request, res: Response) => {
 
     const slug = await generateUniqueFleetSlug(displayName || name);
 
-    const newTenant = await Tenant.create({
-      tenantId,
-      name,
-      code: cleanCode,
-      slug,
-      legalName: legalName || name,
-      displayName: displayName || name,
-      registeredAddress: registeredAddress || null,
-      gstin: cleanGstin,
-      panNumber: cleanPan,
-      sacCode: cleanSac,
-      website: website || null,
-      businessEmail: businessEmail || contactEmail || null,
-      businessPhone: businessPhone || contactPhone || null,
-      billingFooterText: billingFooterText || null,
-      city: city || null,
-      state: state || null,
-      pinCode: pinCode || null,
-      logoUrl: logoUrl || (brandingTokens?.logoUrl) || null,
-      subdomain: subdomain ? subdomain.toLowerCase().trim() : undefined,
-      customDomain: customDomain ? customDomain.toLowerCase().trim() : undefined,
-      planTier: normalizedTier,
-      status: 'ACTIVE',
-      contactEmail,
-      contactPhone,
-      brandingTokens: mergedBrandingTokens,
-    });
+    const cleanBillingCycle = (billingCycle || 'MONTHLY').toUpperCase() === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY';
+    const plan = await getPlanDefinition(normalizedTier);
+    const agreedPrice = cleanBillingCycle === 'ANNUAL'
+      ? (plan?.priceAnnualINR || 3560)
+      : (plan?.priceMonthlyINR || 349);
+    const periodEnd = new Date(Date.now() + (cleanBillingCycle === 'ANNUAL' ? 365 : 30) * 24 * 60 * 60 * 1000);
 
-    const subscription = await TenantSubscription.create({
-      subscriptionId: uuidv4(),
-      tenantId,
-      planTier: normalizedTier,
-      status: 'ACTIVE',
-      vehicleQuota: limits.vehicles,
-      driverQuota: limits.drivers,
-      companyQuota: limits.companies,
-      monthlyTripQuota: limits.trips,
-      allowOverage: normalizedTier !== 'BASIC',
-      monthlyOverageSpendCap: normalizedTier === 'PRO' ? 5000 : 1000,
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    });
-
+    let newTenant!: Tenant;
+    let subscription!: TenantSubscription;
     let rawToken: string | undefined;
     let activationUrl: string | undefined;
+    const adminDisplayName = ownerName || displayName || name;
+    const applicantEmail = contactEmail ? contactEmail.trim().toLowerCase() : '';
 
-    // Dispatches 24h expiring activation link so operator sets their own password
-    if (contactEmail && contactEmail.includes('@')) {
-      rawToken = `act_${crypto.randomBytes(32).toString('hex')}`;
-      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-      await TenantActivationToken.create({
-        tokenId: uuidv4(),
+    await sequelize.transaction(async (t) => {
+      newTenant = await Tenant.create({
         tenantId,
-        adminEmail: contactEmail.trim().toLowerCase(),
-        adminName: name,
-        tokenHash,
-        expiresAt,
-        isRevoked: false,
-      });
+        name,
+        code: cleanCode,
+        slug,
+        legalName: legalName || name,
+        displayName: displayName || name,
+        registeredAddress: registeredAddress || null,
+        gstin: cleanGstin,
+        panNumber: cleanPan,
+        sacCode: cleanSac,
+        website: website || null,
+        businessEmail: businessEmail || contactEmail || null,
+        businessPhone: businessPhone || contactPhone || null,
+        billingFooterText: billingFooterText || null,
+        city: city || null,
+        state: state || null,
+        pinCode: pinCode || null,
+        logoUrl: logoUrl || (brandingTokens?.logoUrl) || null,
+        subdomain: subdomain ? subdomain.toLowerCase().trim() : undefined,
+        customDomain: customDomain ? customDomain.toLowerCase().trim() : undefined,
+        planTier: normalizedTier,
+        status: 'ACTIVE',
+        contactEmail,
+        contactPhone,
+        brandingTokens: mergedBrandingTokens,
+      }, { transaction: t });
 
+      subscription = await TenantSubscription.create({
+        subscriptionId: uuidv4(),
+        tenantId,
+        planTier: normalizedTier,
+        status: 'ACTIVE',
+        vehicleQuota: limits.vehicles,
+        driverQuota: limits.drivers,
+        companyQuota: limits.companies,
+        monthlyTripQuota: limits.trips,
+        allowOverage: normalizedTier !== 'BASIC',
+        monthlyOverageSpendCap: normalizedTier === 'PRO' ? 5000 : 1000,
+        billingCycle: cleanBillingCycle,
+        agreedPrice,
+        currency: 'INR',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: periodEnd,
+      }, { transaction: t });
+
+      // Dispatches 24h expiring activation link so operator sets their own password
+      if (applicantEmail && applicantEmail.includes('@')) {
+        const existingToken = await TenantActivationToken.findOne({
+          where: {
+            tenantId,
+            isRevoked: false,
+            expiresAt: { [Op.gt]: new Date() },
+          },
+          transaction: t,
+        });
+
+        if (!existingToken) {
+          rawToken = `act_${crypto.randomBytes(32).toString('hex')}`;
+          const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+          const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+          await TenantActivationToken.create({
+            tokenId: uuidv4(),
+            tenantId,
+            adminEmail: applicantEmail,
+            adminName: adminDisplayName,
+            tokenHash,
+            expiresAt,
+            isRevoked: false,
+          }, { transaction: t });
+        }
+      }
+    });
+
+    if (rawToken) {
       activationUrl = `${WEB_BASE_URL}/activate-account?token=${rawToken}`;
+    }
+
+    // Generate Official SaaS Plan Summary Agreement PDF after transaction commits
+    let pdfResult: any = null;
+    if (applicantEmail && applicantEmail.includes('@')) {
+      try {
+        pdfResult = await generatePlanSummaryPDF({
+          tenantId,
+          fleetName: newTenant.name,
+          businessCode: cleanCode,
+          ownerName: adminDisplayName,
+          contactEmail: applicantEmail,
+          planName: plan?.name || `${normalizedTier} Mobility Plan`,
+          planTier: normalizedTier,
+          billingCycle: cleanBillingCycle,
+          agreedPrice,
+          currency: 'INR',
+          startDate: new Date(),
+          renewalDate: periodEnd,
+          quotas: {
+            vehicles: limits.vehicles,
+            drivers: limits.drivers,
+            companies: limits.companies,
+            trips: limits.trips,
+          },
+          features: plan?.features || [],
+        });
+      } catch (pdfErr) {
+        console.warn('[ProvisionTenant] Plan Summary PDF generation note:', pdfErr);
+      }
+
+      const fleetLoginUrl = getFleetLoginUrl(slug || newTenant.slug || code.toLowerCase());
+      const downloadPdfUrl = pdfResult?.downloadToken
+        ? `${WEB_BASE_URL}/api/tenants/public/plans/download/${pdfResult.downloadToken}`
+        : undefined;
+
       await sendNotification({
         channel: 'EMAIL',
-        recipient: contactEmail.trim().toLowerCase(),
+        recipient: applicantEmail,
         templateCode: 'TENANT_ADMIN_ACTIVATION_LINK',
-        subject: `🎉 Your Fleet Account Has Been Provisioned: Set Up Your Password`,
-        body: `Dear ${name} Administrator,\n\nYour fleet operator account on FleetFlow Mobility Platform has been provisioned.\n\nPlease click the secure activation link below to set your administrator password and access your dashboard:\n\n${activationUrl}\n\nNote: This link will expire in 24 hours.\n\nBest regards,\nFleetFlow SaaS Team`,
+        subject: `🎉 Congratulations! Your CABZ Account is Approved: ${newTenant.name}`,
+        body: `Dear ${adminDisplayName},\n\nYour fleet operator account for ${newTenant.name} on CABZ Mobility Platform has been approved and provisioned.\n\n` +
+          `STEP 1 — ACTIVATE YOUR ACCOUNT:\n` +
+          `Click your secure activation link to set your administrator password:\n` +
+          `${activationUrl || `${WEB_BASE_URL}/activate-account`}\n\n` +
+          `STEP 2 — DEDICATED FLEET LOGIN PORTAL:\n` +
+          `Once password is set, log in to your fleet portal at:\n` +
+          `${fleetLoginUrl}\n\n` +
+          `Note: This link will expire in 24 hours.\n\nBest regards,\nCABZ SaaS Team`,
         referenceEntity: 'TENANT',
         referenceId: tenantId,
-        metadata: { tenantId, activationUrl, actionText: 'Set Password & Activate' },
+        idempotencyKey: `tenant_activation_${tenantId}`,
+        metadata: {
+          tenantId,
+          fleetName: newTenant.name,
+          ownerName: adminDisplayName,
+          planTier: normalizedTier,
+          billingCycle: cleanBillingCycle,
+          agreedPrice: String(agreedPrice),
+          activationUrl,
+          loginUrl: fleetLoginUrl,
+          fleetLoginUrl,
+          planSummaryPdfUrl: downloadPdfUrl,
+          attachments: pdfResult?.filePath ? [{ filename: pdfResult.fileName, path: pdfResult.filePath }] : undefined,
+          actionText: 'Set Up Administrator Password',
+        },
       });
     }
 
@@ -509,15 +606,15 @@ export const getCurrentTenantProfile = async (req: Request, res: Response) => {
       // Seed root tenant on the fly if not yet in database
       tenant = await Tenant.create({
         tenantId: ROOT_TENANT_ID,
-        name: 'FleetFlow Primary',
-        code: 'FF',
-        subdomain: 'fleetflow',
+        name: 'CABZ Primary',
+        code: 'CZ',
+        subdomain: 'cabz',
         status: 'ACTIVE',
         planTier: 'PRO',
-        contactEmail: 'admin@fleetflow.com',
+        contactEmail: 'admin@cabz.com',
         brandingTokens: {
           primaryColor: '#0284c7',
-          portalTitle: 'FleetFlow Enterprise Mobility',
+          portalTitle: 'CABZ Enterprise Mobility',
         },
       });
       await getOrCreateSubscription(ROOT_TENANT_ID);
@@ -891,8 +988,8 @@ export const getNotificationAuditLogs = async (req: Request, res: Response) => {
       referenceId: log.referenceId,
       tenantId: log.tenantId,
       fleetName: log.tenantId
-        ? (tenantMap.get(log.tenantId) || (log.tenantId === ROOT_TENANT_ID ? 'Platform Default / FleetFlow' : log.tenantId))
-        : 'Platform Default / FleetFlow',
+        ? (tenantMap.get(log.tenantId) || (log.tenantId === ROOT_TENANT_ID ? 'Platform Default / CABZ' : log.tenantId))
+        : 'Platform Default / CABZ',
       providerStatus: log.providerStatus,
       attemptCount: (log.retryCount || 0) + 1,
       maxRetries: log.maxRetries || 3,

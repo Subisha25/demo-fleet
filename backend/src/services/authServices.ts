@@ -14,7 +14,6 @@ import { sendNotification } from './notificationService';
 const { ROLES } = USERS;
 import { normalizeManagerEmails } from '../utils/email';
 import { ROOT_TENANT_ID, getTenantContext } from '../context/tenantContext';
-import { validateRegistrationAgainstPolicy } from '../services/policyService';
 import { generateUniqueCompanySlug } from '../utils/slugUtils';
 
 
@@ -350,15 +349,6 @@ if (existingUserByMobile) {
           message: "You are not authorized to create users for a company belonging to another fleet.",
         });
       }
-    }
-
-    // Dynamic company policy validation (backward-compatible fallback for Danfoss)
-    const policyCheck = await validateRegistrationAgainstPolicy(companyId, normalizedEmail, danfossuserId);
-    if (!policyCheck.valid) {
-      return res.status(400).json({
-        success: false,
-        message: policyCheck.message || "Registration violates company policy."
-      });
     }
 
     // Ensure company SEO URL is valid and never undefined

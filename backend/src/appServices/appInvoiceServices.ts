@@ -663,23 +663,39 @@ const buildLineItems = (closePending: any, packageDetails: any, vehicle: any): I
 
   // Package Amount (always show)
   var packageAmount = safeNumber(closePending?.packageAmount);
-  if(closePending?.selectedPackageData?.packageType === "Local City Use"){
-    
-  const packages = (closePending?.selectedPackageData?.label);
-  items.push({
-    label: 'Package Amount' + `(${packages})`,
-    value: packageAmount 
-  });
-  }
-  else{
+  const pkgType = closePending?.selectedPackageData?.packageType;
+  const isPublic = pkgType === "PUBLIC_BOOKING" || String(pkgType).toLowerCase().includes("public");
 
- const packagesAmountOut = safeNumber(closePending?.selectedPackageData?.amount);
- const packages = (closePending?.selectedPackageData?.label)
-const outKm = safeNumber(closePending?.garageKms)
-  items.push({
-    label: 'Package Amount' + `(${ packages}--->[${packagesAmountOut} * ${outKm}km])`,
-    value: packageAmount 
-  });
+  if (packageAmount === 0 && isPublic) {
+    const rate = safeNumber(closePending?.selectedPackageData?.amount || closePending?.selectedPackageData?.extraKmRate);
+    const km = safeNumber(closePending?.garageKms || closePending?.guestKms);
+    if (rate > 0 && km > 0) {
+      packageAmount = rate * km;
+    }
+  }
+
+  if (pkgType === "Local City Use") {
+    const packages = (closePending?.selectedPackageData?.label);
+    items.push({
+      label: 'Package Amount' + `(${packages})`,
+      value: packageAmount 
+    });
+  } else if (isPublic) {
+    const packagesAmountOut = safeNumber(closePending?.selectedPackageData?.amount || closePending?.selectedPackageData?.extraKmRate);
+    const packages = (closePending?.selectedPackageData?.label || "Public Booking");
+    const outKm = safeNumber(closePending?.garageKms || closePending?.guestKms);
+    items.push({
+      label: 'Package Amount' + ` (${packages} [₹${packagesAmountOut} * ${outKm} KM])`,
+      value: packageAmount 
+    });
+  } else {
+    const packagesAmountOut = safeNumber(closePending?.selectedPackageData?.amount);
+    const packages = (closePending?.selectedPackageData?.label);
+    const outKm = safeNumber(closePending?.garageKms);
+    items.push({
+      label: 'Package Amount' + `(${packages}--->[${packagesAmountOut} * ${outKm}km])`,
+      value: packageAmount 
+    });
   }
  
  
@@ -1017,6 +1033,17 @@ const hasSelfName =
   booking.selfName !== "-" &&
   booking.selfName.toString().trim() !== "";
 
+let snap: any = null;
+try {
+  const parsedNotes = typeof booking?.notes === "string" ? JSON.parse(booking.notes) : booking?.notes;
+  snap = parsedNotes?.packageSnapshot || null;
+} catch {}
+
+const isPublicBooking =
+  booking?.bookingCreatedBy === "PUBLIC_BOOKING" ||
+  booking?.preferredType === "PUBLIC_BOOKING" ||
+  (!booking?.userId && Boolean(booking?.behalfOfName));
+
 
 return {
     invoiceNumber: invoice?.invoiceNumber || `#${booking.bookingId}`,
@@ -1034,11 +1061,11 @@ return {
    invoiceDate: invoice?.startDate ? formatDate(invoice.startDate) : 'N/A',
     dueDate: invoice?.endDate ? formatDate(invoice.endDate) : 'N/A',
 
-   customerName:booking?.selfName &&
+   customerName: booking?.selfName &&
   booking.selfName !== "-" &&
   booking.selfName.toString().trim() !== ""
     ? booking.selfName
-    : booking.user?.username,
+    : (booking.user?.username || booking?.behalfOfName || snap?.customerName || 'Public Customer'),
     customerAddress: `${company?.companyName || ''}\n${company?.companyAddress || user?.userAddress || ''}`,
     gstNo: company?.gstNo || 'N/A',
     city: `${user?.city || ''} - ${user?.pinCode || ''}`,
@@ -1058,10 +1085,12 @@ return {
    ...(hasSelfName
   ? {} // ❌ Don't include email & mobile
   : {
-      email: user?.email || 'N/A',
-      mobile: user?.mobile || 'N/A',
+      email: user?.email || snap?.customerEmail || booking?.email || 'N/A',
+      mobile: user?.mobile || booking?.behalfOfPhone || snap?.customerPhone || 'N/A',
     }),
-    tripDetails: `${booking?.pickupPoint || ''}  Trip: ${booking?.pickupCity || ''} - ${booking?.pickupArea || ''}  to  ${booking?.dropPoint || ''}`,
+    tripDetails: isPublicBooking
+      ? `${booking?.pickupPoint || ''} to ${booking?.dropPoint || ''}`
+      : `${booking?.pickupPoint || ''}  Trip: ${booking?.pickupCity || ''} - ${booking?.pickupArea || ''}  to  ${booking?.dropPoint || ''}`,
     tripsheetno:`Trip Sheet Number : ${closePending?.tripSheetNumber}`,
     lineItems,
     garageOpen: {
@@ -1127,23 +1156,25 @@ const booking = await Booking.findByPk(bookingId, {
     {
       model: User,
       as: "user",
-      include: [{ model: Company, as: "company",attributes: [
-      "companyId",
-      "companyName",
-      "companyAddress",
-      "gstNo",
-      "managerApproval"
-    ] }]
+      required: false,
+      include: [{ model: Company, as: "company", attributes: [
+        "companyId",
+        "companyName",
+        "companyAddress",
+        "gstNo",
+        "managerApproval"
+      ], required: false }]
     },
-       {
+    {
       model: User,
       as: "manager",
       required: false,
-attributes: ["userId", "username", "email"]    },
-    { model: VehicleMaster, as: "vehicleMaster" },
-    { model: VehicleType, as: "vehicleType" },
-    { model: Vehicle, as: "vehicle" },
-    { model: Drivers, as: "driver" }
+      attributes: ["userId", "username", "email"]
+    },
+    { model: VehicleMaster, as: "vehicleMaster", required: false },
+    { model: VehicleType, as: "vehicleType", required: false },
+    { model: Vehicle, as: "vehicle", required: false },
+    { model: Drivers, as: "driver", required: false }
   ], raw: false,    
   nest: true      
 });

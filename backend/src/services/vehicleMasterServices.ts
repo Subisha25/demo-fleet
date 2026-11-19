@@ -31,18 +31,41 @@ export const getAllVehicleMaster = async (req: any, res: Response) => {
         : { tenantId };
 
     const where: any = { isDeleted: status === '1' ? 1 : 0, ...tenantCondition };
-    const vehicles = await VehicleMaster.findAll({ where });
+    const vehicles = await VehicleMaster.findAll({
+      where,
+      include: [
+        { model: Vehicle, as: 'vehicle', required: false },
+        { model: VehicleType, as: 'vehicleTypes', required: false },
+        { model: Vendor, as: 'vendor', required: false },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
 
 
-    // Map only required fields and send
-    const formatted = vehicles.map(v => ({
-      vehicleMasterId: v.vehicleMasterId,
-      vehicleNumber: v.vehicleNumber,
-      vehicleModel: v.vehicleModelName, // direct column
-      vehicleType: v.vehicleType,       // direct column
-      vendorName: v.vendorName,           // direct column
-      isDeleted: v.isDeleted
-    }));
+    // Map required fields and send authoritative seatCapacity, vehicleImg, etc.
+    const formatted = vehicles.map(v => {
+      const vAny = v as any;
+      const seatCapacity = vAny.vehicleTypes?.seatCapacity ?? vAny.vehicle?.vehicleType?.seatCapacity ?? 4;
+      const vehicleImg = vAny.vehicle?.vehicleImg ?? vAny.vehicleTypes?.vehicleImg ?? [];
+      const manufacturing = vAny.vehicle?.manufacturing ?? 'Commercial';
+      return {
+        vehicleMasterId: v.vehicleMasterId,
+        vehicleNumber: v.vehicleNumber,
+        vehicleModel: v.vehicleModelName, // direct column
+        vehicleType: v.vehicleType,       // direct column
+        vendorName: v.vendorName,         // direct column
+        seatCapacity: Number(seatCapacity),
+        vehicleImg: Array.isArray(vehicleImg) ? vehicleImg : [vehicleImg].filter(Boolean),
+        manufacturing,
+        vendorPhone: vAny.vendor?.phno ?? '',
+        vendorEmail: vAny.vendor?.email ?? '',
+        vehicleId: v.vehicleId,
+        vehicleTypeId: v.vehicleTypeId || vAny.vehicle?.vehicleTypeId,
+        vendorId: v.vendorId,
+        isDeleted: v.isDeleted,
+        createdAt: v.createdAt,
+      };
+    });
 
     res.status(200).json({
       message: 'Vehicles retrieved successfully',
@@ -87,6 +110,7 @@ export const updateVehicleMaster = async (req: any, res: Response) => {
     let resolvedTypeName  = vehicleType ?? vm.vehicleType;
     let resolvedVendorName = vendorName ?? vm.vendorName;
 
+    let resolvedTypeId = vehicleTypeId ?? vm.vehicleTypeId;
     if (vehicleId) {
       const v = await Vehicle.findByPk(vehicleId, { include: [VehicleType] });
       if (!v) return res.status(404).json({ message: "Vehicle model not found" });
@@ -95,10 +119,14 @@ export const updateVehicleMaster = async (req: any, res: Response) => {
       }
       resolvedModelName = v.vehicleName;
       resolvedTypeName = v.vehicleType?.vehicleType ?? resolvedTypeName;
+      resolvedTypeId = v.vehicleTypeId ?? resolvedTypeId;
     }
     if (vehicleTypeId) {
       const vt = await VehicleType.findByPk(vehicleTypeId);
-      if (vt) resolvedTypeName = vt.vehicleType;
+      if (vt) {
+        resolvedTypeName = vt.vehicleType;
+        resolvedTypeId = vt.vehicleTypeId;
+      }
     }
     if (vendorId) {
       const o = await Vendor.findByPk(vendorId);
@@ -112,6 +140,7 @@ export const updateVehicleMaster = async (req: any, res: Response) => {
     await vm.update({
       vehicleNumber: vehicleNumber ?? vm.vehicleNumber,
       vehicleId:     vehicleId     ?? vm.vehicleId,
+      vehicleTypeId: resolvedTypeId,
       vehicleModelName: resolvedModelName,    //  correct column
       vehicleType:      resolvedTypeName,     //  stored as string in VehicleMaster
       vendorId:          vendorId     ?? vm.vendorId,
@@ -479,6 +508,22 @@ export const getUnifiedVehicleOptions = async (req: any, res: Response) => {
       }),
     ]);
 
+    const seenModels = new Set<string>();
+    const dedupedModels: any[] = [];
+    for (const m of models) {
+      const key = `${m.vehicleTypeId}__${(m.vehicleName || '').trim().toLowerCase()}`;
+      if (!seenModels.has(key)) {
+        seenModels.add(key);
+        dedupedModels.push({
+          id: m.vehicleId,
+          name: m.vehicleName,
+          vehicleTypeId: m.vehicleTypeId,
+          manufacturing: m.manufacturing,
+          vehicleImg: m.vehicleImg,
+        });
+      }
+    }
+
     return res.status(200).json({
       success: true,
       types: types.map((t) => ({
@@ -488,13 +533,7 @@ export const getUnifiedVehicleOptions = async (req: any, res: Response) => {
         AdvanceBookingHours: t.AdvanceBookingHours,
         vehicleImg: t.vehicleImg,
       })),
-      models: models.map((m) => ({
-        id: m.vehicleId,
-        name: m.vehicleName,
-        vehicleTypeId: m.vehicleTypeId,
-        manufacturing: m.manufacturing,
-        vehicleImg: m.vehicleImg,
-      })),
+      models: dedupedModels,
       owners: vendors.map((v) => ({
         id: v.vendorId,
         name: v.vendorName,

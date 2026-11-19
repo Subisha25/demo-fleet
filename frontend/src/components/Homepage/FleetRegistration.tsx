@@ -2,6 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axiosInstance from '../../utils/axiosInstance';
 import PublicLayout from '../PublicSite/PublicLayout';
+import {
+  formatMobileInput,
+  formatPinCodeInput,
+  formatPanInput,
+  formatGstinInput,
+  validateMobile,
+  validatePinCode,
+  validatePan,
+  validateGstin,
+} from '../../utils/validation';
 
 interface PlanDetail {
   tier: 'BASIC' | 'PRO' | 'ENTERPRISE';
@@ -116,15 +126,24 @@ export default function FleetRegistration() {
     } else if (name === 'businessCode') {
       const clean = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
       setFormData((prev) => ({ ...prev, businessCode: clean }));
-    } else if (name === 'gstin' || name === 'panNumber') {
-      const clean = value.toUpperCase().trim();
+    } else if (name === 'contactPhone' || name === 'businessPhone') {
+      const clean = formatMobileInput(value);
+      setFormData((prev) => ({ ...prev, [name]: clean }));
+    } else if (name === 'pinCode') {
+      const clean = formatPinCodeInput(value);
+      setFormData((prev) => ({ ...prev, [name]: clean }));
+    } else if (name === 'gstin') {
+      const clean = formatGstinInput(value);
       setFormData((prev) => {
-        const copy = { ...prev, [name]: clean };
-        if (name === 'gstin' && clean.length === 15 && !prev.panNumber) {
+        const copy = { ...prev, gstin: clean };
+        if (clean.length === 15 && !prev.panNumber) {
           copy.panNumber = clean.substring(2, 12);
         }
         return copy;
       });
+    } else if (name === 'panNumber') {
+      const clean = formatPanInput(value);
+      setFormData((prev) => ({ ...prev, panNumber: clean }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -173,12 +192,30 @@ export default function FleetRegistration() {
       errors.businessCode = 'Business code must be at least 2 alphanumeric characters.';
     }
 
-    if (formData.gstin && !GSTIN_REGEX.test(formData.gstin)) {
-      errors.gstin = 'Invalid GSTIN format. Expected 15 characters (e.g., 33AAACA1111A1Z1).';
+    const phoneVal = validateMobile(formData.contactPhone);
+    if (!phoneVal.valid) {
+      errors.contactPhone = phoneVal.error || 'Please enter a valid 10-digit mobile number.';
     }
 
-    if (formData.panNumber && !PAN_REGEX.test(formData.panNumber)) {
-      errors.panNumber = 'Invalid PAN format. Expected 10 alphanumeric characters (e.g., AAACA1111A).';
+    if (formData.pinCode) {
+      const pinVal = validatePinCode(formData.pinCode);
+      if (!pinVal.valid) {
+        errors.pinCode = pinVal.error || 'Please enter a valid 6-digit PIN code.';
+      }
+    }
+
+    if (formData.gstin) {
+      const gstinVal = validateGstin(formData.gstin);
+      if (!gstinVal.valid) {
+        errors.gstin = gstinVal.error || 'Invalid GSTIN format. Expected 15 characters (e.g., 33AAACA1111A1Z1).';
+      }
+    }
+
+    if (formData.panNumber) {
+      const panVal = validatePan(formData.panNumber);
+      if (!panVal.valid) {
+        errors.panNumber = panVal.error || 'Invalid PAN format. Expected 10 characters (e.g., AAACA1111A).';
+      }
     }
 
     if (formData.sacCode && !SAC_REGEX.test(formData.sacCode)) {
@@ -307,7 +344,7 @@ export default function FleetRegistration() {
                 Fleet Self-Service Onboarding
               </span>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                Launch Your Transport Fleet on FleetFlow SaaS
+                Launch Your Transport Fleet on CABZ SaaS
               </h1>
               <p className="mt-2 text-[#E2E8F0] text-sm sm:text-base max-w-2xl">
                 Get full corporate billing, live vehicle tracking, dynamic route card consolidation, and enterprise compliance ready in minutes.

@@ -747,8 +747,15 @@ export const createClosePending = async (req: any, res: Response) => {
         {
           model: User,
           as: "user",
-          attributes: ["companyId"]
-        }
+          attributes: ["companyId"],
+          required: false,
+        },
+        {
+          model: Company,
+          as: "company",
+          attributes: ["companyId", "companyName"],
+          required: false,
+        },
       ]
     });
     if (!booking) {
@@ -783,40 +790,94 @@ export const createClosePending = async (req: any, res: Response) => {
       }
     }
 
-    if (
+    const normPkgType = (packageData?.packageType || '').toLowerCase();
+    const isPublicPackageType =
+      normPkgType.includes('public') ||
       packageData?.packageType === 'Public Per-KM Package' ||
-      parsedSelectedPkg?.packageType === 'Public Per-KM Package' ||
+      packageData?.packageType === 'PUBLIC_BOOKING' ||
+      packageData?.packageType === 'Public Booking' ||
+      booking?.bookingCreatedBy === 'PUBLIC_BOOKING' ||
+      booking?.preferredType === 'PUBLIC_BOOKING';
+
+    if (
+      isPublicPackageType ||
+      parsedSelectedPkg?.packageType?.toLowerCase()?.includes('public') ||
       parsedSelectedPkg?.amountPerKm != null
     ) {
       isPerKm = true;
-      if (parsedSelectedPkg?.amountPerKm != null) {
+      if (parsedSelectedPkg?.amountPerKm != null && Number(parsedSelectedPkg.amountPerKm) > 0) {
         perKmRate = Number(parsedSelectedPkg.amountPerKm);
-      } else if (packageData?.packages) {
+      } else if (parsedSelectedPkg?.amount != null && Number(parsedSelectedPkg.amount) > 0) {
+        perKmRate = Number(parsedSelectedPkg.amount);
+      } else if (parsedSelectedPkg?.perKmRate != null && Number(parsedSelectedPkg.perKmRate) > 0) {
+        perKmRate = Number(parsedSelectedPkg.perKmRate);
+      } else if (parsedSelectedPkg?.extraKmRate != null && Number(parsedSelectedPkg.extraKmRate) > 0) {
+        perKmRate = Number(parsedSelectedPkg.extraKmRate);
+      } else if (parsedSelectedPkg?.ratePerKm != null && Number(parsedSelectedPkg.ratePerKm) > 0) {
+        perKmRate = Number(parsedSelectedPkg.ratePerKm);
+      }
+
+      // Check booking.notes snapshot
+      if (!perKmRate && booking?.notes) {
+        try {
+          const notesObj = typeof booking.notes === 'string' ? JSON.parse(booking.notes) : booking.notes;
+          const snap = notesObj?.packageSnapshot;
+          if (snap) {
+            perKmRate = Number(snap.amountPerKm || snap.perKmRate || snap.perKmAmount || snap.amount || 0);
+          }
+        } catch (e) {}
+      }
+
+      // Check packageData.packages
+      if (!perKmRate && packageData?.packages) {
         try {
           const pp = typeof packageData.packages === 'string' ? JSON.parse(packageData.packages) : packageData.packages;
-          perKmRate = Number(pp.amountPerKm ?? pp.ratePerKm ?? 0);
+          if (pp.vehicles && Array.isArray(pp.vehicles) && pp.vehicles.length > 0) {
+            const matchedV = pp.vehicles.find((v: any) => v.vehicleMasterId === booking?.vehicleMasterId || v.vehicleId === booking?.vehicleId) || pp.vehicles[0];
+            perKmRate = Number(matchedV?.perKm ?? matchedV?.amountPerKm ?? 0);
+          } else if (pp.vehicles && typeof pp.vehicles === 'object') {
+            const row: any = Object.values(pp.vehicles)[0];
+            perKmRate = Number(row?.perKm ?? row?.amountPerKm ?? 0);
+          } else {
+            perKmRate = Number(pp.amountPerKm ?? pp.ratePerKm ?? pp.perKm ?? 0);
+          }
         } catch (e) {}
       }
     }
 
-    if (isPerKm) {
-      if (
-        (guestKms != null && Number(guestKms) < 0) ||
-        (garageKms != null && Number(garageKms) < 0) ||
-        (guestCloseKm != null && guestOpenKm != null && Number(guestCloseKm) < Number(guestOpenKm))
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: 'Actual completed kilometres must be non-negative',
-        });
+    // Determine actual billable kilometers
+    const parsedGuestKms = Number(guestKms) || 0;
+    const parsedGuestOpen = Number(guestOpenKm) || 0;
+    const parsedGuestClose = Number(guestCloseKm) || 0;
+    const guestDiff = parsedGuestClose > parsedGuestOpen ? parsedGuestClose - parsedGuestOpen : 0;
+
+    const parsedGarageKms = Number(garageKms) || 0;
+    const parsedGarageOpen = Number(garageOpenKm) || 0;
+    const parsedGarageClose = Number(garageCloseKm) || 0;
+    const garageDiff = parsedGarageClose > parsedGarageOpen ? parsedGarageClose - parsedGarageOpen : 0;
+
+    let actualKms = 0;
+    if (hideGuestDetails) {
+      actualKms = parsedGarageKms > 0 ? parsedGarageKms : garageDiff;
+    } else {
+      if (parsedGuestKms > 0) {
+        actualKms = parsedGuestKms;
+      } else if (guestDiff > 0) {
+        actualKms = guestDiff;
+      } else if (parsedGarageKms > 0) {
+        actualKms = parsedGarageKms;
+      } else if (garageDiff > 0) {
+        actualKms = garageDiff;
       }
+    }
+    if (actualKms === 0) {
+      actualKms = parsedGarageKms || garageDiff || parsedGuestKms || guestDiff || 0;
+    }
 
-      const actualKms = guestKms != null && !isNaN(Number(guestKms)) && Number(guestKms) > 0
-        ? Number(guestKms)
-        : (guestCloseKm != null && guestOpenKm != null && Number(guestCloseKm) >= Number(guestOpenKm))
-          ? (Number(guestCloseKm) - Number(guestOpenKm))
-          : (garageKms != null && !isNaN(Number(garageKms)) && Number(garageKms) > 0 ? Number(garageKms) : 0);
+    let computedFinalTotal = 0;
+    const taxSum = (Number(cgstAmount) || 0) + (Number(sgstAmount) || 0) + (Number(igstAmount) || 0) || (Number(totalTaxAmount) || 0);
 
+    if (isPerKm) {
       if (actualKms < 0) {
         return res.status(400).json({
           success: false,
@@ -824,10 +885,23 @@ export const createClosePending = async (req: any, res: Response) => {
         });
       }
 
-      finalPackageAmount = Math.round(actualKms * perKmRate * 100) / 100;
-      finalTotalAmount = finalPackageAmount + (Number(additionalKmsAmount) || 0) + (Number(additionalHoursAmount) || 0) + (Number(extraCharges) || 0) - (Number(discountAmount) || 0);
-      const taxSum = (Number(cgstAmount) || 0) + (Number(sgstAmount) || 0) + (Number(igstAmount) || 0) || (Number(totalTaxAmount) || 0);
-      finalTotalDue = Math.max(0, Math.round((finalTotalAmount + taxSum - (Number(advanceAmount) || 0)) * 100) / 100);
+      if (perKmRate > 0 && actualKms > 0) {
+        finalPackageAmount = Math.round(actualKms * perKmRate * 100) / 100;
+      } else if (Number(packageAmount) > 0) {
+        finalPackageAmount = Number(packageAmount);
+      }
+
+      finalTotalAmount = finalPackageAmount + (Number(additionalKmsAmount) || 0) + (Number(additionalHoursAmount) || 0) + (Number(extraDriverBeta) || 0) + (Number(extraCharges) || 0) - (Number(discountAmount) || 0);
+      computedFinalTotal = Math.round((finalTotalAmount + taxSum) * 100) / 100;
+      finalTotalDue = Math.max(0, Math.round((computedFinalTotal - (Number(advanceAmount) || 0)) * 100) / 100);
+    } else {
+      // Standard packages: Local City, Outstation, Monthly, OnCall
+      if (finalPackageAmount === 0 && Number(packageAmount) > 0) {
+        finalPackageAmount = Number(packageAmount);
+      }
+      finalTotalAmount = finalPackageAmount + (Number(additionalKmsAmount) || 0) + (Number(additionalHoursAmount) || 0) + (Number(extraDriverBeta) || 0) + (Number(extraCharges) || 0) - (Number(discountAmount) || 0);
+      computedFinalTotal = Number(total) > 0 ? Number(total) : Math.round((finalTotalAmount + taxSum) * 100) / 100;
+      finalTotalDue = Math.max(0, Math.round((computedFinalTotal - (Number(advanceAmount) || 0)) * 100) / 100);
     }
 
     const newClosePending = await ClosePending.create({
@@ -864,13 +938,13 @@ export const createClosePending = async (req: any, res: Response) => {
       additionalHoursAmount: additionalHoursAmount || 0.00,
       totalAmount: finalTotalAmount,
       extraCharges: extraCharges || 0.00,
-      total: total || finalTotalAmount,
+      total: total || computedFinalTotal,
       extraChargesBreakup: extraChargesBreakup || [],
       totalDue: finalTotalDue,
       cgstAmount: cgstAmount || 0.00,
       igstAmount: igstAmount || 0.00,
       sgstAmount: sgstAmount || 0.00,
-      totalTaxAmount: totalTaxAmount || 0.00,
+      totalTaxAmount: totalTaxAmount || taxSum || 0.00,
       companyId: companyId
     });
 

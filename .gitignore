@@ -26,3 +26,4 @@ Thumbs.db
 
 # Local uploads - verify before ignoring
 backend/uploads/
+backend/backup_*.sql

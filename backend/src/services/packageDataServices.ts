@@ -617,7 +617,9 @@
 
 // comment on 10/5 old code 
 import { Request, Response } from 'express';
-import { PackageData } from '../models';
+import { PackageData, Company } from '../models';
+import { Op } from 'sequelize';
+import { ROOT_TENANT_ID } from '../context/tenantContext';
 import { USERS } from "../utils/costants";
 const { ROLES } = USERS;
  
@@ -669,11 +671,11 @@ export const createPackageData = async (req: any, res: Response) => {
     }
 
 // ✅ add to valid types
-const validPackageTypes = ["Out Station", "Local City Use", "Monthly Bookings", "Public Per-KM Package"];
+const validPackageTypes = ["Out Station", "Local City Use", "Monthly Bookings", "Public Booking", "PUBLIC_BOOKING", "Public Per-KM Package"];
     if (!validPackageTypes.includes(packageType)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid packageType. Must be one of: "Out Station", "Local City Use", "Monthly Bookings", "Public Per-KM Package"',
+        message: 'Invalid packageType. Must be one of: "Out Station", "Local City Use", "Monthly Bookings", "Public Booking", "PUBLIC_BOOKING", "Public Per-KM Package"',
       });
     }
 
@@ -835,6 +837,50 @@ if (packageType === "Monthly Bookings") {
   uniqueKey = buildLocalKey(defs); // reuse your same uniqueKey logic
 }
 
+    /* ---------------- PUBLIC BOOKING (PER-KM) ---------------- */
+    if (packageType === "Public Booking" || packageType === "PUBLIC_BOOKING") {
+      const vehicles = parsedPackages.vehicles;
+
+      if (vehicles && (Array.isArray(vehicles) || (typeof vehicles === "object" && Object.keys(vehicles).length > 0))) {
+        const vehicleList: any[] = Array.isArray(vehicles) ? vehicles : Object.values(vehicles);
+        if (vehicleList.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: "No vehicles provided for Public Booking package",
+          });
+        }
+
+        let hasAtLeastOneValidRate = false;
+        for (const row of vehicleList) {
+          const rate = Number(row.perKm ?? row.amountPerKm ?? row.ratePerKm ?? 0);
+          if (row.isActive !== false && rate > 0) {
+            hasAtLeastOneValidRate = true;
+          }
+          if (row.perKm != null) {
+            row.perKm = Math.round(Number(row.perKm) * 100) / 100;
+          }
+        }
+        if (!hasAtLeastOneValidRate) {
+          return res.status(400).json({
+            success: false,
+            message: "At least one active vehicle must have a valid per-KM rate greater than 0",
+          });
+        }
+      } else {
+        const rate = parsedPackages.amountPerKm ?? parsedPackages.ratePerKm ?? parsedPackages.perKm;
+        const numRate = Number(rate);
+        if (rate == null || isNaN(numRate) || numRate <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: "Per-km amount must be a valid positive monetary value",
+          });
+        }
+        parsedPackages.amountPerKm = Math.round(numRate * 100) / 100;
+      }
+
+      uniqueKey = "PUBLIC_BOOKING";
+    }
+
     /* ---------------- PUBLIC PER-KM PACKAGE ---------------- */
     if (packageType === "Public Per-KM Package") {
       const pkgName = parsedPackages.packageName || parsedPackages.name;
@@ -901,6 +947,11 @@ if (packageType === "Monthly Bookings") {
         recordToUpdate = record; // update first record
         break;
       }
+
+      if (packageType === "Public Booking" || packageType === "PUBLIC_BOOKING") {
+        recordToUpdate = record; // one Public Booking per company
+        break;
+      }
     }
 
     if (recordToUpdate) {
@@ -916,9 +967,13 @@ if (packageType === "Monthly Bookings") {
       });
     }
 
+    const comp = await Company.findByPk(companyId);
+    const resolvedTenantId = req.tenantId || comp?.tenantId || ROOT_TENANT_ID;
+
     const newPackage = await PackageData.create({
       packageType,
       companyId,
+      tenantId: resolvedTenantId,
       packages: JSON.stringify(parsedPackages),
     });
 
@@ -1543,9 +1598,20 @@ export const getAllPackageData = async (req: any, res: Response) => {
         }
         const { packageType, companyId } = req.query;
  
-        const where: any = {};
-        if (packageType) where.packageType = packageType;
+        const where: any = { isDeleted: false };
+        if (packageType) {
+          if (packageType === "Public Booking" || packageType === "PUBLIC_BOOKING") {
+            where.packageType = { [Op.in]: ["Public Booking", "PUBLIC_BOOKING", "Public Per-KM Package"] };
+          } else {
+            where.packageType = packageType;
+          }
+        }
         if (companyId) where.companyId = companyId;
+
+        // Tenant scoping: Fleet Admin only sees their own fleet packages
+        if (req.tenantId && req.tenantId !== ROOT_TENANT_ID) {
+          where.tenantId = req.tenantId;
+        }
  
         const packageData = await PackageData.findAll({
             where,
@@ -1600,6 +1666,15 @@ export const updatePackageData = async (req: any, res: Response) => {
             res.status(404).json({
                 success: false,
                 message: 'PackageData not found'
+            });
+            return;
+        }
+
+        // Cross-tenant tampering protection
+        if (req.tenantId && req.tenantId !== ROOT_TENANT_ID && existingPackageData.tenantId && existingPackageData.tenantId !== req.tenantId) {
+            res.status(403).json({
+                success: false,
+                message: "Forbidden: Cannot modify another fleet's package"
             });
             return;
         }
@@ -1696,6 +1771,15 @@ export const deletePackageData = async (req: any, res: Response) => {
             res.status(404).json({
                 success: false,
                 message: 'PackageData not found'
+            });
+            return;
+        }
+
+        // Cross-tenant tampering protection
+        if (req.tenantId && req.tenantId !== ROOT_TENANT_ID && packageData.tenantId && packageData.tenantId !== req.tenantId) {
+            res.status(403).json({
+                success: false,
+                message: "Forbidden: Cannot delete another fleet's package"
             });
             return;
         }

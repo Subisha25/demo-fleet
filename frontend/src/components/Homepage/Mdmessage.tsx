@@ -75,14 +75,14 @@ const MDMessageSection: React.FC = () => {
     Leadership Team
   </h3>
   <p className="text-sm text-slate-600 font-medium">Operations & Fleet Direction</p>
-  <p className="text-xs text-slate-500">FleetFlow Mobility Platform</p>
+  <p className="text-xs text-slate-500">CABZ – Smart Fleet Mobility</p>
 </div>
 
            
 
             <div className="space-y-3 sm:space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed text-justify">
               <p >
-                On behalf of the entire team at FleetFlow, we are
+                On behalf of the entire team at CABZ, we are
                 thrilled to welcome you to our world of exceptional travel
                 experiences.
               </p>
@@ -92,9 +92,9 @@ const MDMessageSection: React.FC = () => {
               </p>
              
               <p>
-                FleetFlow is a leading provider of premium
+                CABZ is a leading provider of premium
                 integrated end-to-end transportation solutions for the corporate
-                sector across major metro hubs. FleetFlow is committed to providing
+                sector across major metro hubs. CABZ is committed to providing
                 unparalleled travel arrangements that cater to the individual needs
                 and preferences of our clients.
               </p>

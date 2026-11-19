@@ -37,7 +37,7 @@ export default function ContactPage() {
             Transport Desk & Support
           </span>
           <h1 className="text-4xl sm:text-5xl font-black text-[#17171D] tracking-tight">
-            Connect with FleetFlow Mobility Desk
+            Connect with CABZ Mobility Desk
           </h1>
           <p className="text-lg text-[#686875] max-w-3xl mx-auto leading-relaxed">
             Have questions about fleet onboarding, corporate employee contracts, spot car rentals, or
@@ -126,7 +126,7 @@ export default function ContactPage() {
                     </div>
                     <h3 className="text-2xl font-extrabold text-[#17171D]">Inquiry Received!</h3>
                     <p className="text-sm text-[#686875] max-w-md mx-auto">
-                      Thank you for contacting FleetFlow. Our transport desk coordinator will reach out
+                      Thank you for contacting CABZ. Our transport desk coordinator will reach out
                       to you within 2 hours during active business shifts.
                     </p>
                     <button

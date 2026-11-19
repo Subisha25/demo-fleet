@@ -34,14 +34,14 @@ const PrivacyPolicy: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="space-y-6 text-gray-700 leading-relaxed">
             <p>
-              FleetFlow respects your privacy and recognizes the need to protect the personally identifiable information you share with us.
+              CABZ respects your privacy and recognizes the need to protect the personally identifiable information you share with us.
               We follow appropriate standards when it comes to protecting your privacy on our websites.
             </p>
 
             <p>
               There are times when we may collect personal information from you such as name, physical address or telephone number.
               It is our intent to inform you before we do that and explain how the information will be used.
-              If you choose not to provide the information we request, you can still visit the FleetFlow website, 
+              If you choose not to provide the information we request, you can still visit the CABZ website, 
               but some services may not be accessible.
             </p>
           </div>
@@ -52,7 +52,7 @@ const PrivacyPolicy: React.FC = () => {
           <h3 className="text-2xl font-bold text-[#5B3DF5] mb-4">Information Protection</h3>
           <div className="space-y-4 text-gray-700 leading-relaxed">
             <p>
-              FleetFlow will not sell, trade, or disclose any information derived from the registration or use of
+              CABZ will not sell, trade, or disclose any information derived from the registration or use of
               any online service (including names and addresses) without the consent of the user or customer,
               unless required by law.
             </p>
@@ -68,7 +68,7 @@ const PrivacyPolicy: React.FC = () => {
           <h3 className="text-2xl font-bold text-[#5B3DF5] mb-4">Security Measures</h3>
           <div className="space-y-4 text-gray-700 leading-relaxed">
             <p>
-              FleetFlow will continue to enhance our security procedures as new technology becomes available.
+              CABZ will continue to enhance our security procedures as new technology becomes available.
               If our privacy policy changes, it will be posted here with a new effective date.
             </p>
             <p>
@@ -83,7 +83,7 @@ const PrivacyPolicy: React.FC = () => {
 
         <section className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h3 className="text-2xl font-bold text-[#5B3DF5] mb-4">
-            <strong>FleetFlow Mobility Platform</strong> — Full Privacy Policy
+            <strong>CABZ – Smart Fleet Mobility</strong> — Full Privacy Policy
           </h3>
 
           <div className="space-y-6 text-gray-700 leading-relaxed">
@@ -91,13 +91,13 @@ const PrivacyPolicy: React.FC = () => {
             <p><strong>Effective Date:</strong> November 24, 2025</p>
 
             <p>
-              At FleetFlow ("Platform," "we," "our," "us"), we take your privacy seriously. 
+              At CABZ ("Platform," "we," "our," "us"), we take your privacy seriously. 
               This Privacy Policy explains how we handle your information when you use our website or platform services.
               This must be read along with our Terms and Conditions.
             </p>
 
             <p>
-              By accessing or using the <strong>FleetFlow Platform</strong>, you agree to be governed by this Privacy Policy.
+              By accessing or using the <strong>CABZ Platform</strong>, you agree to be governed by this Privacy Policy.
             </p>
 
             {/* 1. INFORMATION WE COLLECT */}

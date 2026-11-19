@@ -337,7 +337,7 @@ const ForgotPassword = () => {
 
           <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 mt-5">
             <ShieldCheck size={14} className="text-emerald-600" />
-            <span>Protected by FleetFlow industry-standard SSL encryption</span>
+            <span>Protected by CABZ industry-standard SSL encryption</span>
           </div>
         </div>
       </main>

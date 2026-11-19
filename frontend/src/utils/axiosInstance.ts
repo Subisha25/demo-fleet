@@ -14,6 +14,14 @@ axiosInstance.interceptors.request.use(
     const token = localStorage.getItem('token');
     if (token && req.headers) {
       req.headers['Authorization'] = `Bearer ${token}`;
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload?.tenantId && payload.role !== 'superadmin' && payload.role !== 'SUPERADMIN') {
+          req.headers['X-Tenant-ID'] = payload.tenantId;
+          localStorage.setItem('tenantId', payload.tenantId);
+          return req;
+        }
+      } catch {}
     }
     const tenantId = localStorage.getItem('tenantId');
     if (tenantId && req.headers) {

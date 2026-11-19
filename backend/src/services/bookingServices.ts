@@ -12,6 +12,7 @@ import { ClosePending, Employee, Invoice, PackageData, PaymentMode, Tax, User } 
 import { Payment } from "../models/payment";
 import { Drivers, Vendor, VehicleMaster } from '../models';
 import { Company } from "../models/company";
+import { Tenant } from "../models/tenant";
 import { Op, fn, col, literal } from "sequelize";
 const { ROLES } = USERS;
 import { fetchAllEmailConfs, sendEmailFromTemplate } from "../services/emailConfServices";
@@ -183,11 +184,11 @@ function mapToUserInvoiceData(booking: any, targetInvoiceId?: string) {
     // startDate: fmtDT(invoice?.startDate),
     // endDate: fmtDT(invoice?.endDate),
 
-    customerName: booking?.user?.username || "Customer",
+    customerName: booking?.user?.username || booking?.behalfOfName || "Customer",
     customerAddress:
-      (booking?.user?.company?.companyName ? booking.user.company.companyName + ", " : "") +
-      (booking?.user?.company?.companyAddress || booking?.user?.userAddress || "-"),
-    gstNo: booking?.user?.company?.gstNo || "-",
+      (booking?.company?.companyName || booking?.user?.company?.companyName ? (booking?.company?.companyName || booking.user.company.companyName) + ", " : "") +
+      (booking?.company?.companyAddress || booking?.user?.company?.companyAddress || booking?.user?.userAddress || "-"),
+    gstNo: booking?.company?.gstNo || booking?.user?.company?.gstNo || "-",
     city: booking?.user?.city || "-",
     state: booking?.user?.state || "-",
     country: booking?.user?.country || "India",
@@ -195,13 +196,20 @@ function mapToUserInvoiceData(booking: any, targetInvoiceId?: string) {
     orderNumber: booking?.bookingCode || booking?.bookingId,
     pickupPoint: booking?.pickupPoint || "-",
     vehicleType:
+      booking?.vehicleType?.vehicleType ||
       booking?.vehicleType?.vehicleTypeName ||
+      booking?.vehicleMaster?.vehicleType ||
       booking?.vehicle?.vehicleMaster?.vehicleModelName || "-",
     pickupDate: fmtDT(booking?.bookingDate || cp?.pickupDate),
-    vehicleNumber: booking.vehicle?.vehicleNumber || booking.vehicle?.vehicleMaster?.vehicleNumber,
+    vehicleNumber: booking?.vehicleMaster?.vehicleNumber || booking?.vehicle?.vehicleNumber || booking?.vehicle?.vehicleMaster?.vehicleNumber || "-",
 
-    email: booking?.user?.email || "-",
-    mobile: booking?.user?.mobile || "-",
+    email: booking?.user?.email || (() => {
+      try {
+        const n = typeof booking?.notes === 'string' ? JSON.parse(booking?.notes) : booking?.notes;
+        return n?.packageSnapshot?.customerEmail || "-";
+      } catch { return "-"; }
+    })(),
+    mobile: booking?.user?.mobile || booking?.behalfOfPhone || "-",
 
     tripDetails: `${booking?.pickupPoint || ""} → ${booking?.dropPoint || booking?.pickupCity || ""}`,
     lineItems,
@@ -431,13 +439,47 @@ export const getOrdersByStatus = async (confirmStatus: number, req?: any) => {
       ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
       : { tenantId };
 
-  return await Booking.findAll({
+  const bookings = await Booking.findAll({
     where: { confirmStatus, ...tenantCondition },
     include: [
       { model: VehicleType, required: false },
       { model: Vehicle, required: false },
+      { model: Company, as: "company", required: false, attributes: ["companyId", "companyName", "companyAddress", "companyPhno"] },
+      { model: Tenant, as: "tenant", required: false, attributes: ["tenantId", "name", "slug", "logoUrl"] },
+      { model: User, as: "user", required: false, attributes: ["userId", "username", "email", "mobile", "companyId"] },
+      { model: Drivers, as: "driver", required: false, attributes: ["driverId", "driverName", "phno"] },
+      {
+        model: VehicleMaster,
+        as: "vehicleMaster",
+        required: false,
+        attributes: ["vehicleMasterId", "vehicleNumber", "vehicleModelName", "vehicleTypeId"],
+        include: [
+          { model: Vehicle, as: "vehicle", required: false },
+          { model: VehicleType, as: "vehicleTypes", required: false, attributes: ["seatCapacity", "vehicleType"] }
+        ]
+      }
     ],
     order: [["createdAt", "DESC"]],
+  });
+
+  return bookings.map((b: any) => {
+    const raw = b.toJSON ? b.toJSON() : b;
+    if (!raw.user || !raw.userId) {
+      let snap: any = null;
+      try {
+        const parsed = typeof raw.notes === 'string' ? JSON.parse(raw.notes) : raw.notes;
+        snap = parsed?.packageSnapshot || null;
+      } catch {}
+      raw.user = {
+        userId: null,
+        username: raw.behalfOfName || snap?.customerName || "Public Passenger",
+        email: snap?.customerEmail || "",
+        mobile: raw.behalfOfPhone || snap?.customerPhone || "",
+        companyId: raw.companyId,
+        company: raw.company || null,
+      };
+    }
+    return raw;
   });
 };
 
@@ -786,11 +828,46 @@ export const getCancelledBooking = async (req: Request, res: Response) => {
 
     const bookings = await Booking.findAll({
       where: { confirmStatus: ORDER.STATUS.CANCELLED, ...tenantCondition },
+      include: [
+        { model: Company, as: "company", required: false, attributes: ["companyId", "companyName", "companyAddress", "companyPhno"] },
+        { model: Tenant, as: "tenant", required: false, attributes: ["tenantId", "name", "slug", "logoUrl"] },
+        { model: User, as: "user", required: false, attributes: ["userId", "username", "email", "mobile", "companyId"] },
+        { model: VehicleType, as: "vehicleType", required: false, attributes: ["vehicleTypeId", "vehicleType", "seatCapacity"] },
+        {
+          model: VehicleMaster,
+          as: "vehicleMaster",
+          required: false,
+          attributes: ["vehicleMasterId", "vehicleNumber", "vehicleModelName", "vehicleTypeId"],
+          include: [{ model: Vehicle, as: "vehicle", required: false }]
+        },
+        { model: Drivers, as: "driver", required: false, attributes: ["driverId", "driverName", "phno"] },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    const enriched = bookings.map((b: any) => {
+      const raw = b.toJSON ? b.toJSON() : b;
+      if (!raw.user || !raw.userId) {
+        let snap: any = null;
+        try {
+          const parsed = typeof raw.notes === 'string' ? JSON.parse(raw.notes) : raw.notes;
+          snap = parsed?.packageSnapshot || null;
+        } catch {}
+        raw.user = {
+          userId: null,
+          username: raw.behalfOfName || snap?.customerName || "Public Passenger",
+          email: snap?.customerEmail || "",
+          mobile: raw.behalfOfPhone || snap?.customerPhone || "",
+          companyId: raw.companyId,
+          company: raw.company || null,
+        };
+      }
+      return raw;
     });
 
     res.status(200).json({
       message: "Cancelled bookings fetched successfully",
-      data: bookings,
+      data: enriched,
     });
   } catch (error: any) {
     res.status(500).json({
@@ -1044,28 +1121,53 @@ export const declineBooking = async (req: any, res: Response) => {
 // };
 export const getOrderById = async (req: Request, res: Response) => {
   try {
-    const { bookingId } = req.body;
+    const rawBookingId =
+      req.body.bookingId ||
+      req.body.bookingCode ||
+      req.body.id ||
+      (req as any).params?.bookingId ||
+      (req as any).params?.bookingCode ||
+      (req as any).query?.bookingId;
 
-    if (!bookingId) {
+    const cleanId = String(rawBookingId || "").trim();
+
+    if (!cleanId) {
       return res.status(400).json({
         success: false,
         message: "bookingId is required in request body.",
       });
     }
 
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId);
     const order = await Booking.findOne({
-      where: isUuid
-        ? { [Op.or]: [{ bookingId }, { bookingCode: bookingId }] }
-        : { bookingCode: bookingId },
+      where: {
+        [Op.or]: [{ bookingId: cleanId }, { bookingCode: cleanId }],
+      },
       include: [
+        {
+          model: Company,
+          as: "company",
+          required: false,
+          attributes: ["companyId", "companyName", "companyAddress", "companyPhno"],
+        },
+        {
+          model: Tenant,
+          as: "tenant",
+          required: false,
+          attributes: ["tenantId", "name", "slug", "logoUrl"],
+        },
+        {
+          model: Vehicle,
+          as: "vehicle",
+          required: false,
+          attributes: ["vehicleId", "vehicleName", "manufacturing", "vehicleImg", "availableStatus", "vehicleTypeId"],
+        },
         {
           model: VehicleType,
           as: "vehicleType",
           required: false,
         },
 
-        // ✅ Booking -> VehicleMaster -> Vehicle (YOUR REQUIRED FLOW)
+        // ✅ Booking -> VehicleMaster -> Vehicle & VehicleType
         {
           model: VehicleMaster,
           as: "vehicleMaster", // ✅ from Booking.belongsTo(VehicleMaster)
@@ -1095,6 +1197,12 @@ export const getOrderById = async (req: Request, res: Response) => {
               ],
             },
             {
+              model: VehicleType,
+              as: "vehicleTypes",
+              required: false,
+              attributes: ["vehicleTypeId", "vehicleType", "seatCapacity"],
+            },
+            {
               model: Vendor,
               as: "vendor",
               required: false,
@@ -1107,7 +1215,6 @@ export const getOrderById = async (req: Request, res: Response) => {
           model: Invoice,
           as: "invoice",
           required: false,
-          where: { bookingId },
           attributes: [
             "invoiceId",
             "invoiceNumber",
@@ -1242,10 +1349,61 @@ export const getOrderById = async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: err.message || 'Forbidden' });
     }
 
+    const orderData: any = order.toJSON ? order.toJSON() : order;
+
+    // Parse packageSnapshot and notes
+    let customerEmail = "";
+    let packageSnapshot: any = null;
+    let ratePerKm: number | null = null;
+    try {
+      const parsedNotes = typeof orderData.notes === "string" ? JSON.parse(orderData.notes) : orderData.notes;
+      packageSnapshot = parsedNotes?.packageSnapshot || null;
+      customerEmail = packageSnapshot?.customerEmail || "";
+      if (packageSnapshot?.amountPerKm != null) {
+        ratePerKm = Number(packageSnapshot.amountPerKm);
+      } else if (packageSnapshot?.perKmRate != null) {
+        ratePerKm = Number(packageSnapshot.perKmRate);
+      } else if (packageSnapshot?.perKmAmount != null) {
+        ratePerKm = Number(packageSnapshot.perKmAmount);
+      } else if (packageSnapshot?.perKm != null) {
+        ratePerKm = Number(packageSnapshot.perKm);
+      }
+    } catch {}
+
+    if (!orderData.user || !orderData.userId) {
+      orderData.user = {
+        userId: null,
+        username: orderData.behalfOfName || packageSnapshot?.customerName || "Public Passenger",
+        email: customerEmail || (orderData as any).email || "",
+        mobile: orderData.behalfOfPhone || packageSnapshot?.customerPhone || "",
+        companyId: orderData.companyId,
+        userAddress: "",
+        company: orderData.company || null,
+      };
+    }
+
+    if (orderData.user && !orderData.user.company && orderData.company) {
+      orderData.user.company = orderData.company;
+    }
+
+    if (ratePerKm !== null && !orderData.ratePerKm) {
+      orderData.ratePerKm = ratePerKm;
+    }
+
+    // Attach authoritative seatCapacity
+    orderData.seatCapacity =
+      orderData.vehicleType?.seatCapacity ||
+      orderData.vehicleMaster?.vehicleTypes?.seatCapacity ||
+      4;
+
+    if (orderData.tenant) {
+      orderData.tenant.logo = orderData.tenant.logoUrl || null;
+    }
+
     return res.status(200).json({
       success: true,
       message: "Booking details retrieved successfully.",
-      data: order,
+      data: orderData,
     });
   } catch (error) {
     console.error("[GET_ORDER_BY_ID_ERROR]", error);
@@ -1432,11 +1590,38 @@ export const getBookingDetails = async (req: Request, res: Response) => {
           model: User,
           as: "user",
           attributes: ["userId", "username", "email", "mobile", "companyId"],
+          required: false,
           include: [
             {
               model: Company,
               as: "company",
               attributes: ["companyId", "companyName", "allowTax"],
+            },
+          ],
+        },
+        {
+          model: Company,
+          as: "company",
+          attributes: ["companyId", "companyName", "allowTax"],
+          required: false,
+        },
+        {
+          model: Tenant,
+          as: "tenant",
+          attributes: ["tenantId", "name", "slug", "logoUrl"],
+          required: false,
+        },
+        {
+          model: VehicleMaster,
+          as: "vehicleMaster",
+          attributes: ["vehicleMasterId", "vehicleModelName", "vehicleNumber", "vehicleType"],
+          required: false,
+          include: [
+            {
+              model: VehicleType,
+              as: "vehicleTypes",
+              attributes: ["seatCapacity", "vehicleType"],
+              required: false,
             },
           ],
         },
@@ -1464,7 +1649,7 @@ export const getBookingDetails = async (req: Request, res: Response) => {
     }
 
     const userCompanyId = booking.companyId || booking.user?.companyId;
-    const allowTax = booking.user?.company?.allowTax || "";
+    const allowTax = (booking as any).company?.allowTax || booking.user?.company?.allowTax || "";
 
     // ✅ Vehicle table rates REMOVE. Name மட்டும் போதும்.
     const vehicle = booking.vehicleId
@@ -1510,7 +1695,19 @@ export const getBookingDetails = async (req: Request, res: Response) => {
     };
 
     const pickVehicleRow = (vehiclesObj: any, vehicleTypeName: string) => {
-      if (!vehiclesObj || typeof vehiclesObj !== "object") return null;
+      if (!vehiclesObj) return null;
+      if (Array.isArray(vehiclesObj)) {
+        const wanted = norm(vehicleTypeName);
+        const match = vehiclesObj.find((v: any) => {
+          if (booking.vehicleId && v.vehicleId === booking.vehicleId) return true;
+          if (booking.vehicleTypeId && v.vehicleTypeId === booking.vehicleTypeId) return true;
+          if (v.vehicleMasterId && (booking as any).vehicleMasterId === v.vehicleMasterId) return true;
+          if (norm(v.vehicleModelName) === wanted || norm(v.vehicleType) === wanted || norm(v.vehicleName) === wanted) return true;
+          return false;
+        });
+        return match || vehiclesObj[0] || null;
+      }
+      if (typeof vehiclesObj !== "object") return null;
       const wanted = norm(vehicleTypeName);
       const key = Object.keys(vehiclesObj).find((k) => norm(k) === wanted);
       return key ? vehiclesObj[key] : null;
@@ -1530,10 +1727,15 @@ export const getBookingDetails = async (req: Request, res: Response) => {
       pickupNorm.includes("monthly") ||
       pickupNorm.includes("monthlybooking") ||
       pickupNorm.includes("monthlybookings");
+    const isPublicBooking =
+      booking.bookingCreatedBy === "PUBLIC_BOOKING" ||
+      booking.preferredType === "PUBLIC_BOOKING" ||
+      pickupNorm.includes("public");
 
     const filteredPackages = packageData.filter((pkg: any) => {
       const t = norm(pkg.packageType);
 
+      if (isPublicBooking) return t.includes("public");
       if (isOutstationPickup) return t.includes("outstation");
       if (isMonthlyPickup) return t.includes("monthlybookings");
 
@@ -1548,6 +1750,34 @@ export const getBookingDetails = async (req: Request, res: Response) => {
       if (parsed && !Array.isArray(parsed) && typeof parsed === "object") {
         const vehiclesObj = parsed.vehicles || {};
         const row = pickVehicleRow(vehiclesObj, effectiveVehicleType.vehicleType) || {};
+
+        /* ✅ PUBLIC BOOKING */
+        if (isPublicBooking) {
+          let snapshotRate = 0;
+          try {
+            const parsedNotes = safeJson(booking.notes);
+            if (parsedNotes?.packageSnapshot?.amountPerKm) {
+              snapshotRate = Number(parsedNotes.packageSnapshot.amountPerKm);
+            }
+          } catch {}
+
+          const perKm = snapshotRate > 0 ? snapshotRate : Number(row?.perKm ?? (typeof row === "number" ? row : (row?.amountPerKm ?? 0)));
+          return {
+            packageDataId: pkg.packageDataId,
+            packageType: pkg.packageType,
+            companyId: pkg.companyId,
+            vehicleType: effectiveVehicleType.vehicleType,
+            packages: [
+              {
+                packageId: "public_km",
+                perKm,
+                ratePerKm: perKm,
+                amount: { amt: perKm },
+                packageLabel: `${effectiveVehicleType.vehicleType} Public Package (₹${perKm}/km)`,
+              },
+            ],
+          };
+        }
 
         /* ✅ OUTSTATION */
         if (isOutstationPickup) {
@@ -1644,6 +1874,26 @@ export const getBookingDetails = async (req: Request, res: Response) => {
 
       // ✅ OLD FORMAT (array) fallback
       const arr: any[] = Array.isArray(parsed) ? parsed : [];
+      if (isPublicBooking && arr.length > 0) {
+        const p = arr[0] || {};
+        const perKm = Number(p.perKm ?? p.ratePerKm ?? p.amount ?? 0);
+        return {
+          packageDataId: pkg.packageDataId,
+          packageType: pkg.packageType,
+          companyId: pkg.companyId,
+          vehicleType: effectiveVehicleType.vehicleType,
+          packages: [
+            {
+              packageId: "public_km",
+              perKm,
+              ratePerKm: perKm,
+              amount: { amt: perKm },
+              packageLabel: `${effectiveVehicleType.vehicleType} Public Package (₹${perKm}/km)`,
+            },
+          ],
+        };
+      }
+
       const matched = arr.map((p: any) => {
         const amount =
           p[effectiveVehicleType.vehicleType] ??
@@ -1690,11 +1940,50 @@ export const getBookingDetails = async (req: Request, res: Response) => {
       });
     }
 
+    let customerEmail = (booking as any).email || "";
+    let customerCompany = (booking as any).company || null;
+    let customerName = booking.behalfOfName || "Public Customer";
+    let snapshotRate = 0;
+    try {
+      const parsedNotes = safeJson(booking.notes);
+      if (parsedNotes?.packageSnapshot?.customerEmail) {
+        customerEmail = parsedNotes.packageSnapshot.customerEmail;
+      }
+      if (parsedNotes?.packageSnapshot?.companyName && !customerCompany) {
+        customerCompany = { companyId: userCompanyId, companyName: parsedNotes.packageSnapshot.companyName, allowTax: "" } as any;
+      }
+      if (parsedNotes?.packageSnapshot?.customerName) {
+        customerName = parsedNotes.packageSnapshot.customerName;
+      }
+      if (parsedNotes?.packageSnapshot?.amountPerKm || parsedNotes?.packageSnapshot?.perKmRate) {
+        snapshotRate = Number(parsedNotes.packageSnapshot.amountPerKm || parsedNotes.packageSnapshot.perKmRate);
+      }
+    } catch {}
+
+    const effectiveUser = booking.user || {
+      userId: null,
+      username: customerName,
+      email: customerEmail,
+      mobile: booking.behalfOfPhone || "",
+      companyId: userCompanyId,
+      company: customerCompany || { companyId: userCompanyId, companyName: "Public Booking", allowTax: "" },
+    };
+
+    const bookingJson: any = booking.toJSON();
+    if (bookingJson.tenant) {
+      bookingJson.tenant.logo = bookingJson.tenant.logoUrl || null;
+    }
+
     return res.json({
-      booking,
+      booking: {
+        ...bookingJson,
+        user: booking.user || effectiveUser,
+        ratePerKm: snapshotRate || (booking as any).ratePerKm || 0,
+        seatCapacity: (booking as any).seatCapacity || (booking as any).vehicleMaster?.vehicleTypes?.seatCapacity || 4,
+      },
       vehicle,
-      userId: booking.user?.userId,
-      companyId: booking.user?.companyId,
+      userId: effectiveUser.userId,
+      companyId: userCompanyId,
       vehicleType: effectiveVehicleType,
       packages: formattedPackages,
       tax: taxDetails,
@@ -2174,6 +2463,25 @@ export const getOrderPaymentListById = async (req: any, res: Response) => {
                 "roundTrip",
                 "vehicleTypeId",
                 "tenantId",
+                "companyId",
+                "userId",
+                "bookingCreatedBy",
+                "preferredType",
+                "behalfOfName",
+                "behalfOfPhone",
+                "notes",
+              ],
+              include: [
+                { model: Company, as: "company", required: false, attributes: ["companyId", "companyName"] },
+                { model: Tenant, as: "tenant", required: false, attributes: ["tenantId", "name", "slug"] },
+                { model: User, as: "user", required: false, attributes: ["userId", "username", "email", "mobile"] },
+                {
+                  model: VehicleMaster,
+                  as: "vehicleMaster",
+                  required: false,
+                  include: [{ model: Vehicle, as: "vehicle", required: false }],
+                },
+                { model: Drivers, as: "driver", required: false, attributes: ["driverId", "driverName", "phno"] },
               ],
             },
           ],
@@ -2220,6 +2528,28 @@ export const getOrderPaymentListById = async (req: any, res: Response) => {
     // attach to data so client receives in data.* (consistent with your example)
     paymentObj.bankRefNo = bankRefNo;
     paymentObj.paymentRefNo = paymentRefNo;
+
+    if (Array.isArray(paymentObj.invoices)) {
+      paymentObj.invoices.forEach((inv: any) => {
+        const b = inv?.booking;
+        if (b && !b.user && (b.bookingCreatedBy === 'PUBLIC_BOOKING' || b.preferredType === 'PUBLIC_BOOKING' || b.behalfOfName)) {
+          let custEmail = '';
+          let snap: any = null;
+          try {
+            const parsed = typeof b.notes === 'string' ? JSON.parse(b.notes) : b.notes;
+            custEmail = parsed?.packageSnapshot?.customerEmail || '';
+            snap = parsed?.packageSnapshot || null;
+          } catch {}
+          b.user = {
+            userId: null,
+            username: b.behalfOfName || snap?.customerName || 'Public Customer',
+            email: custEmail,
+            mobile: b.behalfOfPhone || snap?.customerPhone || '',
+            company: b.company || { companyName: snap?.companyName || 'Public Passenger' },
+          };
+        }
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -4807,6 +5137,24 @@ export const downloadUserInvoicePdf = async (req: any, res: Response) => {
     // });
     const booking = await Booking.findByPk(bookingId, {
       include: [
+        {
+          model: Company,
+          as: "company",
+          required: false,
+          attributes: ["companyId", "companyName", "companyAddress", "companyPhno"],
+        },
+        {
+          model: Tenant,
+          as: "tenant",
+          required: false,
+          attributes: ["tenantId", "name", "slug", "logoUrl"],
+        },
+        {
+          model: Vehicle,
+          as: "vehicle",
+          required: false,
+          attributes: ["vehicleId", "vehicleName", "manufacturing", "vehicleImg", "availableStatus", "vehicleTypeId"],
+        },
         {
           model: VehicleType,
           as: "vehicleType",

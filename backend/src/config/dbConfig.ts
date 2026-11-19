@@ -37,7 +37,6 @@ import { OnCallInvoiceItems } from '../models/onCallInvoiceItems';
 import { Tenant } from '../models/tenant';
 import { TenantSubscription } from '../models/tenantSubscription';
 import { TenantUsageMeter } from '../models/tenantUsageMeter';
-import { CompanyPolicy } from '../models/companyPolicy';
 import { TenantRegistrationRequest } from '../models/tenantRegistrationRequest';
 import { TenantActivationToken } from '../models/tenantActivationToken';
 import { SubscriptionInvoice } from '../models/subscriptionInvoice';
@@ -57,7 +56,7 @@ const sequelize = new Sequelize({
     Payment,VehicleType,OTP, Tax, Pickuparea,Pickupcity,VehicleMaster,PaymentMode,orderSummery,Package,
     PackageData,Configuration,ClosePending,EmailConfiguration,BookingSequence,PaymentSequence, InvoiceSequence,
      MonthlyInvoice, MonthlyInvoiceItems, MonthlyBookingSequence,MapCount,OnCallInvoice,OnCallInvoiceItems,
-     Tenant, TenantSubscription, TenantUsageMeter, CompanyPolicy,
+     Tenant, TenantSubscription, TenantUsageMeter,
      TenantRegistrationRequest, TenantActivationToken, TenantInitialAllowance, SubscriptionInvoice, NotificationLog, SaaSPlan, SmsTemplate,
      TenantSmsConfig],
   logging: false,

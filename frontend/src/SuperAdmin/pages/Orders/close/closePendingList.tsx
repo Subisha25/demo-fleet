@@ -224,12 +224,21 @@ interface BookingResponse {
     pickupPoint: string;
     dropPoint: string;
     companyId:string;
+    bookingCreatedBy?: string;
+    preferredType?: string;
+    behalfOfName?: string;
+    tenant?: {
+      tenantId: string;
+      name: string;
+      logo?: string;
+    };
     user: {
       username: string;
       email: string;
       mobile: string;
       companyId: string;
     };
+    [key: string]: any;
   };
 vehicle: {
   vehicleId?: string;
@@ -423,6 +432,23 @@ if (bookingData.packages?.length > 0) {
       (grp.packages || []).map((p: any, idx: number): PackageOption | null => {
         const normalizedType = String(grp.packageType || "").toLowerCase().replace(/\s+/g, "");
         const isOutstation = normalizedType.includes("outstation") || normalizedType.includes("outst");
+        const isPublic = normalizedType.includes("public");
+
+        if (isPublic) {
+          const perKm = Number(p.perKm ?? p.ratePerKm ?? (typeof p.amount === "number" ? p.amount : p.amount?.amt) ?? 0);
+          if (perKm === 0) return null;
+          return {
+            optionId: `${grp.packageDataId}::public_${idx}`,
+            label: `₹${perKm}/Km (Public Booking)`,
+            hours: 0,
+            kms: 0,
+            amount: perKm,
+            packageDataId: grp.packageDataId,
+            packageType: grp.packageType || "Public Booking",
+            extraKmRate: perKm,
+            extraHourRate: 0,
+          };
+        }
 
         if (isOutstation) {
           const perKm = Number(p.outstationPerKm ?? 0);
@@ -469,6 +495,9 @@ if (bookingData.packages?.length > 0) {
     .filter((pkg): pkg is PackageOption => pkg !== null); // ✅ Remove null values
 
   setPackages(fetchedPackages);
+  if (fetchedPackages.length === 1) {
+    setSelectedPackage(fetchedPackages[0].optionId);
+  }
 }
 
       } catch (error: any) {
@@ -577,6 +606,16 @@ const selectedPkg = packages.find((p) => p.optionId === selectedPackage);
     const normalizedPackageType = selectedPkg.packageType?.toLowerCase().replace(/\s+/g, '') || '';
     return normalizedPackageType.includes('outstation') || normalizedPackageType.includes('outst');
   }, [selectedPkg]);
+
+  const isSelectedPackagePublic = useMemo(() => {
+    if (!selectedPkg) {
+      const createdBy = String(data?.booking?.bookingCreatedBy || '').toUpperCase();
+      const pref = String((data?.booking as any)?.preferredType || '').toUpperCase();
+      return createdBy === 'PUBLIC_BOOKING' || pref === 'PUBLIC_BOOKING';
+    }
+    const normalizedPackageType = selectedPkg.packageType?.toLowerCase().replace(/\s+/g, '') || '';
+    return normalizedPackageType.includes('public');
+  }, [selectedPkg, data]);
 
   const getSuggestedPackages = useMemo((): SuggestedPackage[] => {
     if (!selectedPkg) return [];
@@ -718,16 +757,21 @@ const packageAmount = useMemo(() => {
     return selectedPkg.amount * outstationBillableKm;
   }
 
+  if (isSelectedPackagePublic) {
+    // ✅ Public Booking: perKm rate × actual km used
+    return selectedPkg.amount * calculationKmUsed;
+  }
+
   return selectedPkg.amount || 0; // local fixed amount
-}, [selectedPkg, isSelectedPackageOutstation, outstationBillableKm]);
+}, [selectedPkg, isSelectedPackageOutstation, isSelectedPackagePublic, outstationBillableKm, calculationKmUsed]);
 
   const totalAmountBeforeTax = useMemo(() => {
-  const addKmAmount = isSelectedPackageOutstation ? 0 : additionalKm * ratePerKm;
-  const addHrAmount = isSelectedPackageOutstation ? 0 : additionalHours * ratePerHour;
+  const addKmAmount = (isSelectedPackageOutstation || isSelectedPackagePublic) ? 0 : additionalKm * ratePerKm;
+  const addHrAmount = (isSelectedPackageOutstation || isSelectedPackagePublic) ? 0 : additionalHours * ratePerHour;
   const discountAmount = parseFloat(discount) || 0;
 
   return packageAmount + addKmAmount + addHrAmount + totalDriverBeta - discountAmount;
-}, [packageAmount, additionalKm, additionalHours, discount, ratePerKm, ratePerHour, isSelectedPackageOutstation, totalDriverBeta]);
+}, [packageAmount, additionalKm, additionalHours, discount, ratePerKm, ratePerHour, isSelectedPackageOutstation, isSelectedPackagePublic, totalDriverBeta]);
 
   interface AdditionalTime {
     hours: number;
@@ -767,16 +811,16 @@ const packageAmount = useMemo(() => {
   }, [selectedPkg, garageOpenDate, garageCloseDate, guestOpenDate, guestCloseDate, hasGarageDetails]);
 
   const additionalHoursAmount = useMemo(() => {
-    if (!selectedPkg || isSelectedPackageOutstation) return 0;
+    if (!selectedPkg || isSelectedPackageOutstation || isSelectedPackagePublic) return 0;
     return additionalTime.decimalHours * ratePerHour;
-  }, [additionalTime, ratePerHour, selectedPkg, isSelectedPackageOutstation]);
+  }, [additionalTime, ratePerHour, selectedPkg, isSelectedPackageOutstation, isSelectedPackagePublic]);
 
     // Amount before extra charges (for GST calculation)
   const amountBeforeExtraCharges = useMemo(() => {
-    const addKmAmount = isSelectedPackageOutstation ? 0 : additionalKm * ratePerKm;
+    const addKmAmount = (isSelectedPackageOutstation || isSelectedPackagePublic) ? 0 : additionalKm * ratePerKm;
     const discountAmount = parseFloat(discount) || 0;
     return packageAmount + addKmAmount + additionalHoursAmount + totalDriverBeta;
-  }, [packageAmount, additionalKm, additionalHoursAmount, totalDriverBeta, discount, ratePerKm, isSelectedPackageOutstation]);
+  }, [packageAmount, additionalKm, additionalHoursAmount, totalDriverBeta, discount, ratePerKm, isSelectedPackageOutstation, isSelectedPackagePublic]);
 
   const totalAmount = useMemo(() => {
     return amountBeforeExtraCharges;
@@ -850,8 +894,8 @@ const packageAmount = useMemo(() => {
   
 // ✅ Base amount (WITHOUT extra charges & discount)
 const baseAmount = useMemo(() => {
-  const addKmAmount = isSelectedPackageOutstation ? 0 : additionalKm * ratePerKm;
-  const addHrAmount = isSelectedPackageOutstation ? 0 : additionalHoursAmount;
+  const addKmAmount = (isSelectedPackageOutstation || isSelectedPackagePublic) ? 0 : additionalKm * ratePerKm;
+  const addHrAmount = (isSelectedPackageOutstation || isSelectedPackagePublic) ? 0 : additionalHoursAmount;
 
   return packageAmount + addKmAmount + addHrAmount + totalDriverBeta;
 }, [
@@ -861,6 +905,7 @@ const baseAmount = useMemo(() => {
   additionalHoursAmount,
   totalDriverBeta,
   isSelectedPackageOutstation,
+  isSelectedPackagePublic,
 ]);
 
 // ✅ Amount before tax (WITH extra charges & discount)
@@ -1009,8 +1054,8 @@ companyId: data?.booking.companyId || data?.booking.user.companyId || "",
 
   packageAmount: r(packageAmount),
 
-  additionalKmsAmount: r(isSelectedPackageOutstation ? 0 : additionalKm * ratePerKm),
-  additionalHoursAmount: r(isSelectedPackageOutstation ? 0 : additionalHoursAmount),
+  additionalKmsAmount: r((isSelectedPackageOutstation || isSelectedPackagePublic) ? 0 : additionalKm * ratePerKm),
+  additionalHoursAmount: r((isSelectedPackageOutstation || isSelectedPackagePublic) ? 0 : additionalHoursAmount),
 
   extraDriverBeta: r(totalDriverBeta),
 
@@ -1141,11 +1186,16 @@ const money2 = (v: any) => {
     <PageLayout>
     <div className="p-6">
       <div>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <h2 className="text-xl font-semibold">Close Pending Order</h2>
-          <p className="text-black text-xl">
-            # {data.booking?.bookingCode} - ({data.booking?.user?.username || "Guest"})
-          </p>
+          <div className="text-right">
+            <p className="text-black text-xl font-bold">
+              # {data.booking?.bookingCode} - ({data.booking?.user?.username || data.booking?.behalfOfName || "Public Customer"})
+            </p>
+            {data.booking?.tenant?.name && (
+              <span className="text-xs text-gray-500 font-medium">Fleet: {data.booking.tenant.name}</span>
+            )}
+          </div>
         </div>
 
         {errors.general && (
@@ -1181,6 +1231,41 @@ const money2 = (v: any) => {
   </div>
 </div>
 
+        {isSelectedPackagePublic && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 mb-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div className="flex items-center space-x-3">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-600 text-white shadow-sm">
+                  Public Booking
+                </span>
+                <h3 className="text-lg font-bold text-gray-900">Per-KM Trip Sheet Closure</h3>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-gray-500 font-medium">Agreed Rate: </span>
+                <span className="text-lg font-extrabold text-blue-700">₹{selectedPkg?.amount || 0}/km</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-blue-200">
+              <div className="bg-white p-3 rounded-lg border border-blue-100">
+                <div className="text-xs text-gray-500 font-medium">Billable Distance</div>
+                <div className="text-xl font-bold text-gray-800">{calculationKmUsed} km</div>
+              </div>
+              <div className="bg-white p-3 rounded-lg border border-blue-100">
+                <div className="text-xs text-gray-500 font-medium">Billing Formula</div>
+                <div className="text-sm font-semibold text-gray-700 mt-1">
+                  {calculationKmUsed} km × ₹{selectedPkg?.amount || 0}/km
+                </div>
+              </div>
+              <div className="bg-white p-3 rounded-lg border border-blue-100">
+                <div className="text-xs text-gray-500 font-medium">Calculated Package Amount</div>
+                <div className="text-xl font-extrabold text-emerald-600">₹{r(packageAmount).toLocaleString('en-IN')}</div>
+              </div>
+            </div>
+            <div className="text-xs text-blue-700 mt-3 flex items-center gap-1 font-medium">
+              <span>ℹ️</span> Public bookings bill strictly on total distance travelled at the pre-agreed rate per kilometer. Hourly extensions and driver batta do not apply.
+            </div>
+          </div>
+        )}
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <h3 className="text-lg font-semibold text-blue-700 mb-4">Garage Details</h3>
@@ -1481,7 +1566,7 @@ Bata per Day: ₹<span className="font-medium">{driverBattaPerDay}</span>
           )}
         </div>
 
-        {!isSelectedPackageOutstation && (hasGarageDetails || hasGuestDetails) && (
+        {!isSelectedPackageOutstation && !isSelectedPackagePublic && (hasGarageDetails || hasGuestDetails) && (
           <div className="bg-white shadow rounded-lg mb-6">
             <div className="border-b px-4 py-2 text-orange-600 font-semibold">Extension Charges</div>
             <div className="p-4">
@@ -1606,13 +1691,15 @@ Bata per Day: ₹<span className="font-medium">{driverBattaPerDay}</span>
   Package Amount{" "}
   {isSelectedPackageOutstation
     ? `(${selectedPkg?.amount} × ${outstationBillableKm})`
+    : isSelectedPackagePublic
+    ? `(${selectedPkg?.amount} × ${calculationKmUsed} km)`
     : ""}
   :
 </span>
 <span>₹{r(packageAmount)}</span>
             </div>
 
-            {!isSelectedPackageOutstation && (hasGarageDetails || hasGuestDetails) && (
+            {!isSelectedPackageOutstation && !isSelectedPackagePublic && (hasGarageDetails || hasGuestDetails) && (
               <>
                 <div className="flex justify-between">
                   <span>Additional Km(s) ({additionalKm} × ₹{ratePerKm}) :</span>

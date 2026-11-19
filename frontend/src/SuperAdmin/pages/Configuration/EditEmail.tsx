@@ -55,15 +55,15 @@ const PLACEHOLDER_CATALOG: PlaceholderGroup[] = [
       { tag: "###PlanTier###", label: "SaaS Plan Tier", sample: "PRO" },
       { tag: "###BillingCycle###", label: "Billing Cycle", sample: "MONTHLY" },
       { tag: "###ExpiryDate###", label: "Subscription Expiry Date", sample: "Nov 30, 2026" },
-      { tag: "###RenewalUrl###", label: "Renewal Portal Link", sample: "https://fleetflow.com/billing/checkout" },
+      { tag: "###RenewalUrl###", label: "Renewal Portal Link", sample: "https://cabz.com/billing/checkout" },
       { tag: "###TransactionReference###", label: "Payment Txn Ref", sample: "TXN_772188" },
     ],
   },
   {
     category: "Authentication & Accounts",
     items: [
-      { tag: "###ActivationUrl###", label: "Expiring Activation URL", sample: "https://fleetflow.com/activate-account?token=act_..." },
-      { tag: "###LoginUrl###", label: "Operator Login Portal", sample: "https://fleetflow.com/adminlogin" },
+      { tag: "###ActivationUrl###", label: "Expiring Activation URL", sample: "https://cabz.com/activate-account?token=act_..." },
+      { tag: "###LoginUrl###", label: "Operator Login Portal", sample: "https://cabz.com/adminlogin" },
       { tag: "###RejectionReason###", label: "Application Rejection Reason", sample: "Incomplete documentation submitted." },
       { tag: "###Password###", label: "Masked Password", sample: "••••••••••••" },
     ],
@@ -346,7 +346,7 @@ const EditEmail: React.FC = () => {
                     className="w-full border border-[#D5CFC9] px-3.5 py-2 rounded-lg text-sm text-[#1C1A18] focus:ring-2 focus:ring-[#C04E24] focus:outline-none"
                     value={fromName}
                     onChange={(e) => setFromName(e.target.value)}
-                    placeholder="FleetFlow Platform"
+                    placeholder="CABZ Platform"
                   />
                 </div>
                 <div>
@@ -358,7 +358,7 @@ const EditEmail: React.FC = () => {
                     className="w-full border border-[#D5CFC9] px-3.5 py-2 rounded-lg text-sm text-[#1C1A18] focus:ring-2 focus:ring-[#C04E24] focus:outline-none"
                     value={fromAddress}
                     onChange={(e) => setFromAddress(e.target.value)}
-                    placeholder="notifications@fleetflow.com"
+                    placeholder="notifications@cabz.com"
                   />
                 </div>
               </div>
@@ -405,7 +405,7 @@ const EditEmail: React.FC = () => {
                   className="w-full border border-[#D5CFC9] px-3.5 py-2 rounded-lg text-sm text-[#1C1A18] focus:ring-2 focus:ring-[#C04E24] focus:outline-none"
                   value={emailBCC}
                   onChange={(e) => setEmailBCC(e.target.value)}
-                  placeholder="audit@fleetflow.com, records@fleetflow.com"
+                  placeholder="audit@cabz.com, records@cabz.com"
                 />
               </div>
 

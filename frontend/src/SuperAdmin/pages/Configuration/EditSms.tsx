@@ -70,7 +70,7 @@ const EditSms: React.FC = () => {
     VehicleModel: "Toyota Innova",
     Otp: "4589",
     InvoiceAmount: "₹ 1,850",
-    FleetName: "FleetFlow Fleet",
+    FleetName: "CABZ Fleet",
   };
 
   const renderPreview = () => {

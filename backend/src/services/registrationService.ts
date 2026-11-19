@@ -17,6 +17,7 @@ import { generatePlanSummaryPDF } from './planSummaryPdfService';
 import { calculateSubscriptionPeriodEnd } from './subscriptionBillingService';
 import { sendNotification, getSuperAdminEmail, getSuperAdminPhone, diagnoseSmtpConfig } from './notificationService';
 import { generateUniqueFleetSlug, getFleetLoginUrl } from './slugService';
+import sequelize from '../config/dbConfig';
 import config from '../config/config';
 
 const WEB_BASE_URL = config.baseurl?.webbaseurl || 'http://localhost:3000';
@@ -121,7 +122,7 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
     if (existingFleetName) {
       return res.status(409).json({
         success: false,
-        message: `A fleet with name '${cleanFleetName}' is already registered on FleetFlow. Fleet names must be unique.`,
+        message: `A fleet with name '${cleanFleetName}' is already registered on CABZ. Fleet names must be unique.`,
       });
     }
 
@@ -239,62 +240,96 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
       termsConsent: Boolean(termsConsent),
     });
 
-    // Dispatch notifications concurrently and safely via Promise.allSettled
-    const superAdminEmail = await getSuperAdminEmail();
-    const superAdminPhone = await getSuperAdminPhone();
+    // Strict Recipient Separation (Prompt Section 4):
+    // Dedicated isolated variables for all notification channels
+    const applicantEmail = cleanEmail;
+    const applicantPhone = cleanPhone;
+    const superAdminNotificationEmail = (await getSuperAdminEmail()).toLowerCase().trim();
+
+    // Guard: Applicant email must be valid; never redirect to SuperAdmin
+    if (!applicantEmail || !EMAIL_REGEX.test(applicantEmail)) {
+      console.error('[Registration] Cannot dispatch registration email: Invalid applicant email:', applicantEmail);
+      return res.status(400).json({ success: false, message: 'Invalid applicant contact email format.' });
+    }
+
+    // Resolve plan details for template display
+    const plan = await getPlanDefinition(normalizedTier);
+    const agreedPrice = normalizedCycle === 'ANNUAL'
+      ? (plan?.priceAnnualINR || 3560)
+      : (plan?.priceMonthlyINR || 349);
 
     const notificationTasks: Promise<any>[] = [
-      // 1. Acknowledgment email to applicant
+      // EVENT 1 (Email): Registration Received acknowledgment email strictly to applicant
       sendNotification({
         channel: 'EMAIL',
-        recipient: registration.contactEmail,
+        recipient: applicantEmail,
         templateCode: 'REGISTRATION_RECEIVED',
-        subject: `FleetFlow Fleet Application Received: ${registration.fleetName} (${registration.businessCode})`,
-        body: `Hello ${registration.ownerName},\n\nThank you for applying to join FleetFlow Mobility Platform. Your application for ${registration.fleetName} (Code: ${registration.businessCode}) has been received and is currently under review by our operations team.\n\nApplication Reference: ${requestId}\nPlan: ${normalizedTier} (${normalizedCycle} billing)\n\nYou will receive a secure activation link once your fleet application is approved.`,
+        subject: `Application Received: Welcome to CABZ — ${registration.fleetName}`,
+        body: `Hello ${registration.ownerName},\n\nThank you for applying to join CABZ Mobility Platform. Your application for ${registration.fleetName} (Code: ${registration.businessCode}) has been received and is currently under review by our platform administration team.\n\nApplication Reference: ${requestId}\nPlan: ${normalizedTier} (${normalizedCycle} billing)\nAgreed Price: ₹${agreedPrice}\n\nYou will receive a secure activation link once your fleet application is approved.`,
         referenceEntity: 'REGISTRATION_REQUEST',
         referenceId: requestId,
+        metadata: {
+          fleetName: registration.fleetName,
+          businessCode: registration.businessCode,
+          ownerName: registration.ownerName,
+          contactEmail: applicantEmail,
+          contactPhone: applicantPhone,
+          planTier: normalizedTier,
+          billingCycle: normalizedCycle,
+          agreedPrice: String(agreedPrice),
+          supportEmail: 'support@cabz.com',
+        },
       }),
 
-      // 2. Alert SuperAdmin via Email (subisha2002.m@gmail.com)
-      sendNotification({
-        channel: 'EMAIL',
-        recipient: superAdminEmail,
-        templateCode: 'SUPERADMIN_NEW_APPLICATION_ALERT',
-        subject: `[ALERT] New Fleet Application: ${registration.fleetName} (${registration.businessCode})`,
-        body: `A new fleet application has been submitted by ${registration.ownerName} (${registration.contactEmail}, ${registration.contactPhone}) for ${registration.fleetName}.\n\nPlan Tier: ${normalizedTier}\nCity: ${registration.city}, ${registration.state}\n\nPlease review the application at: ${WEB_BASE_URL}/admin/registrations`,
-        referenceEntity: 'REGISTRATION_REQUEST',
-        referenceId: requestId,
-        metadata: { reviewUrl: `${WEB_BASE_URL}/admin/registrations`, actionText: 'Review Inbound Applications' },
-      }),
-
-      // 3. Alert SuperAdmin via SMS (authorized phone e.g. 9080280818)
+      // EVENT 1 (SMS): Registration Received acknowledgment SMS strictly to applicant mobile
       sendNotification({
         channel: 'SMS',
-        recipient: superAdminPhone,
-        templateCode: 'SUPERADMIN_NEW_APPLICATION_SMS',
+        recipient: applicantPhone,
+        templateCode: 'REGISTRATION_RECEIVED_SMS',
         smsTemplateName: 'Booking Creation',
-        smsVars: [`Fleet: ${registration.fleetName}`],
-        body: `FleetFlow Alert: New fleet registration application submitted for ${registration.fleetName} (${registration.businessCode}) by ${registration.ownerName}.`,
+        smsVars: [registration.ownerName || 'Applicant'],
+        subject: `CABZ: Registration Received - ${registration.fleetName}`,
+        body: `CABZ: Registration for ${registration.fleetName} (${registration.businessCode}) has been received and is awaiting SuperAdmin approval. Ref: ${requestId.substring(0, 8)}.`,
         referenceEntity: 'REGISTRATION_REQUEST',
         referenceId: requestId,
+        metadata: {
+          fleetName: registration.fleetName,
+          businessCode: registration.businessCode,
+          ownerName: registration.ownerName,
+          contactPhone: applicantPhone,
+        },
+      }),
+
+      // EVENT 2: Alert SuperAdmin via separate pending approval alert email only (NO SMS to SuperAdmin)
+      sendNotification({
+        channel: 'EMAIL',
+        recipient: superAdminNotificationEmail,
+        templateCode: 'SUPERADMIN_NEW_APPLICATION_ALERT',
+        subject: `🚨 New Fleet Application Received: ${registration.fleetName} (${registration.businessCode})`,
+        body: `A new fleet transport operator has submitted a registration application for review:\n\nFleet Name: ${registration.fleetName}\nBusiness Code: ${registration.businessCode}\nApplicant: ${registration.ownerName}\nContact Email: ${applicantEmail}\nContact Phone: ${applicantPhone}\nLocation: ${registration.city}, ${registration.state}\nRequested Plan: ${normalizedTier} (${normalizedCycle})\nAgreed Price: ₹${agreedPrice}\n\nPlease review the application at: ${WEB_BASE_URL}/admin/registrations`,
+        referenceEntity: 'REGISTRATION_REQUEST',
+        referenceId: requestId,
+        metadata: {
+          fleetName: registration.fleetName,
+          businessCode: registration.businessCode,
+          ownerName: registration.ownerName,
+          contactEmail: applicantEmail,
+          contactPhone: applicantPhone,
+          city: registration.city,
+          state: registration.state,
+          planTier: normalizedTier,
+          billingCycle: normalizedCycle,
+          agreedPrice: String(agreedPrice),
+          reviewUrl: `${WEB_BASE_URL}/admin/registrations`,
+          actionText: 'Review Inbound Applications',
+        },
       }),
     ];
 
-    // 4. Acknowledgment SMS to applicant if phone provided
-    if (registration.contactPhone) {
-      notificationTasks.push(
-        sendNotification({
-          channel: 'SMS',
-          recipient: registration.contactPhone,
-          templateCode: 'REGISTRATION_RECEIVED_SMS',
-          smsTemplateName: 'Booking Creation',
-          smsVars: [registration.ownerName || 'Applicant'],
-          body: `FleetFlow: Application for ${registration.fleetName} (${registration.businessCode}) received. Ref: ${requestId.substring(0, 8)}. Review in progress.`,
-          referenceEntity: 'REGISTRATION_REQUEST',
-          referenceId: requestId,
-        })
-      );
-    }
+    // NOTE: Per strict requirements:
+    // - SuperAdmin receives EMAIL ONLY (SUPERADMIN_NEW_APPLICATION_ALERT). SuperAdmin phone receives ZERO SMS.
+    // - SuperAdmin never receives applicant registration success email or SMS.
+    // - Applicant receives BOTH registration success email (REGISTRATION_RECEIVED) and SMS (REGISTRATION_RECEIVED_SMS).
 
     await Promise.allSettled(notificationTasks);
 
@@ -443,7 +478,8 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
       });
     }
 
-    // 1. Provision Tenant
+    // 1. Provision Tenant, Subscription & Activation Token inside an ACID transaction
+    // Strictly ensures approval email triggers only after database transaction commits
     const tenantId = uuidv4();
     const limits = PLAN_LIMITS[reg.requestedPlanTier];
     const plan = await getPlanDefinition(reg.requestedPlanTier);
@@ -454,39 +490,32 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
 
     const tenantSlug = reg.slug || await generateUniqueFleetSlug(reg.displayName || reg.fleetName);
 
-    const tenant = await Tenant.create({
-      tenantId,
-      name: reg.fleetName,
-      legalName: reg.legalName || reg.fleetName,
-      displayName: reg.displayName || reg.fleetName,
-      code: reg.businessCode,
-      subdomain: reg.businessCode.toLowerCase(),
-      slug: tenantSlug,
-      status: 'ACTIVE',
-      planTier: reg.requestedPlanTier,
-      contactEmail: reg.contactEmail,
-      contactPhone: reg.contactPhone,
-      registeredAddress: reg.registeredAddress || null,
-      gstin: reg.gstin || null,
-      panNumber: reg.panNumber || null,
-      sacCode: reg.sacCode || '996609',
-      website: reg.website || null,
-      businessEmail: reg.businessEmail || reg.contactEmail,
-      businessPhone: reg.businessPhone || reg.contactPhone,
-      billingFooterText: reg.billingFooterText || null,
-      city: reg.city || null,
-      state: reg.state || null,
-      pinCode: reg.pinCode || null,
-      logoUrl: reg.logoUrl || null,
-      brandingTokens: {
-        primaryColor: '#0f1c3f',
-        secondaryColor: '#0d9488',
-        portalTitle: `${reg.displayName || reg.fleetName} Fleet Portal`,
+    const now = new Date();
+    const periodEnd = calculateSubscriptionPeriodEnd(now, billingCycle);
+
+    const rawToken = `act_${crypto.randomBytes(32).toString('hex')}`;
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours expiry
+
+    let tenant: Tenant;
+    let subscription: TenantSubscription;
+    let activationTokenRecord: TenantActivationToken;
+
+    await sequelize.transaction(async (t) => {
+      tenant = await Tenant.create({
+        tenantId,
+        name: reg.fleetName,
         legalName: reg.legalName || reg.fleetName,
         displayName: reg.displayName || reg.fleetName,
+        code: reg.businessCode,
+        subdomain: reg.businessCode.toLowerCase(),
+        slug: tenantSlug,
+        status: 'ACTIVE',
+        planTier: reg.requestedPlanTier,
+        contactEmail: reg.contactEmail,
+        contactPhone: reg.contactPhone,
         registeredAddress: reg.registeredAddress || null,
         gstin: reg.gstin || null,
-        gstNumber: reg.gstin || null,
         panNumber: reg.panNumber || null,
         sacCode: reg.sacCode || '996609',
         website: reg.website || null,
@@ -497,47 +526,66 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
         state: reg.state || null,
         pinCode: reg.pinCode || null,
         logoUrl: reg.logoUrl || null,
-      },
+        brandingTokens: {
+          primaryColor: '#0f1c3f',
+          secondaryColor: '#0d9488',
+          portalTitle: `${reg.displayName || reg.fleetName} Fleet Portal`,
+          legalName: reg.legalName || reg.fleetName,
+          displayName: reg.displayName || reg.fleetName,
+          registeredAddress: reg.registeredAddress || null,
+          gstin: reg.gstin || null,
+          gstNumber: reg.gstin || null,
+          panNumber: reg.panNumber || null,
+          sacCode: reg.sacCode || '996609',
+          website: reg.website || null,
+          businessEmail: reg.businessEmail || reg.contactEmail,
+          businessPhone: reg.businessPhone || reg.contactPhone,
+          billingFooterText: reg.billingFooterText || null,
+          city: reg.city || null,
+          state: reg.state || null,
+          pinCode: reg.pinCode || null,
+          logoUrl: reg.logoUrl || null,
+        },
+      }, { transaction: t });
+
+      subscription = await TenantSubscription.create({
+        subscriptionId: uuidv4(),
+        tenantId,
+        planTier: reg.requestedPlanTier,
+        status: 'TRIALING',
+        vehicleQuota: limits.vehicles,
+        driverQuota: limits.drivers,
+        companyQuota: limits.companies,
+        monthlyTripQuota: limits.trips,
+        allowOverage: reg.requestedPlanTier !== 'BASIC',
+        monthlyOverageSpendCap: reg.requestedPlanTier === 'PRO' ? 5000 : 1000,
+        billingCycle,
+        agreedPrice,
+        currency: 'INR',
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+      }, { transaction: t });
+
+      activationTokenRecord = await TenantActivationToken.create({
+        tokenId: uuidv4(),
+        tenantId,
+        adminEmail: reg.contactEmail,
+        adminName: reg.ownerName,
+        tokenHash,
+        expiresAt,
+        isRevoked: false,
+      }, { transaction: t });
+
+      await reg.update({
+        status: 'APPROVED',
+        reviewedBy: (req as any).user?.userId || 'SuperAdmin',
+        reviewedAt: new Date(),
+        tenantId,
+        reviewNotes: reviewNotes || 'Application reviewed and approved.',
+      }, { transaction: t });
     });
 
-    // 2. Provision TenantSubscription with agreed price and billing cycle in TRIALING state
-    const now = new Date();
-    const periodEnd = calculateSubscriptionPeriodEnd(now, billingCycle);
-
-    await TenantSubscription.create({
-      subscriptionId: uuidv4(),
-      tenantId,
-      planTier: reg.requestedPlanTier,
-      status: 'TRIALING',
-      vehicleQuota: limits.vehicles,
-      driverQuota: limits.drivers,
-      companyQuota: limits.companies,
-      monthlyTripQuota: limits.trips,
-      allowOverage: reg.requestedPlanTier !== 'BASIC',
-      monthlyOverageSpendCap: reg.requestedPlanTier === 'PRO' ? 5000 : 1000,
-      billingCycle,
-      agreedPrice,
-      currency: 'INR',
-      currentPeriodStart: now,
-      currentPeriodEnd: periodEnd,
-    });
-
-    // 3. Generate Cryptographically Secure Activation Token (32 bytes = 64 hex chars)
-    const rawToken = `act_${crypto.randomBytes(32).toString('hex')}`;
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours expiry
-
-    await TenantActivationToken.create({
-      tokenId: uuidv4(),
-      tenantId,
-      adminEmail: reg.contactEmail,
-      adminName: reg.ownerName,
-      tokenHash,
-      expiresAt,
-      isRevoked: false,
-    });
-
-    // 4. Generate Official SaaS Plan Summary Document PDF
+    // 2. Generate Official SaaS Plan Summary Document PDF (after transaction succeeds)
     let pdfResult: any = null;
     try {
       pdfResult = await generatePlanSummaryPDF({
@@ -565,50 +613,53 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
       console.warn('Notice: PDF generation error handled gracefully:', pdfErr);
     }
 
-    // 5. Update Registration Status
-    await reg.update({
-      status: 'APPROVED',
-      reviewedBy: (req as any).user?.userId || 'SuperAdmin',
-      reviewedAt: new Date(),
-      tenantId,
-      reviewNotes: reviewNotes || 'Application reviewed and approved.',
-    });
-
-    // 6. Dispatch Activation & Welcome Notification with Plan Details & PDF
+    // 3. Strict Recipient Separation: Dispatch activation & approval email to applicant only
+    // EVENT 3: SuperAdmin Approves Fleet — sent ONLY to registered applicant / Fleet Admin email
+    const applicantEmail = reg.contactEmail.trim().toLowerCase();
     const activationUrl = `${WEB_BASE_URL}/activate-account?token=${rawToken}`;
     const fleetLoginUrl = getFleetLoginUrl(tenantSlug);
     const downloadPdfUrl = pdfResult
       ? `${config.baseurl?.apibaseurl || 'http://localhost:5000'}/api/tenants/plan-summary/download/${pdfResult.fileName}?token=${pdfResult.downloadToken}`
       : '';
 
-    await sendNotification({
-      channel: 'EMAIL',
-      recipient: reg.contactEmail,
-      templateCode: 'TENANT_ADMIN_ACTIVATION_LINK',
-      subject: `🎉 Congratulations! Your Fleet Account is Approved: Set Up Your Password & Review Plan`,
-      body: `Dear ${reg.ownerName},\n\nYour application for ${reg.fleetName} has been approved!\n\n` +
-        `PLAN SUMMARY:\n` +
-        `• Plan: ${plan?.name || reg.requestedPlanTier}\n` +
-        `• Agreed Price: ₹${agreedPrice} / ${billingCycle.toLowerCase()}\n` +
-        `• Included Quotas: Up to ${limits.vehicles} Vehicles, ${limits.drivers} Drivers, ${limits.companies} Corporate Accounts\n\n` +
-        `STEP 1 — ACTIVATE YOUR ACCOUNT:\n` +
-        `Click the secure activation link below to set your administrator password:\n${activationUrl}\n` +
-        `(Note: This link will expire in 24 hours. Never share this link with anyone.)\n\n` +
-        `STEP 2 — DEDICATED FLEET LOGIN PORTAL:\n` +
-        `Access your branded fleet operator dashboard at your unique URL:\n${fleetLoginUrl}\n\n` +
-        (downloadPdfUrl ? `STEP 3 — DOWNLOAD PLAN SUMMARY PDF:\nView and download your official subscription agreement: ${downloadPdfUrl}\n\n` : '') +
-        `Best regards,\nFleetFlow SaaS Platform Team`,
-      referenceEntity: 'TENANT',
-      referenceId: tenantId,
-      metadata: {
-        tenantId,
-        activationUrl,
-        fleetLoginUrl,
-        loginUrl: fleetLoginUrl,
-        planSummaryPdfUrl: downloadPdfUrl,
-        attachments: pdfResult?.filePath ? [{ filename: pdfResult.fileName, path: pdfResult.filePath }] : undefined,
-      },
-    });
+    if (!applicantEmail || !EMAIL_REGEX.test(applicantEmail)) {
+      console.error('[Approval] Cannot dispatch activation email: missing or invalid contactEmail on request', reg.requestId);
+    } else {
+      await sendNotification({
+        channel: 'EMAIL',
+        recipient: applicantEmail,
+        templateCode: 'TENANT_ADMIN_ACTIVATION_LINK',
+        subject: `🎉 Congratulations! Your CABZ Account is Approved: ${reg.fleetName}`,
+        body: `Dear ${reg.ownerName},\n\nYour application for ${reg.fleetName} has been approved!\n\n` +
+          `PLAN SUMMARY:\n` +
+          `• Plan: ${plan?.name || reg.requestedPlanTier}\n` +
+          `• Agreed Price: ₹${agreedPrice} / ${billingCycle.toLowerCase()}\n` +
+          `• Included Quotas: Up to ${limits.vehicles} Vehicles, ${limits.drivers} Drivers, ${limits.companies} Corporate Accounts\n\n` +
+          `STEP 1 — ACTIVATE YOUR ACCOUNT:\n` +
+          `Click the secure activation link below to set your administrator password:\n${activationUrl}\n` +
+          `(Note: This link will expire in 24 hours. Never share this link with anyone.)\n\n` +
+          `STEP 2 — DEDICATED FLEET LOGIN PORTAL:\n` +
+          `Access your branded fleet operator dashboard at your unique URL:\n${fleetLoginUrl}\n\n` +
+          (downloadPdfUrl ? `STEP 3 — DOWNLOAD PLAN SUMMARY PDF:\nView and download your official subscription agreement: ${downloadPdfUrl}\n\n` : '') +
+          `Best regards,\nCABZ SaaS Platform Team`,
+        referenceEntity: 'TENANT',
+        referenceId: tenantId,
+        metadata: {
+          tenantId,
+          fleetName: reg.fleetName,
+          ownerName: reg.ownerName,
+          planTier: reg.requestedPlanTier,
+          billingCycle,
+          agreedPrice: String(agreedPrice),
+          activationUrl,
+          loginUrl: fleetLoginUrl,
+          fleetLoginUrl,
+          planSummaryPdfUrl: downloadPdfUrl,
+          attachments: pdfResult?.filePath ? [{ filename: pdfResult.fileName, path: pdfResult.filePath }] : undefined,
+          actionText: 'Set Up Administrator Password',
+        },
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -618,8 +669,8 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
       planSummaryPdfUrl: downloadPdfUrl,
       data: {
         tenantId,
-        fleetName: tenant.name,
-        code: tenant.code,
+        fleetName: tenant!.name,
+        code: tenant!.code,
         rawToken, // Provided in development for automated verification
         activationUrl,
         loginUrl: fleetLoginUrl,
@@ -661,23 +712,37 @@ export const rejectRegistrationRequest = async (req: Request, res: Response) => 
       });
     }
 
-    await reg.update({
-      status: 'REJECTED',
-      rejectionReason: String(rejectionReason).trim(),
-      reviewNotes: reviewNotes || null,
-      reviewedBy: (req as any).user?.userId || 'SuperAdmin',
-      reviewedAt: new Date(),
+    await sequelize.transaction(async (t) => {
+      await reg.update({
+        status: 'REJECTED',
+        rejectionReason: String(rejectionReason).trim(),
+        reviewNotes: reviewNotes || null,
+        reviewedBy: (req as any).user?.userId || 'SuperAdmin',
+        reviewedAt: new Date(),
+      }, { transaction: t });
     });
 
-    await sendNotification({
-      channel: 'EMAIL',
-      recipient: reg.contactEmail,
-      templateCode: 'REGISTRATION_REJECTED',
-      subject: `Update on your FleetFlow Fleet Application: ${reg.fleetName}`,
-      body: `Dear ${reg.ownerName},\n\nThank you for your interest in FleetFlow. After careful review, we regret to inform you that we are unable to approve your application for ${reg.fleetName} at this time.\n\nReason: ${reg.rejectionReason}\n\nIf you have any questions or feel this decision was made in error, please contact our support team at support@fleetflow.com.`,
-      referenceEntity: 'REGISTRATION_REQUEST',
-      referenceId: requestId,
-    });
+    // EVENT 4: Dispatch Rejection Notification strictly to applicant only
+    const applicantEmail = reg.contactEmail.trim().toLowerCase();
+    if (applicantEmail && EMAIL_REGEX.test(applicantEmail)) {
+      await sendNotification({
+        channel: 'EMAIL',
+        recipient: applicantEmail,
+        templateCode: 'REGISTRATION_REJECTED',
+        subject: `Update on Your CABZ Application: ${reg.fleetName}`,
+        body: `Dear ${reg.ownerName},\n\nThank you for your interest in CABZ. After careful review, we regret to inform you that we are unable to approve your application for ${reg.fleetName} at this time.\n\nReason: ${reg.rejectionReason}\n\nIf you have any questions or feel this decision was made in error, please contact our support team at support@cabz.com.`,
+        referenceEntity: 'REGISTRATION_REQUEST',
+        referenceId: requestId,
+        metadata: {
+          fleetName: reg.fleetName,
+          ownerName: reg.ownerName,
+          rejectionReason: reg.rejectionReason,
+          supportEmail: 'support@cabz.com',
+        },
+      });
+    } else {
+      console.warn('[Rejection] Cannot dispatch rejection notification: invalid or missing applicant email');
+    }
 
     return res.status(200).json({
       success: true,
@@ -726,15 +791,23 @@ export const resendActivationLink = async (req: Request, res: Response) => {
       isRevoked: false,
     });
 
+    const applicantEmail = reg.contactEmail.trim().toLowerCase();
     const activationUrl = `${WEB_BASE_URL}/activate-account?token=${rawToken}`;
     await sendNotification({
       channel: 'EMAIL',
-      recipient: reg.contactEmail,
-      templateCode: 'ACTIVATION_RESEND_INFORMATION',
-      subject: `Resent: Set Up Your FleetFlow Administrator Password`,
+      recipient: applicantEmail,
+      templateCode: 'TENANT_ADMIN_ACTIVATION_LINK',
+      subject: `Resent: Set Up Your CABZ Administrator Password: ${reg.fleetName}`,
       body: `Dear ${reg.ownerName},\n\nAs requested, here is your updated activation link to access your fleet operations:\n\n${activationUrl}\n\nThis link is valid for 24 hours.`,
       referenceEntity: 'TENANT',
       referenceId: reg.tenantId,
+      metadata: {
+        tenantId: reg.tenantId,
+        fleetName: reg.fleetName,
+        ownerName: reg.ownerName,
+        activationUrl,
+        actionText: 'Set Up Password',
+      },
     });
 
     return res.status(200).json({
@@ -913,8 +986,8 @@ export const completeAccountActivation = async (req: Request, res: Response) => 
       channel: 'EMAIL',
       recipient: record.adminEmail,
       templateCode: 'ACCOUNT_ACTIVATED',
-      subject: `✅ Welcome to FleetFlow: Your Operator Account is Ready`,
-      body: `Dear ${record.adminName || 'Fleet Operator'},\n\nYour administrator password has been set successfully. You can now log into your FleetFlow fleet management portal.\n\nSign In URL: ${loginUrl}\nLogin Email: ${record.adminEmail}\n\nFrom your dashboard, you can configure your fleet, assign vehicles, dispatch trips, and monitor operations.\n\nBest regards,\nFleetFlow SaaS Team`,
+      subject: `✅ Welcome to CABZ: Your Operator Account is Ready`,
+      body: `Dear ${record.adminName || 'Fleet Operator'},\n\nYour administrator password has been set successfully. You can now log into your CABZ fleet management portal.\n\nSign In URL: ${loginUrl}\nLogin Email: ${record.adminEmail}\n\nFrom your dashboard, you can configure your fleet, assign vehicles, dispatch trips, and monitor operations.\n\nBest regards,\nCABZ SaaS Team`,
       referenceEntity: 'TENANT',
       referenceId: record.tenantId,
       metadata: { loginUrl, actionText: 'Sign In to Fleet Portal' },

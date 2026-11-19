@@ -59,7 +59,6 @@ export default function EditCompany() {
   const [companyForm, setCompanyForm] = useState({
     companyName: "",
     seoUrl: "",
-    managerEmail: "",
     domainName: "",
     companyAddress: "",
     allowTax: false,
@@ -117,7 +116,6 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
           setCompanyForm({
             companyName: company.companyName || "",
             seoUrl: company.seoUrl || "",
-            managerEmail: company.managerEmail || "",
             domainName: company.domainName || "",
             companyAddress: company.companyAddress || "",
             allowTax: company.allowTax === "Yes",
@@ -174,12 +172,11 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       const formData = new FormData();
       formData.append("companyName", companyForm.companyName);
-      formData.append("managerEmail", companyForm.managerEmail);
       formData.append("seoUrl", companyForm.seoUrl);
       formData.append("domainName", companyForm.domainName);
       formData.append("companyAddress", companyForm.companyAddress); // ✅ ADD
       formData.append("allowTax", companyForm.allowTax ? "Yes" : "No");
-      formData.append("needEmail", "false");
+      formData.append("needEmail", "true");
       formData.append("managerApproval", "false");
       formData.append("gstNo", companyForm.gstNo);
       formData.append("startTime", companyForm.startTime);
@@ -284,20 +281,7 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                   placeholder="Domain Name"
                 />
               </div>
-              <div className="w-full">
-                <label className="block mb-1 font-medium">Manager Email</label>
-                <textarea
-                  name="managerEmail"
-                  value={companyForm.managerEmail}
-                  onChange={handleInputChange}
-                  className="w-full border p-2 rounded"
-                  placeholder="Enter emails separated by comma"
 
-                />
-                  <span className="text-xs text-gray-500 mt-1">
-    Separate multiple emails with comma (,) or new line.
-  </span>
-              </div>
 
            
               <div className="w-full">

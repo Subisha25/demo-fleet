@@ -160,26 +160,12 @@ useEffect(() => {
       return;
     }
 
-    if (form.managerEmails && form.managerEmails.trim() !== "") {
-      const emailList = form.managerEmails.split(/[,;\s]+/).filter(Boolean);
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const invalidEmails = emailList.filter((email: string) => !emailRegex.test(email));
-      if (invalidEmails.length > 0) {
-        showToast(
-          `Invalid email(s): ${invalidEmails.join(", ")}. Example: billing@fleetflow.com`,
-          "warn"
-        );
-        return;
-      }
-    }
-
     isSubmittingRef.current = true;
     setSubmitting(true);
 
     try {
       const formData = new FormData();
       formData.append("companyName", form.companyName.trim());
-      formData.append("managerEmail", (form.managerEmails || "").trim());
       formData.append("companyCode", form.companyCode.trim());
 
       if (form.seoUrl && form.seoUrl.trim() !== "") {
@@ -196,7 +182,7 @@ useEffect(() => {
 
       // Send allowTax as "Yes" or "No" from state
       formData.append("allowTax", allowTax ? "Yes" : "No");
-      formData.append("needEmail", "false");
+      formData.append("needEmail", "true");
       formData.append("managerApproval", "false");
       formData.append(
         "bookingRules",
@@ -272,24 +258,6 @@ useEffect(() => {
               <div className="w-full">
                 <InputBox label="seoUrl" name="seoUrl" icon={faLink} placeholder="company-name-seo-url" />
               </div>
-
-           <div className="flex flex-col">
-  <InputBox
-    label={
-      <span>
-        Corporate / Manager Emails (Optional)
-      </span>
-    }
-    name="managerEmails"
-   isTextarea
-    icon={faEnvelope}
-    placeholder="Enter manager email(s) (optional)"
-  />
-
-  <span className="text-xs text-gray-500 mt-1">
-    Separate multiple emails with comma (,) or new line.
-  </span>
-</div>
 
               <div className="w-full">
                 <InputBox

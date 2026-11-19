@@ -5,8 +5,9 @@ import { useAuth } from "../../../context/AuthContext";
 import { showToast, AlertContainer } from "../../../components/AlertBox";
 import UserLoginHeader from "./userloginheader";
 import Footer from "../../../components/Homepage/Footer";
-import { Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Building2 } from "lucide-react";
 import LoadingButton from "../../../components/LoadingButton";
+import config from "../../../config/config";
 
 interface CompanyData {
   companyId: string;
@@ -30,6 +31,24 @@ const UserLogin: React.FC = () => {
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   const [loadingCompany, setLoadingCompany] = useState(true);
   const [companyNotFound, setCompanyNotFound] = useState(false);
+  const [companyLogoError, setCompanyLogoError] = useState(false);
+  const [fleetLogoError, setFleetLogoError] = useState(false);
+
+  const BASE_URL = (config?.baseurl?.apibaseurl || '').replace(/\/+$/, '');
+
+  const companyLogoUrl = companyData?.companyLogo
+    ? (companyData.companyLogo.startsWith('http') || companyData.companyLogo.startsWith('data:')
+        ? companyData.companyLogo
+        : `${BASE_URL}/uploads/companyLogo/${companyData.companyLogo}`)
+    : null;
+
+  const fleetLogoUrl = companyData?.fleetLogo
+    ? (companyData.fleetLogo.startsWith('http') || companyData.fleetLogo.startsWith('data:')
+        ? companyData.fleetLogo
+        : companyData.fleetLogo.startsWith('/')
+          ? `${BASE_URL}${companyData.fleetLogo}`
+          : `${BASE_URL}/uploads/fleetLogo/${companyData.fleetLogo}`)
+    : null;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -260,70 +279,108 @@ const UserLogin: React.FC = () => {
     <>
       <AlertContainer />
       <UserLoginHeader companyData={companyData} />
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex items-center justify-center px-4">
-        <div className="w-full max-w-md">
-          <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden">
+      <div className="min-h-screen bg-[#F8F8FC] flex flex-col justify-between">
+        <div className="max-w-md mx-auto w-full px-4 py-8 sm:py-12 my-auto">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden relative">
+            {/* Top Brand Accent Bar */}
+            <div className="h-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800" />
 
             {/* Header */}
-            <div className="bg-gradient-to-r from-[#274782] to-[#352E6B] px-8 py-8 text-center">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Lock className="text-white" size={32} />
+            <div className="p-7 sm:p-8 text-center pb-4">
+              <div className="flex items-center justify-center gap-3 mb-4">
+                {companyLogoUrl && !companyLogoError ? (
+                  <img
+                    src={companyLogoUrl}
+                    alt={companyData?.companyName || "Company Logo"}
+                    onError={() => setCompanyLogoError(true)}
+                    className="h-14 max-w-[160px] object-contain p-1 rounded-xl border border-slate-200 bg-white shadow-xs"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 text-white font-black text-xl flex items-center justify-center shadow-md">
+                    {(companyData?.companyName || "C").trim().slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+
+                {fleetLogoUrl && !fleetLogoError && (
+                  <img
+                    src={fleetLogoUrl}
+                    alt={companyData?.fleetName || "Fleet"}
+                    onError={() => setFleetLogoError(true)}
+                    className="h-10 max-w-[120px] object-contain p-1 rounded-lg border border-slate-200 bg-white shadow-2xs opacity-85"
+                  />
+                )}
               </div>
-              <h2 className="text-2xl font-bold text-white">
-                {companyData?.companyName || "Corporate"} Login
-              </h2>
-              {companyData?.fleetName && (
-                <p className="text-blue-200 text-xs font-semibold uppercase tracking-wider mt-1">
-                  Fleet: {companyData.fleetName}
-                </p>
-              )}
-              <p className="text-blue-100 text-sm mt-1">Sign in to continue</p>
+
+              <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                {companyData?.companyName || "Corporate"}
+              </h1>
+
+              <div className="mt-1.5 flex items-center justify-center gap-2">
+                <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-3 py-0.5 rounded-full border border-purple-200">
+                  {companyData?.fleetName ? `Powered by ${companyData.fleetName}` : "Corporate Mobility Portal"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-2">Sign in to your corporate employee account</p>
             </div>
 
             {/* Form */}
-            <form onSubmit={onSubmit} className="px-8 py-8 space-y-5">
+            <form onSubmit={onSubmit} className="px-7 sm:px-8 pb-8 space-y-4">
               {errors.server && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-700">
                   {errors.server}
                 </div>
               )}
 
               {/* Email */}
               <div>
-                <label className="text-sm font-semibold text-gray-700 block mb-2">Email</label>
+                <label className="text-xs font-bold uppercase text-slate-700 block mb-1.5">Email</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-11 py-3 border-2 rounded-xl focus:border-[#275981]"
-                    placeholder="Enter Your email"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 text-sm outline-none transition"
+                    placeholder="name@company.com"
                   />
                 </div>
+                {errors.email && (
+                  <p className="text-[11px] text-red-600 font-semibold mt-1">{errors.email}</p>
+                )}
               </div>
 
               {/* Password */}
               <div>
-                <label className="text-sm font-semibold text-gray-700 block mb-2">Password</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold uppercase text-slate-700">Password</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgetModal(true)}
+                    className="text-xs font-semibold text-purple-700 hover:text-purple-800 transition"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-11 pr-12 py-3 border-2 rounded-xl"
-                     placeholder="Enter your password"
-
+                    className="w-full pl-10 pr-11 py-2.5 rounded-xl border border-slate-300 focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20 text-sm outline-none transition"
+                    placeholder="Enter your password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                   >
-                    {showPassword ? <EyeOff /> : <Eye />}
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
+                {errors.password && (
+                  <p className="text-[11px] text-red-600 font-semibold mt-1">{errors.password}</p>
+                )}
               </div>
 
               <LoadingButton
@@ -332,32 +389,26 @@ const UserLogin: React.FC = () => {
                 loadingText="Signing In..."
                 variant="primary"
                 size="lg"
-                className="w-full shadow-md"
+                className="w-full shadow-md rounded-xl bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800"
               >
                 Sign In
               </LoadingButton>
 
-              <p
-                onClick={() => setShowForgetModal(true)}
-                className="text-center text-sm text-[#275981] cursor-pointer hover:underline"
-              >
-                Forgot your password?
-              </p>
-
-              <Link
-                to={registerUrl}
-                className="block text-center text-sm text-[#275981] hover:underline"
-              >
-                Register
-              </Link>
+              <div className="pt-2 text-center">
+                <Link
+                  to={registerUrl}
+                  className="text-xs font-semibold text-purple-700 hover:text-purple-900 transition underline underline-offset-2"
+                >
+                  Register new corporate employee account &rarr;
+                </Link>
+              </div>
             </form>
           </div>
         </div>
       </div>
 
       {/* ===== Forgot Password Modal ===== */}
-  {/* Forget Password Modal */}
-{showForgetModal && (
+      {showForgetModal && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
     <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
       

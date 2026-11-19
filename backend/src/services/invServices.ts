@@ -827,16 +827,22 @@ export const getAllCompanyInvoices = async (req: Request, res: Response) => {
     const companySummaries: any[] = [];
 
     for (const company of companies) {
-      // Get all bookings for this company
+      // Get all bookings for this company (handles both direct booking.companyId and user.companyId)
       const bookings = await Booking.findAll({
+        where: {
+          [Op.or]: [
+            { companyId: company.companyId },
+            { '$user.companyId$': company.companyId },
+          ],
+        },
         include: [
           {
             model: User,
             as: "user",
-            where: { companyId: company.companyId },
-            attributes: []
-          }
-        ]
+            required: false,
+            attributes: ["userId", "companyId"],
+          },
+        ],
       });
 
       const bookingsCount = bookings.length;
@@ -921,9 +927,12 @@ export const getcompanyOrderSummery = async (req: Request, res: Response) => {
 
     const whereClause: any = { ...tenantCondition };
 
-    // Filter by companyId
+    // Filter by companyId (handles both direct booking.companyId and user.company.companyId)
     if (companyId) {
-      whereClause["$User.Company.companyId$"] = companyId as string;
+      whereClause[Op.or] = [
+        { companyId: companyId as string },
+        { "$User.Company.companyId$": companyId as string },
+      ];
     }
 
     // Filter by pickupPoint

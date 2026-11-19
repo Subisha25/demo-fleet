@@ -9,10 +9,19 @@ import axiosInstance from "../../../utils/axiosInstance";
 interface PaymentRow {
   id: string; // ✅ Regular: paymentId, Monthly: monthlyInvoiceId
   paymentNo: string; // ✅ Regular: transactionId, Monthly: invoiceNumber
+  bookingCode?: string;
+  bookingId?: string;
+  fleetName?: string;
+  companyName?: string;
+  passengerName?: string;
   paymentMode: string;
   createdAt: string;
   amount: string;
-  viewType: "regular" | "monthly";
+  balance?: string;
+  status?: string;
+  invoiceNumber?: string;
+  isPublicBooking?: boolean;
+  viewType: "regular" | "monthly" | "public";
 }
 
 type MonthlyRow = {
@@ -68,7 +77,7 @@ const formatToCustom = (dateString: string) => {
 const ListPayment: React.FC = () => {
   const [rows, setRows] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [viewType, setViewType] = useState<"regular" | "monthly">("regular");
+  const [viewType, setViewType] = useState<"regular" | "monthly" | "public">("regular");
   const navigate = useNavigate();
   const filterFormRef = useRef<HTMLDivElement | null>(null);
 
@@ -95,15 +104,40 @@ const ListPayment: React.FC = () => {
 
             const amountVal = pay?.amount ?? inv?.invoiceAmount ?? 0;
 
+            const b = inv?.booking || {};
+            let snap: any = null;
+            try {
+              const parsed = typeof b.notes === "string" ? JSON.parse(b.notes) : b.notes;
+              snap = parsed?.packageSnapshot || null;
+            } catch {}
+
+            const isPublic =
+              b.bookingCreatedBy === "PUBLIC_BOOKING" ||
+              b.preferredType === "PUBLIC_BOOKING" ||
+              b.behalfOfName ||
+              snap;
+
+            const companyName = b.company?.companyName || b.user?.company?.companyName || snap?.companyName || "-";
+            const passengerName = b.user?.username || b.behalfOfName || snap?.customerName || (isPublic ? "Public Passenger" : "-");
+            const fleetName = b.tenant?.name || "-";
+
             return {
               id: pay.paymentId,
               paymentNo: pay.transactionId || "—",
+              bookingCode: b.bookingCode || "-",
+              bookingId: b.bookingId,
+              fleetName,
+              companyName,
+              passengerName,
               paymentMode: pay.paymentMode || "-",
               createdAt: formatToCustom(pay.createdAt || inv?.createdAt || cp?.createdAt),
               amount: Number(amountVal || 0).toLocaleString("en-IN", {
                 minimumFractionDigits: 2,
               }),
-              viewType: "regular",
+              status: pay.status === "9" || pay.status === "0" ? "Paid" : (pay.status || "Completed"),
+              invoiceNumber: inv.invoiceNumber ? String(inv.invoiceNumber) : "-",
+              isPublicBooking: !!isPublic,
+              viewType: isPublic ? "public" : "regular",
             };
           })
           .filter((x): x is PaymentRow => x !== null); // ✅ Type guard
@@ -195,7 +229,7 @@ const ListPayment: React.FC = () => {
 
   // ========= INITIAL LOAD =========
   useEffect(() => {
-    if (viewType === "regular") fetchRegularPayments();
+    if (viewType === "regular" || viewType === "public") fetchRegularPayments();
     else fetchMonthlyPayments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewType]);
@@ -226,6 +260,43 @@ const ListPayment: React.FC = () => {
     { header: "Payment Mode", accessor: "paymentMode" },
     { header: "Payment Date", accessor: "createdAt" },
     { header: "Amount Paid (Rs)", accessor: "amount" },
+  ];
+
+  const publicColumns: Column<PaymentRow>[] = [
+    {
+      header: "Payment No #",
+      accessor: "paymentNo",
+      render: (r) => (
+        <span
+          onClick={() => handleView(r)}
+          className="text-blue-600 hover:text-blue-800 font-bold cursor-pointer"
+          title="View"
+        >
+          {r.paymentNo}
+        </span>
+      ),
+    },
+    { header: "Booking #", accessor: "bookingCode" },
+    { header: "Fleet", accessor: "fleetName" },
+    { header: "Company", accessor: "companyName" },
+    { header: "Passenger", accessor: "passengerName" },
+    { header: "Payment Date", accessor: "createdAt" },
+    { header: "Payment Mode", accessor: "paymentMode" },
+    {
+      header: "Amount Paid (Rs)",
+      accessor: "amount",
+      render: (r) => <span className="font-bold text-emerald-700">₹{r.amount}</span>,
+    },
+    { header: "Invoice #", accessor: "invoiceNumber" },
+    {
+      header: "Status",
+      accessor: "status",
+      render: (r) => (
+        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">
+          {r.status || "Paid"}
+        </span>
+      ),
+    },
   ];
 
   const handleSearch = async () => {
@@ -312,20 +383,33 @@ const ListPayment: React.FC = () => {
             <div className="flex gap-2 whitespace-nowrap">
               <button
                 onClick={() => setViewType("regular")}
-                className={`px-4 py-2 rounded font-semibold ${viewType === "regular"
+                className={`px-4 py-2 rounded font-semibold ${
+                  viewType === "regular"
                     ? "bg-[#275981] text-white"
                     : "bg-gray-200 text-gray-700"
-                  }`}
+                }`}
               >
-                Regular
+                Single-Trip / Regular
+              </button>
+
+              <button
+                onClick={() => setViewType("public")}
+                className={`px-4 py-2 rounded font-semibold ${
+                  viewType === "public"
+                    ? "bg-[#275981] text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+              >
+                Public Bookings
               </button>
 
               <button
                 onClick={() => setViewType("monthly")}
-                className={`px-4 py-2 rounded font-semibold ${viewType === "monthly"
+                className={`px-4 py-2 rounded font-semibold ${
+                  viewType === "monthly"
                     ? "bg-[#275981] text-white"
                     : "bg-gray-200 text-gray-700"
-                  }`}
+                }`}
               >
                 Monthly
               </button>
@@ -335,8 +419,20 @@ const ListPayment: React.FC = () => {
 
         {loading ? (
           <p className="text-gray-500">Loading payments...</p>
+        ) : viewType === "public" ? (
+          <DataTable
+            columns={publicColumns}
+            data={rows.filter((r) => r.isPublicBooking)}
+            onView={handleView}
+            rowsPerPage={10}
+          />
         ) : (
-          <DataTable columns={columns} data={rows} onView={handleView} rowsPerPage={5} />
+          <DataTable
+            columns={columns}
+            data={viewType === "regular" ? rows.filter((r) => !r.isPublicBooking) : rows}
+            onView={handleView}
+            rowsPerPage={10}
+          />
         )}
       </main>
 

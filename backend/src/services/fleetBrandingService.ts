@@ -76,7 +76,7 @@ export const getFleetDocumentBranding = async (
   }
 
   const tokens = (tenant?.brandingTokens as any) || {};
-  const name = tenant?.name || 'FleetFlow Fleet';
+  const name = tenant?.name || 'CABZ Fleet';
   const legalName = tenant?.legalName || tokens.legalName || name;
   const displayName = tenant?.displayName || tokens.displayName || name;
   const registeredAddress = tenant?.registeredAddress || tokens.registeredAddress || '';
@@ -139,11 +139,25 @@ export const getFleetDocumentBranding = async (
     } else {
       try {
         const cleanedPath = rawLogo.replace(/^\//, '');
-        const absPath = path.isAbsolute(cleanedPath) ? cleanedPath : path.join(process.cwd(), cleanedPath);
-        if (fs.existsSync(absPath)) {
-          const ext = path.extname(absPath).replace('.', '').toLowerCase() || 'png';
+        const candidatePaths = [
+          path.isAbsolute(cleanedPath) ? cleanedPath : path.join(process.cwd(), cleanedPath),
+          path.join(process.cwd(), 'uploads', 'fleetLogo', path.basename(cleanedPath)),
+          path.join(process.cwd(), 'uploads', cleanedPath),
+          path.join(process.cwd(), 'public', cleanedPath),
+        ];
+
+        let foundPath: string | null = null;
+        for (const candidate of candidatePaths) {
+          if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+            foundPath = candidate;
+            break;
+          }
+        }
+
+        if (foundPath) {
+          const ext = path.extname(foundPath).replace('.', '').toLowerCase() || 'png';
           const mime = ext === 'svg' ? 'svg+xml' : ext === 'jpg' ? 'jpeg' : ext;
-          const buf = fs.readFileSync(absPath);
+          const buf = fs.readFileSync(foundPath);
           logoSrc = `data:image/${mime};base64,${buf.toString('base64')}`;
         }
       } catch (err) {

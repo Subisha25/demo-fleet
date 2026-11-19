@@ -6,7 +6,7 @@ import { Booking } from '../models/booking';
 import { Vehicle } from '../models/vehicle';
 import { VehicleType } from '../models/vehicleType';
 import { Tax } from '../models/tax';
-import { Company, Employee, User, Invoice, Payment, VehicleMaster, ClosePending } from '../models';
+import { Company, Employee, User, Invoice, Payment, VehicleMaster, ClosePending, Tenant, Drivers } from '../models';
 import { USERS, ORDER, USERSTATUS,COMPANY } from "../utils/costants";
 import moment from "moment-timezone";
 import sequelize from 'sequelize';
@@ -1469,6 +1469,7 @@ export const confirmPendingOrderCountWeb = async (req: any, res: Response) => {
       include: [
         { model: Vehicle, required: false },
         { model: VehicleType, required: false },
+        { model: Company, as: "company", required: false, attributes: ["companyId", "companyName", "tenantId"] },
         {
           model: User,
           as: "user",
@@ -1623,24 +1624,72 @@ export const paymentPendingOrderCount = async (req: any, res: Response) => {
             "pickupPoint",
             "dropPoint",
             "bookingDate",
+            "bookingTime",
             "bookingStatus",
             "confirmStatus",
             "purpose",
             "roundTrip",
+            "bookingCreatedBy",
+            "preferredType",
+            "behalfOfName",
+            "behalfOfPhone",
+            "notes",
+            "travellersCount",
+            "companyId",
+            "tenantId",
+            "vehicleId",
+            "vehicleTypeId",
+            "vehicleMasterId",
+            "driverId",
           ],
           include: [
             {
               model: User,
               as: "user",
-              required: true,
-              where: whereUser,
-              attributes: ["userId", "username", "email", "companyId"],
+              required: false,
+              where: Object.keys(whereUser).length > 0 ? whereUser : undefined,
+              attributes: ["userId", "username", "email", "mobile", "companyId"],
               include: [
                 {
                   model: Company,
                   attributes: ["companyId", "companyName"],
                 },
               ],
+            },
+            {
+              model: Company,
+              as: "company",
+              required: false,
+              attributes: ["companyId", "companyName"],
+            },
+            {
+              model: Tenant,
+              as: "tenant",
+              required: false,
+              attributes: ["tenantId", "name", "slug"],
+            },
+            {
+              model: VehicleType,
+              as: "vehicleType",
+              required: false,
+            },
+            {
+              model: VehicleMaster,
+              as: "vehicleMaster",
+              required: false,
+              include: [
+                {
+                  model: Vehicle,
+                  as: "vehicle",
+                  required: false,
+                },
+              ],
+            },
+            {
+              model: Drivers,
+              as: "driver",
+              required: false,
+              attributes: ["driverId", "driverName", "phno"],
             },
           ],
         },
@@ -1654,11 +1703,28 @@ export const paymentPendingOrderCount = async (req: any, res: Response) => {
             "pickupDate",
             "garageKms",
             "guestKms",
+            "garageOpenKm",
+            "garageCloseKm",
+            "guestOpenKm",
+            "guestCloseKm",
             "packageAmount",
             "totalAmount",
+            "total",
             "discountAmount",
             "advanceAmount",
             "totalDue",
+            "additionalKms",
+            "additionalHours",
+            "additionalKmsAmount",
+            "additionalHoursAmount",
+            "extraCharges",
+            "extraChargesBreakup",
+            "chargesTitle",
+            "cgstAmount",
+            "sgstAmount",
+            "igstAmount",
+            "totalTaxAmount",
+            "selectedPackageData",
           ],
         },
 
@@ -1673,11 +1739,35 @@ export const paymentPendingOrderCount = async (req: any, res: Response) => {
       order: [["createdAt", "DESC"]],
     });
 
+    // Synthesize user and company for public bookings if needed
+    const mappedInvoices = invoices.map((inv: any) => {
+      const invData = inv.toJSON ? inv.toJSON() : inv;
+      const b = invData.booking;
+      if (b && !b.user && (b.bookingCreatedBy === 'PUBLIC_BOOKING' || b.behalfOfName || b.preferredType === 'PUBLIC_BOOKING')) {
+        let custEmail = '';
+        let snap: any = null;
+        try {
+          const parsed = typeof b.notes === 'string' ? JSON.parse(b.notes) : b.notes;
+          custEmail = parsed?.packageSnapshot?.customerEmail || '';
+          snap = parsed?.packageSnapshot || null;
+        } catch {}
+        b.user = {
+          userId: null,
+          username: b.behalfOfName || snap?.customerName || 'Public Customer',
+          email: custEmail,
+          mobile: b.behalfOfPhone || snap?.customerPhone || '',
+          companyId: b.companyId,
+          company: b.company || null,
+        };
+      }
+      return invData;
+    });
+
     return res.status(200).json({
       success: true,
       message: "Pending invoice details fetched successfully",
-      count: invoices.length,
-      data: invoices,
+      count: mappedInvoices.length,
+      data: mappedInvoices,
     });
   } catch (err) {
     console.error("Fetch Pending Invoices Error:", err);
@@ -2068,6 +2158,37 @@ export const paymentCompletedOrderCount = async (req: any, res: Response) => {
                 "bookingId",
                 "bookingCode",
                 "confirmStatus",
+                "bookingDate",
+                "pickupPoint",
+                "dropPoint",
+                "bookingCreatedBy",
+                "preferredType",
+                "behalfOfName",
+                "behalfOfPhone",
+                "notes",
+                "companyId",
+                "tenantId",
+                "userId",
+              ],
+              include: [
+                {
+                  model: Company,
+                  as: "company",
+                  required: false,
+                  attributes: ["companyId", "companyName"],
+                },
+                {
+                  model: Tenant,
+                  as: "tenant",
+                  required: false,
+                  attributes: ["tenantId", "name", "slug"],
+                },
+                {
+                  model: User,
+                  as: "user",
+                  required: false,
+                  attributes: ["userId", "username", "email", "mobile"],
+                },
               ],
             },
           ],
@@ -2142,13 +2263,18 @@ export const getCompletedList = async (req: any, res: Response) => {
           model: Invoice,
           as: "invoice", // Booking -> Invoice (HasMany)
           required: false,
-          attributes: ["invoiceId", "invoiceNumber", "invoiceAmount", "invoiceStatus", "createdAt"],
+          attributes: ["invoiceId", "invoiceNumber", "invoiceAmount", "invoiceStatus", "createdAt", "closePendingId"],
           include: [
             {
               model: Payment,
               as: "payment", // invoice -> payment (may be null)
               required: false,
               attributes: ["paymentId", "transactionId", "paymentMode", "amount", "status", "isOnline", "createdAt"],
+            },
+            {
+              model: ClosePending,
+              as: "closePending",
+              required: false,
             },
           ],
         },
@@ -2165,6 +2291,30 @@ export const getCompletedList = async (req: any, res: Response) => {
               required: companyWhere ? true : false,
             },
           ],
+        },
+        {
+          model: Company,
+          as: "company",
+          required: false,
+          attributes: ["companyId", "companyName"],
+        },
+        {
+          model: Tenant,
+          as: "tenant",
+          required: false,
+          attributes: ["tenantId", "name", "slug"],
+        },
+        {
+          model: VehicleMaster,
+          as: "vehicleMaster",
+          required: false,
+          include: [{ model: Vehicle, as: "vehicle", required: false }],
+        },
+        {
+          model: Drivers,
+          as: "driver",
+          required: false,
+          attributes: ["driverId", "driverName", "phno"],
         },
       ],
       order: [["createdAt", "DESC"]],
@@ -2219,7 +2369,35 @@ export const getCompletedList = async (req: any, res: Response) => {
       const pay = b.payment;
       const invoice = (b.invoice && b.invoice[0]) || null;
       const user = b.user;
-      const company = user?.company;
+
+      let snap: any = null;
+      try {
+        const parsed = typeof b.notes === "string" ? JSON.parse(b.notes) : b.notes;
+        snap = parsed?.packageSnapshot || null;
+      } catch {}
+
+      const isPublic =
+        b.bookingCreatedBy === "PUBLIC_BOOKING" ||
+        b.preferredType === "PUBLIC_BOOKING" ||
+        b.behalfOfName ||
+        snap;
+
+      const company =
+        user?.company ||
+        b.company ||
+        (snap?.companyName ? { companyId: b.companyId, companyName: snap.companyName } : null);
+      const uName =
+        user?.username || b.behalfOfName || snap?.customerName || (isPublic ? "Public Customer" : null);
+      const uEmail = user?.email || snap?.customerEmail || null;
+      const uMobile = user?.mobile || b.behalfOfPhone || snap?.customerPhone || null;
+
+      const vehicleName =
+        b.vehicleMaster?.vehicle?.vehicleName || b.vehicleMaster?.vehicleModelName || null;
+      const vehicleNumber = b.vehicleMaster?.vehicleNumber || null;
+      const driverName = b.driver?.driverName || null;
+      const driverPhone = b.driver?.phno || null;
+      const actualKms = invoice?.closePending?.guestKms || invoice?.closePending?.garageKms || null;
+      const ratePerKm = snap?.amountPerKm || snap?.perKmRate || snap?.perKmAmount || snap?.perKm || null;
 
       return {
         bookingId: b.bookingId,
@@ -2240,15 +2418,26 @@ export const getCompletedList = async (req: any, res: Response) => {
         orderNumber: b.bookingCode || null,
         pickupDate: b.bookingDate || null,
         pickupPoint: b.pickupPoint || null,
+        dropPoint: b.dropPoint || null,
         purpose: b.purpose || null,
         orderDate: b.createdAt || null,
 
         userId: user?.userId || null,
-        userName: user?.username || null,
-        userEmail: user?.email || null,
-        userMobile: user?.mobile || null,
+        userName: uName,
+        userEmail: uEmail,
+        userMobile: uMobile,
         companyId: company?.companyId || null,
         companyName: company?.companyName || null,
+        fleetName: b.tenant?.name || null,
+        bookingCreatedBy: b.bookingCreatedBy,
+        preferredType: b.preferredType,
+        isPublicBooking: !!isPublic,
+        vehicleName,
+        vehicleNumber,
+        driverName,
+        driverPhone,
+        actualKms,
+        ratePerKm,
       };
     });
 

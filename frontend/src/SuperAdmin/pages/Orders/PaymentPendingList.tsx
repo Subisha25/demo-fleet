@@ -21,6 +21,7 @@ interface ApiItem {
   bookingCode: string;
   bookingDate: string;
   pickupPoint: string;
+  dropPoint?: string;
   userId: string;
   createdAt: string;
   invoiceNumber?: string;
@@ -30,6 +31,22 @@ interface ApiItem {
   companyName?: string;
   orderDate?: string;
   pickupDate?: string;
+  bookingCreatedBy?: string;
+  preferredType?: string;
+  isPublicBooking?: boolean;
+  userPhone?: string;
+  fleetName?: string;
+  vehicleDetails?: string;
+  driverName?: string;
+  billableKms?: number;
+  ratePerKm?: number;
+  packageAmount?: number;
+  extraCharges?: number;
+  discountAmount?: number;
+  totalTaxAmount?: number;
+  advanceAmount?: number;
+  totalDue?: number;
+  paymentStatus?: string;
 }
 
 interface MonthlyApiItem {
@@ -112,7 +129,7 @@ const PaymentPendingList: React.FC = () => {
     bookingId: string;
     bookingCode: string;
   } | null>(null);
-  const [viewType, setViewType] = useState<"regular" | "monthly" | "oncall">("regular");
+  const [viewType, setViewType] = useState<"regular" | "monthly" | "oncall" | "public">("regular");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   /* ── OnCall State ── */
@@ -233,6 +250,33 @@ const handleOnCallDownload = async (inv: OnCallInvoice) => {
       let formatted: ApiItem[] = data.map((item: any) => {
         const booking = item.booking || {};
         const closePending = item.closePending || {};
+
+        let snap: any = null;
+        try {
+          const parsed = typeof booking.notes === "string" ? JSON.parse(booking.notes) : booking.notes;
+          snap = parsed?.packageSnapshot || null;
+        } catch {}
+
+        const isPublic =
+          booking.bookingCreatedBy === "PUBLIC_BOOKING" ||
+          booking.preferredType === "PUBLIC_BOOKING" ||
+          (booking.notes && (typeof booking.notes === "string" ? booking.notes.includes("PUBLIC_BOOKING") : false)) ||
+          booking.behalfOfName ||
+          snap;
+
+        const vehicleModel =
+          booking.vehicleMaster?.vehicle?.vehicleName ||
+          booking.vehicleMaster?.vehicleModelName ||
+          booking.vehicleType?.vehicleType ||
+          "";
+        const vehicleNum = booking.vehicleMaster?.vehicleNumber || "";
+        const vehicleDetails = vehicleModel ? `${vehicleModel} (${vehicleNum || "-"})` : vehicleNum || "-";
+
+        const userName = booking.user?.username || booking.behalfOfName || snap?.customerName || (isPublic ? "Public Passenger" : "-");
+        const userPhone = booking.user?.mobile || booking.behalfOfPhone || snap?.customerPhone || "-";
+        const companyName = booking.user?.company?.companyName || booking.company?.companyName || snap?.companyName || "-";
+        const fleetName = booking.tenant?.name || "-";
+
         return {
           bookingId: booking.bookingId,
           bookingCode: booking.bookingCode,
@@ -240,13 +284,30 @@ const handleOnCallDownload = async (inv: OnCallInvoice) => {
           invoiceNumber: item.invoiceNumber ? String(item.invoiceNumber) : "-",
           invoiceAmount: item.invoiceAmount ?? 0,
           pickupPoint: booking.pickupPoint || "-",
+          dropPoint: booking.dropPoint || "-",
           pickupDate: formatToCustom(closePending.pickupDate || booking.bookingDate),
           orderDate: formatToCustom(item.createdAt),
-          userName: booking.user?.username || "-",
-          companyName: booking.user?.company?.companyName || "-",
+          userName,
+          userPhone,
+          companyName,
+          fleetName,
           userId: booking.userId,
           createdAt: item.createdAt,
           bookingDate: booking.bookingDate,
+          bookingCreatedBy: booking.bookingCreatedBy,
+          preferredType: booking.preferredType,
+          isPublicBooking: !!isPublic,
+          vehicleDetails,
+          driverName: booking.driver?.driverName || "-",
+          billableKms: closePending.guestKms || closePending.garageKms || 0,
+          ratePerKm: snap?.amountPerKm || snap?.perKmRate || snap?.perKmAmount || (booking as any)?.ratePerKm || undefined,
+          packageAmount: Number(closePending.packageAmount) || (isPublic ? ((Number(closePending.guestKms || closePending.garageKms || 0)) * Number(snap?.amountPerKm || snap?.perKmRate || (booking as any)?.ratePerKm || 0)) : (closePending.packageAmount ?? 0)),
+          extraCharges: closePending.extraCharges ?? 0,
+          discountAmount: closePending.discountAmount ?? 0,
+          totalTaxAmount: closePending.totalTaxAmount ?? 0,
+          advanceAmount: closePending.advanceAmount ?? 0,
+          totalDue: closePending.totalDue ?? item.invoiceAmount ?? 0,
+          paymentStatus: item.invoiceStatus === "0" ? "PENDING" : item.invoiceStatus || "PENDING",
         };
       });
 
@@ -365,7 +426,7 @@ const formatted: MonthlyApiItem[] = data.map((item: any) => ({
   };
 
   useEffect(() => {
-    if (viewType === "regular") fetchOrders();
+    if (viewType === "regular" || viewType === "public") fetchOrders();
     else if (viewType === "monthly") fetchMonthlyOrders();
     else fetchOnCallInvoices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -373,7 +434,7 @@ const formatted: MonthlyApiItem[] = data.map((item: any) => ({
 
   const handleSearch = async (query: string) => {
     setSearchValue(query);
-    if (viewType === "regular") fetchOrders(query);
+    if (viewType === "regular" || viewType === "public") fetchOrders(query);
     else if (viewType === "monthly") fetchMonthlyOrders(query);
     else fetchOnCallInvoices(query);
   };
@@ -533,6 +594,73 @@ const formatted: MonthlyApiItem[] = data.map((item: any) => ({
     { header: "Travel Package", accessor: "pickupPoint" },
     { header: "User Name", accessor: "userName" },
     { header: "Company Name", accessor: "companyName" },
+  ];
+
+  const publicColumns: Column<ApiItem>[] = [
+    {
+      header: "Booking #",
+      accessor: "bookingCode",
+      render: (row) => (
+        <span
+          className="font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+          onClick={() => handleView(row)}
+        >
+          {row.bookingCode}
+        </span>
+      ),
+    },
+    { header: "Fleet", accessor: "fleetName" },
+    { header: "Company", accessor: "companyName" },
+    { header: "Passenger", accessor: "userName" },
+    { header: "Phone", accessor: "userPhone" },
+    {
+      header: "Route",
+      accessor: "pickupPoint",
+      render: (row) => (
+        <div className="text-xs">
+          <div className="font-medium text-slate-800">{row.pickupPoint}</div>
+          <div className="text-slate-500">to {row.dropPoint || "-"}</div>
+        </div>
+      ),
+    },
+    { header: "Vehicle", accessor: "vehicleDetails" },
+    { header: "Driver", accessor: "driverName" },
+    {
+      header: "Billable KM",
+      accessor: "billableKms",
+      render: (row) => (
+        <span className="text-xs font-semibold text-slate-700">
+          {row.billableKms ? `${row.billableKms} KM` : "-"}
+        </span>
+      ),
+    },
+    {
+      header: "Rate / KM",
+      accessor: "ratePerKm",
+      render: (row) => (
+        <span className="text-xs font-semibold text-teal-700">
+          {row.ratePerKm ? `₹${row.ratePerKm}/km` : "-"}
+        </span>
+      ),
+    },
+    {
+      header: "Total Due",
+      accessor: "totalDue",
+      render: (row) => (
+        <span className="text-xs font-bold text-emerald-700">
+          {cur(row.totalDue)}
+        </span>
+      ),
+    },
+    {
+      header: "Status",
+      accessor: "paymentStatus",
+      render: (row) => (
+        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800">
+          {row.paymentStatus || "PENDING"}
+        </span>
+      ),
+    },
   ];
 
   const monthlyColumns: Column<MonthlyApiItem>[] = [
@@ -895,6 +1023,16 @@ const renderOnCallTable = () => {
               Single-Trip / Regular
             </button>
             <button
+              onClick={() => setViewType("public")}
+              className={`px-4 py-2 rounded-lg font-bold text-xs transition ${
+                viewType === "public"
+                  ? "bg-[#0f1c3f] text-white shadow-sm border border-[#0f1c3f]"
+                  : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-300"
+              }`}
+            >
+              Public Bookings
+            </button>
+            <button
               onClick={() => setViewType("monthly")}
               className={`px-4 py-2 rounded-lg font-bold text-xs transition ${
                 viewType === "monthly"
@@ -921,7 +1059,24 @@ const renderOnCallTable = () => {
           <DataTable<ApiItem>
             key={searchValue + orders.length}
             columns={regularColumns}
-            data={orders}
+            data={orders.filter((o) => !o.isPublicBooking)}
+            onView={handleView}
+            onCancel={handleCancel}
+            onInvoice={handleInvoiceDownload}
+            invoiceLabel={(row: ApiItem) =>
+              downloadingId === row.invoiceId ? "Downloading..." : "Download"
+            }
+            invoiceIcon={<FontAwesomeIcon icon={faFileInvoiceDollar} className="mr-1" />}
+            loading={loading}
+            rowsPerPage={10}
+          />
+        )}
+
+        {viewType === "public" && (
+          <DataTable<ApiItem>
+            key={"public_" + searchValue + orders.length}
+            columns={publicColumns}
+            data={orders.filter((o) => o.isPublicBooking)}
             onView={handleView}
             onCancel={handleCancel}
             onInvoice={handleInvoiceDownload}

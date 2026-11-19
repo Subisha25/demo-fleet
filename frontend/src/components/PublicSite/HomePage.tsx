@@ -615,7 +615,7 @@ export default function HomePage() {
               onClick={() => navigate("/register-fleet")}
               className="w-full sm:w-auto px-8 py-4 text-base font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all transform hover:-translate-y-0.5"
             >
-              Get Started with FleetFlow
+              Get Started with CABZ
             </button>
             <button
               id="cta-contact-btn"

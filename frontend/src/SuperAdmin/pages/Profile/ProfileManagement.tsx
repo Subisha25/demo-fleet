@@ -222,7 +222,7 @@ const ProfileManagement: React.FC = () => {
       if (res.data && res.data.success) {
         showToast('Portal theme branding updated successfully!', 'success');
         document.documentElement.style.setProperty('--primary-tenant-color', primaryColor);
-        if (portalTitle) document.title = `${portalTitle} — FleetFlow`;
+        if (portalTitle) document.title = `${portalTitle} — CABZ`;
         refreshTenant();
       }
     } catch (err: any) {
@@ -590,7 +590,7 @@ const ProfileManagement: React.FC = () => {
                 <p className="text-xs text-[#7A7570] mt-0.5">
                   {isSuperAdmin
                     ? 'The verified contact number here is used dynamically as the authoritative recipient for platform notifications.'
-                    : 'Your personal account credentials for logging into FleetFlow.'}
+                    : 'Your personal account credentials for logging into CABZ.'}
                 </p>
               </div>
               {hasPersonalChanges && (
@@ -1195,10 +1195,10 @@ const ProfileManagement: React.FC = () => {
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center font-black text-sm">
-                  FF
+                  CZ
                 </div>
                 <div>
-                  <div className="text-xs font-bold tracking-tight">{portalTitle || displayName || 'FleetFlow Portal'}</div>
+                  <div className="text-xs font-bold tracking-tight">{portalTitle || displayName || 'CABZ Portal'}</div>
                   <div className="text-[10px] text-white/80">Active Dynamic Brand Swatch</div>
                 </div>
               </div>

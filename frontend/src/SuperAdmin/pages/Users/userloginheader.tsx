@@ -41,7 +41,7 @@ const UserLoginHeader: React.FC<{ companyData: CompanyData | null }> = ({ compan
         <div className="container mx-auto px-4 py-1 flex justify-between items-center text-gray-700">
           <div className="flex items-center space-x-2">
             <Mail size={14} className="text-[#C04E24]" />
-            <span className="text-[13px]">support@fleetflow.com</span>
+            <span className="text-[13px]">support@cabz.com</span>
           </div>
 
           <div className="flex items-center space-x-2">

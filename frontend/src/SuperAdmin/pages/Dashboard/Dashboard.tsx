@@ -502,7 +502,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-                    FleetFlow Platform SaaS Subscription Revenue
+                    CABZ Platform SaaS Subscription Revenue
                   </h3>
                   <p className="text-xs text-slate-500">
                     Verified collections from active tenant subscriptions ({revenueSummary?.data?.currency || revenueSummary?.currency || 'INR'})

@@ -36,12 +36,12 @@ export const SubscriptionRequiredModal: React.FC<SubscriptionModalProps> = ({
 
   const handleChoosePlan = () => {
     onClose();
-    navigate('/billing/current');
+    navigate('/billing/checkout');
   };
 
   const handleViewPlanDetails = () => {
     onClose();
-    navigate('/subscription/history');
+    navigate('/billing/current');
   };
 
   return (
@@ -63,7 +63,7 @@ export const SubscriptionRequiredModal: React.FC<SubscriptionModalProps> = ({
             </div>
             <div>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#C04E24]/30 text-[#DE8A66] border border-[#C04E24]/40 uppercase tracking-wider">
-                FleetFlow SaaS Entitlement
+                CABZ SaaS Entitlement
               </span>
               <h2 className="text-lg font-bold text-white mt-0.5">
                 {title || defaultTitle}
@@ -108,11 +108,11 @@ export const SubscriptionRequiredModal: React.FC<SubscriptionModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="bg-[#FAF8F5] border-t border-[#E0DAD1] p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-end gap-2.5">
+        <div className="bg-[#FAF8F5] border-t border-[#E0DAD1] p-4 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-[#E0DAD1] hover:bg-white text-xs font-bold text-[#5C5752] transition cursor-pointer"
+            className="order-3 sm:order-1 px-4 py-2.5 rounded-xl border border-[#D5CEC4] bg-white hover:bg-[#F2ECE4] text-xs font-semibold text-[#5C5752] transition-colors cursor-pointer text-center"
           >
             Close
           </button>
@@ -120,19 +120,19 @@ export const SubscriptionRequiredModal: React.FC<SubscriptionModalProps> = ({
           <button
             type="button"
             onClick={handleViewPlanDetails}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-[#C04E24]/30 bg-[#C04E24]/10 hover:bg-[#C04E24]/20 text-xs font-bold text-[#C04E24] transition flex items-center justify-center gap-1.5 cursor-pointer"
+            className="order-2 sm:order-2 px-4 py-2.5 rounded-xl border-2 border-[#C04E24] bg-white hover:bg-[#FAF4F0] text-xs font-bold text-[#A43D1A] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm hover:shadow"
           >
-            <FileText size={14} />
+            <FileText size={15} className="text-[#C04E24] shrink-0" />
             <span>View Plan Details</span>
           </button>
 
           <button
             type="button"
             onClick={handleChoosePlan}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#C04E24] hover:bg-[#A43D1A] text-white text-xs font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-1.5 cursor-pointer"
+            className="order-1 sm:order-3 px-5 py-2.5 rounded-xl bg-[#C04E24] hover:bg-[#A43D1A] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <span>{isExpired ? 'Renew Subscription' : 'Subscribe / Choose Plan'}</span>
-            <ArrowRight size={14} />
+            <ArrowRight size={15} className="shrink-0" />
           </button>
         </div>
       </div>
