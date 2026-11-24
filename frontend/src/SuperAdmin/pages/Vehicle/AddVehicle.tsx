@@ -17,6 +17,10 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { showToast, AlertContainer } from '../../../components/AlertBox';
 import axiosInstance from '../../../utils/axiosInstance';
+import {
+  validateVehicleReg,
+  extractApiErrorMessage,
+} from '../../../utils/validation';
 
 interface TypeOption {
   id: string;
@@ -205,14 +209,15 @@ export const AddVehicle: React.FC = () => {
       return;
     }
 
-    const cleanNum = vehicleNumber.trim().toUpperCase();
-    if (!cleanNum || cleanNum.length < 4) {
-      showToast('Please enter a valid Vehicle Registration Number.', 'error');
+    const regCheck = validateVehicleReg(vehicleNumber);
+    if (!regCheck.valid) {
+      showToast(regCheck.error || 'Please enter a valid vehicle registration number.', 'warn');
       return;
     }
+    const cleanNum = vehicleNumber.trim().toUpperCase().replace(/[\s\-]/g, '');
 
     if (!vendorId) {
-      showToast('Please select a Vehicle Owner.', 'error');
+      showToast('Please select a vehicle owner.', 'warn');
       return;
     }
 
@@ -237,13 +242,13 @@ export const AddVehicle: React.FC = () => {
       });
 
       if (res.status === 201 || res.status === 200) {
-        showToast('Vehicle registered successfully in your fleet!', 'success');
+        showToast('Vehicle registered successfully in your fleet.', 'success');
         setTimeout(() => {
           navigate('/vehicle/vehiclemaster/list');
         }, 1000);
       }
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'Failed to register vehicle.';
+      const msg = extractApiErrorMessage(err, 'Failed to register vehicle. Please try again.');
       showToast(msg, 'error');
     } finally {
       setSubmitting(false);

@@ -8,31 +8,34 @@ import restoreGif from "./restore.gif";
 type ToastType = "success" | "error" | "info" | "warn";
 
 export const showToast = (message: string, type: ToastType = "success") => {
+  const cleanMsg = typeof message === "string" ? message.trim() : (message ? String(message) : "");
+  if (!cleanMsg) return;
+
   switch (type) {
     case "success":
-      toast.success(message, {
-        id: message,
+      toast.success(cleanMsg, {
+        id: cleanMsg,
         position: "top-right",
         duration: 3000,
       });
       break;
     case "error":
-      toast.error(message, {
-        id: message,
+      toast.error(cleanMsg, {
+        id: cleanMsg,
         position: "top-right",
         duration: 4000,
       });
       break;
     case "info":
-      toast(message, {
-        id: message,
+      toast(cleanMsg, {
+        id: cleanMsg,
         position: "top-right",
         duration: 3000,
       });
       break;
     case "warn":
-      toast(message, {
-        id: message,
+      toast(cleanMsg, {
+        id: cleanMsg,
         position: "top-right",
         duration: 3500,
         style: {
@@ -43,7 +46,7 @@ export const showToast = (message: string, type: ToastType = "success") => {
       });
       break;
     default:
-      toast(message);
+      toast(cleanMsg);
   }
 };
 

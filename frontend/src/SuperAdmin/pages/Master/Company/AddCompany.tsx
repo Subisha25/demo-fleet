@@ -21,6 +21,13 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { showToast, AlertContainer } from "../../../../components/AlertBox";
 import axiosInstance from "../../../../utils/axiosInstance";
+import {
+  validateName,
+  validateRequired,
+  validateGstin,
+  extractApiErrorMessage,
+  extractFieldErrors,
+} from "../../../../utils/validation";
 
 type VehicleBookingRule = {
   vehicleTypeId: string;
@@ -55,6 +62,7 @@ const [companyName, setCompanyName] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
@@ -149,17 +157,33 @@ useEffect(() => {
     if (isSubmittingRef.current || submitting) return;
 
     const form = getFormStore();
+    const newErrors: Record<string, string> = {};
 
-    if (!form.companyName || form.companyName.trim() === "") {
-      showToast("Company Name is required", "warn");
+    const nameCheck = validateName(form.companyName, "Company name", 2);
+    if (!nameCheck.valid) {
+      newErrors.companyName = nameCheck.error || "Please enter the company name.";
+    }
+
+    const codeCheck = validateRequired(form.companyCode, "Company code", 2);
+    if (!codeCheck.valid) {
+      newErrors.companyCode = codeCheck.error || "Please enter the company code.";
+    }
+
+    if (form.gstNo && String(form.gstNo).trim() !== "") {
+      const gstCheck = validateGstin(form.gstNo);
+      if (!gstCheck.valid) {
+        newErrors.gstNo = "Please enter a valid GST number.";
+      }
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setFormErrors(newErrors);
+      const firstError = Object.values(newErrors)[0];
+      showToast(firstError, "warn");
       return;
     }
 
-    if (!form.companyCode || form.companyCode.trim() === "") {
-      showToast("Company Code is required", "warn");
-      return;
-    }
-
+    setFormErrors({});
     isSubmittingRef.current = true;
     setSubmitting(true);
 
@@ -201,10 +225,14 @@ useEffect(() => {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      showToast("Company saved successfully!", "success");
+      showToast("Company created successfully.", "success");
       navigate("/master/company/list");
     } catch (error: any) {
-      const msg = error?.response?.data?.message || "Failed to save company. Please try again.";
+      const fieldErrors = extractFieldErrors(error);
+      if (Object.keys(fieldErrors).length > 0) {
+        setFormErrors((prev) => ({ ...prev, ...fieldErrors }));
+      }
+      const msg = extractApiErrorMessage(error, "Failed to create company. Please try again.");
       showToast(msg, "error");
     } finally {
       isSubmittingRef.current = false;
@@ -239,6 +267,16 @@ useEffect(() => {
   name="companyName"
   icon={faBuilding}
   placeholder="Enter company name"
+  error={formErrors.companyName}
+  onChange={() => {
+    if (formErrors.companyName) {
+      setFormErrors((prev) => {
+        const copy = { ...prev };
+        delete copy.companyName;
+        return copy;
+      });
+    }
+  }}
 />
               </div>
               <div className="w-full">
@@ -251,6 +289,16 @@ useEffect(() => {
     name="companyCode"
     icon={faReceipt}
     placeholder="Enter company code"
+    error={formErrors.companyCode}
+    onChange={() => {
+      if (formErrors.companyCode) {
+        setFormErrors((prev) => {
+          const copy = { ...prev };
+          delete copy.companyCode;
+          return copy;
+        });
+      }
+    }}
   />
 </div>
 
@@ -270,7 +318,22 @@ useEffect(() => {
               </div>
 
               <div className="w-full">
-                <InputBox label="GST Number" name="gstNo" icon={faFileInvoice} placeholder="Enter GST Number" />
+                <InputBox
+                  label="GST Number"
+                  name="gstNo"
+                  icon={faFileInvoice}
+                  placeholder="Enter GST Number"
+                  error={formErrors.gstNo}
+                  onChange={() => {
+                    if (formErrors.gstNo) {
+                      setFormErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.gstNo;
+                        return copy;
+                      });
+                    }
+                  }}
+                />
               </div>
 
               <div className="w-full">

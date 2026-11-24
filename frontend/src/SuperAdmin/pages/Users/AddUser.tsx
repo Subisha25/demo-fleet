@@ -16,6 +16,15 @@ import {
   faHashtag,
 } from "@fortawesome/free-solid-svg-icons";
 import { AlertContainer, showToast } from "../../../components/AlertBox";
+import {
+  validateName,
+  validateEmail,
+  validateMobile,
+  validatePinCode,
+  validateSelect,
+  extractApiErrorMessage,
+  extractFieldErrors,
+} from "../../../utils/validation";
 import { Country, State, City, ICountry, IState, ICity } from "country-state-city";
 
 interface Company {
@@ -38,6 +47,8 @@ export default function AddUser() {
   const [presentAddress, setPresentAddress] = useState("");
   const [pinCode, setPinCode] = useState("");
   const [loadingPincode, setLoadingPincode] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const clearError = (field: string) => setErrors((prev) => { const n = { ...prev }; delete n[field]; return n; });
   const navigate = useNavigate();
 
   const [countries, setCountries] = useState<ICountry[]>([]);
@@ -160,73 +171,43 @@ export default function AddUser() {
     e.preventDefault();
     e.stopPropagation();
 
-    if (submitting) return;
+    if (submitting || isSubmittingRef.current) return;
 
-    if (!username.trim()) {
-      showToast("Username is required.", "warn");
+    const newErrors: Record<string, string> = {};
+    const nameRes = validateName(username, "Username", 2);
+    if (!nameRes.valid) newErrors.username = nameRes.error!;
+
+    const emailRes = validateEmail(email);
+    if (!emailRes.valid) newErrors.email = emailRes.error!;
+
+    const mobileRes = validateMobile(mobile);
+    if (!mobileRes.valid) newErrors.mobile = mobileRes.error!;
+
+    const countryRes = validateSelect(country, "a country");
+    if (!countryRes.valid) newErrors.country = countryRes.error!;
+
+    const stateRes = validateSelect(state, "a state");
+    if (!stateRes.valid) newErrors.state = stateRes.error!;
+
+    if (!city || !city.trim()) {
+      newErrors.city = "Please enter the city.";
+    }
+
+    const compRes = validateSelect(companyId, "a company");
+    if (!compRes.valid) newErrors.companyId = compRes.error!;
+
+    if (pinCode && pinCode.trim()) {
+      const pinRes = validatePinCode(pinCode);
+      if (!pinRes.valid) newErrors.pinCode = pinRes.error!;
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      showToast(Object.values(newErrors)[0], "warn");
       return;
     }
 
-    if (!email.trim()) {
-      showToast("Email is required.", "warn");
-      return;
-    }
-
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!emailRegex.test(email.trim())) {
-      showToast("Please enter a valid email address (example: user@domain.com)", "error");
-      return;
-    }
-
-    try {
-      const check = await axiosInstance.get(`/user/getAllUsers`, {
-        params: { email: email.trim() },
-      });
-
-      if (check.data.exists) {
-        showToast("This email is already registered. Please use another email.", "error");
-        return;
-      }
-    } catch (error) {
-      console.log("Email check failed, continuing...");
-    }
-
-    if (!mobile.trim()) {
-      showToast("Mobile number is required.", "warn");
-      return;
-    }
-
-    if (!/^[0-9]{10}$/.test(mobile)) {
-      showToast("Mobile number must be 10 digits.", "warn");
-      return;
-    }
-
-    if (!country) {
-      showToast("Please select a country.", "warn");
-      return;
-    }
-
-    if (!state) {
-      showToast("Please select a state.", "warn");
-      return;
-    }
-
-    if (!city) {
-      showToast("Please enter a city.", "warn");
-      return;
-    }
-
-    if (!companyId) {
-      showToast("Please select a company.", "warn");
-      return;
-    }
-
-    if (pinCode && !/^[0-9]{6}$/.test(pinCode)) {
-      showToast("Pin code must be 6 digits.", "warn");
-      return;
-    }
-
-    if (isSubmittingRef.current || submitting) return;
+    setErrors({});
     isSubmittingRef.current = true;
     setSubmitting(true);
 
@@ -271,11 +252,11 @@ export default function AddUser() {
         showToast(response.data?.message || "Already exists. Please try again.", "error");
       }
     } catch (error: any) {
-      if (error.response && error.response.data) {
-        showToast(error.response.data.message || "An error occurred while adding user.", "error");
-      } else {
-        showToast("Network error. Please try again.", "error");
+      const fieldErrors = extractFieldErrors(error);
+      if (Object.keys(fieldErrors).length > 0) {
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
       }
+      showToast(extractApiErrorMessage(error, "Failed to create user. Please try again."), "error");
     } finally {
       isSubmittingRef.current = false;
       setSubmitting(false);
@@ -315,7 +296,8 @@ export default function AddUser() {
                 required={false}
                 placeholder="Enter Username"
                 value={username}
-                onChange={(name, value) => setUsername(value)}
+                onChange={(name, value) => { setUsername(value); clearError("username"); }}
+                error={errors.username}
                 icon={faUser}
               />
 
@@ -330,7 +312,8 @@ export default function AddUser() {
                 type="email"
                 placeholder="Enter Email"
                 value={email}
-                onChange={(name, value) => setEmail(value)}
+                onChange={(name, value) => { setEmail(value); clearError("email"); }}
+                error={errors.email}
                 icon={faEnvelope}
               />
 
@@ -345,7 +328,8 @@ export default function AddUser() {
                 type="number"
                 placeholder="Enter Mobile Number"
                 value={mobile}
-                onChange={(name, value) => setMobile(value)}
+                onChange={(name, value) => { setMobile(value); clearError("mobile"); }}
+                error={errors.mobile}
                 icon={faPhone}
               />
 
@@ -382,6 +366,7 @@ export default function AddUser() {
                 }))}
                 placeholder="Select Country"
                 icon={<FontAwesomeIcon icon={faGlobe} />}
+                error={errors.country}
               />
 
               <InputBox
@@ -402,6 +387,7 @@ export default function AddUser() {
                 placeholder="Select State"
                 icon={<FontAwesomeIcon icon={faLocationArrow} />}
                 disabled={!country}
+                error={errors.state}
               />
 
               <InputBox
@@ -414,8 +400,9 @@ export default function AddUser() {
                 type="text"
                 required={false}
                 value={city}
-                onChange={(name, value) => setCity(value)}
+                onChange={(name, value) => { setCity(value); clearError("city"); }}
                 placeholder="Enter City"
+                error={errors.city}
                 icon={<FontAwesomeIcon icon={faCity} />}
               />
 
@@ -439,6 +426,7 @@ export default function AddUser() {
                     </option>
                   ))}
                 </select>
+                {errors.companyId && <p className="mt-1 text-xs text-red-600">{errors.companyId}</p>}
               </div>
 
 
@@ -468,8 +456,9 @@ export default function AddUser() {
                 required={false}
                 placeholder={loadingPincode ? "Loading pincode..." : "Enter Pin Code (auto-filled)"}
                 value={pinCode}
-                onChange={(name, value) => setPinCode(value)}
+                onChange={(name, value) => { setPinCode(value); clearError("pinCode"); }}
                 icon={faHashtag}
+                error={errors.pinCode}
                 disabled={loadingPincode}
               />
             </div>

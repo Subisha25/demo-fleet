@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Pickuparea, Pickupcity } from '../models';
 import { USERS } from "../utils/costants";
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
+import { handleDatabaseError, validateRequired } from '../utils/validationUtils';
 const { ROLES } = USERS;
 
 export const getCountries = async (req: Request, res: Response) => {
@@ -48,6 +49,10 @@ export const getCities = async (req: Request, res: Response) => {
 export const addPickupCity = async (req: any, res: Response) => {
   const { country, state, pickupCity, sortOrder, isPickupCity } = req.body;
   try {
+    const cityCheck = validateRequired(pickupCity, 'Pickup city', 2);
+    if (!cityCheck.valid) {
+      return res.status(400).json({ success: false, message: cityCheck.error, field: 'pickupCity' });
+    }
     const role = req.role;
     if (role === ROLES.USER) {
       return res.status(403).json({ message: 'Not Authorized' });
@@ -70,7 +75,7 @@ export const addPickupCity = async (req: any, res: Response) => {
 
     res.status(201).json({ message: 'Registered successfully', pickupcity });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || err });
+    return handleDatabaseError(err, res, 'Failed to add pickup city.');
   }
 };
 
@@ -83,6 +88,14 @@ export const addPickUpArea = async (req: any, res: Response) => {
     }
 
     const { pickupCity, pickupArea } = req.body;
+    const cityCheck = validateRequired(pickupCity, 'Pickup city', 2);
+    if (!cityCheck.valid) {
+      return res.status(400).json({ success: false, message: cityCheck.error, field: 'pickupCity' });
+    }
+    const areaCheck = validateRequired(pickupArea, 'Pickup area', 2);
+    if (!areaCheck.valid) {
+      return res.status(400).json({ success: false, message: areaCheck.error, field: 'pickupArea' });
+    }
     const ctx = getTenantContext();
     const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
 
@@ -124,9 +137,6 @@ export const addPickUpArea = async (req: any, res: Response) => {
       data: newArea
     });
   } catch (error: any) {
-    res.status(400).json({
-      message: 'Error creating pickup area',
-      error: error.message,
-    });
+    return handleDatabaseError(error, res, 'Failed to create pickup area.');
   }
 };

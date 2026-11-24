@@ -8,6 +8,7 @@ import axiosInstance from '../../../../utils/axiosInstance';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTag, faPercentage, faFileInvoice } from '@fortawesome/free-solid-svg-icons';
 import { AlertContainer, showToast } from '../../../../components/AlertBox';
+import { extractApiErrorMessage } from '../../../../utils/validation';
 
 export default function AddMasterTax() {
   const [taxName, setTaxName] = useState('');
@@ -83,7 +84,7 @@ export default function AddMasterTax() {
           showToast(error.response.data.message, 'error');
         }
       } else {
-        showToast(error.response?.data?.message || 'Failed to add tax. Please check requirements.', 'error');
+        showToast(extractApiErrorMessage(error, 'Failed to add tax. Please check requirements.'), 'error');
       }
     }
   };

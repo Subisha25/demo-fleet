@@ -13,6 +13,8 @@ import {
   validatePinCode,
   validatePan,
   validateGstin,
+  extractApiErrorMessage,
+  extractFieldErrors,
 } from '../../../utils/validation';
 
 interface PlanDetail {
@@ -291,9 +293,13 @@ const AddTenant: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Error provisioning tenant:', err);
-      const msg = err?.response?.data?.message || err.message || 'Failed to provision tenant.';
+      const msg = extractApiErrorMessage(err, 'Failed to provision tenant.');
       setErrorMessage(msg);
       showToast(msg, 'error');
+      const backendFieldErrors = extractFieldErrors(err);
+      if (Object.keys(backendFieldErrors).length > 0) {
+        setFieldErrors((prev) => ({ ...prev, ...backendFieldErrors }));
+      }
     } finally {
       setSubmitting(false);
     }

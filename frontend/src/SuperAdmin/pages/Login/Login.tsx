@@ -6,6 +6,8 @@ import { useAuth } from '../../../context/AuthContext';
 import SimpleHeader from '../../../components/Homepage/simpleheader';
 import Footer from '../../../components/Homepage/Footer';
 import LoadingButton from '../../../components/LoadingButton';
+import { showToast, AlertContainer } from '../../../components/AlertBox';
+import { validateEmail, extractApiErrorMessage } from '../../../utils/validation';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -33,19 +35,15 @@ const Login: React.FC = () => {
 
   // ----- Login Validation -----
   const validate = () => {
-    const newErrors: { email?: string; password?: string } = {};
-    const cleanEmail = email.trim();
-    if (!cleanEmail) {
-      newErrors.email = 'Email address is required';
-    } else if (!/\S+@\S+\.\S+/.test(cleanEmail)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-
-    if (!password.trim()) {
-      newErrors.password = 'Password is required';
-    }
+    const newErrors: Record<string, string> = {};
+    const emailRes = validateEmail(email);
+    if (!emailRes.valid) newErrors.email = emailRes.error!;
+    if (!password.trim()) newErrors.password = 'Please enter your password.';
 
     setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      showToast(Object.values(newErrors)[0], "warn");
+    }
     return Object.keys(newErrors).length === 0;
   };
 
@@ -105,9 +103,9 @@ const Login: React.FC = () => {
         setErrors({ server: 'Login failed. Please verify credentials and try again.' });
       }
     } catch (error: any) {
-      const errorMsg =
-        error?.response?.data?.message || 'Login failed. Please check your credentials.';
+      const errorMsg = extractApiErrorMessage(error, 'Invalid email or password.');
       setErrors((prev) => ({ ...prev, server: errorMsg }));
+      showToast(errorMsg, 'error');
     } finally {
       isSubmittingRef.current = false;
       setSubmitting(false);

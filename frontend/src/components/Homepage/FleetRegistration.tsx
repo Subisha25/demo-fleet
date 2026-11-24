@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axiosInstance from '../../utils/axiosInstance';
 import PublicLayout from '../PublicSite/PublicLayout';
+import { showToast, AlertContainer } from '../AlertBox';
 import {
   formatMobileInput,
   formatPinCodeInput,
@@ -11,6 +12,8 @@ import {
   validatePinCode,
   validatePan,
   validateGstin,
+  extractApiErrorMessage,
+  extractFieldErrors,
 } from '../../utils/validation';
 
 interface PlanDetail {
@@ -262,8 +265,13 @@ export default function FleetRegistration() {
         setErrorMessage(response.data?.message || 'Failed to submit registration application.');
       }
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'Error submitting application. Please try again.';
+      const msg = extractApiErrorMessage(err, 'Failed to submit registration application.');
       setErrorMessage(msg);
+      showToast(msg, 'error');
+      const backendFieldErrors = extractFieldErrors(err);
+      if (Object.keys(backendFieldErrors).length > 0) {
+        setFieldErrors((prev) => ({ ...prev, ...backendFieldErrors }));
+      }
     } finally {
       setLoading(false);
     }

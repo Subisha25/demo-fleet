@@ -24,6 +24,11 @@ import { sendSmsNotifications } from '../utils/smsNotifications';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
 import { Op } from 'sequelize';
+import {
+  validateVehicleRegistration,
+  validateRequired,
+  handleDatabaseError,
+} from '../utils/validationUtils';
 
 export const confirmBooking = async (req: any, res: Response) => {
   try {
@@ -724,7 +729,7 @@ export const createDriver = async (req: any, res: Response) => {
       where: { phno: cleanPhone, tenantId, isDeleted: false }
     });
     if (existing) {
-      return res.status(400).json({ message: 'Phone number already exists in this fleet', field: 'phno' });
+      return res.status(409).json({ message: 'Phone number already exists in this fleet', field: 'phno' });
     }
 
     // Check email if provided
@@ -739,7 +744,7 @@ export const createDriver = async (req: any, res: Response) => {
         where: { driverEmail: cleanEmail, tenantId, isDeleted: false }
       });
       if (existingEmail) {
-        return res.status(400).json({ message: 'Email already exists for another driver in this fleet', field: 'driverEmail' });
+        return res.status(409).json({ message: 'Email already exists for another driver in this fleet', field: 'driverEmail' });
       }
     }
 
@@ -967,33 +972,45 @@ export const createVehicleType = async (req: any, res: Response) => {
   try {
     const role = req.role;
     if (role === ROLES.USER) {
-      return res.status(403).json({ message: 'Not Authorized' });
+      return res.status(403).json({ success: false, message: 'Not Authorized' });
     }
 
     const ctx = getTenantContext();
     const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
 
+    const nameCheck = validateRequired(vehicleType, 'Vehicle type', 2);
+    if (!nameCheck.valid) {
+      return res.status(400).json({ success: false, message: nameCheck.error, field: 'vehicleType', errors: { vehicleType: nameCheck.error } });
+    }
+
+    const cleanVehicleType = nameCheck.normalized;
+    const existing = await VehicleType.findOne({ where: { vehicleType: cleanVehicleType, tenantId, isDeleted: false } });
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'This vehicle type is already registered in this fleet.', field: 'vehicleType', errors: { vehicleType: 'This vehicle type is already registered in this fleet.' } });
+    }
+
+    const capacityNum = Number(seatCapacity);
+    if (isNaN(capacityNum) || capacityNum <= 0) {
+      return res.status(400).json({ success: false, message: 'Seat capacity must be a positive number.', field: 'seatCapacity', errors: { seatCapacity: 'Seat capacity must be a positive number.' } });
+    }
+
     const vehicleImg = req.files ? (req.files as Express.Multer.File[]).map(file => file.filename) : [];
 
-    const existing = await VehicleType.findOne({ where: { vehicleType, tenantId } });
-    if (existing) return res.status(400).json({ message: 'Vehicle type already registered in this fleet' });
-
     const vehiType = await VehicleType.create({
-      vehicleType,
-      seatCapacity,
+      vehicleType: cleanVehicleType,
+      seatCapacity: capacityNum,
       vehicleImg,
       priorMinutes: Number(priorMinutes ?? 0),
       tenantId
     });
 
-    res.status(201).json({ message: 'Vehicle type created successfully', vehiType });
-    return;
+    return res.status(201).json({ success: true, message: 'Vehicle type created successfully', vehiType });
 
   } catch (err: any) {
     if (isTenantError(err)) {
-      return res.status(403).json({ message: err.message });
+      return res.status(403).json({ success: false, message: err.message });
     }
-    res.status(500).json({ error: err.message || err });
+    return handleDatabaseError(err, res, 'Failed to create vehicle type.');
   }
 };
 
@@ -1010,42 +1027,50 @@ export const createVehicle = async (req: any, res: Response) => {
   try {
     const role = req.role;
     if (role === ROLES.USER) {
-      return res.status(403).json({ message: 'Not Authorized' });
+      return res.status(403).json({ success: false, message: 'Not Authorized' });
     }
 
     const ctx = getTenantContext();
     const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
 
-    if (vehicleTypeId) {
-      const vt = await VehicleType.findByPk(vehicleTypeId);
-      if (!vt) {
-        return res.status(404).json({ message: 'Vehicle type not found' });
-      }
-      if (vt.tenantId && vt.tenantId !== tenantId && vt.tenantId !== ROOT_TENANT_ID) {
-        return res.status(403).json({ message: 'Selected vehicle type does not belong to your fleet' });
-      }
+    const nameCheck = validateRequired(vehicleName, 'Vehicle name', 2);
+    if (!nameCheck.valid) {
+      return res.status(400).json({ success: false, message: nameCheck.error, field: 'vehicleName', errors: { vehicleName: nameCheck.error } });
     }
 
-    const existing = await Vehicle.findOne({ where: { vehicleTypeId, vehicleName, tenantId } });
-    if (existing) return res.status(400).json({ message: 'Vehicle model already registered in this fleet' });
+    if (!vehicleTypeId) {
+      return res.status(400).json({ success: false, message: 'Please select a vehicle type.', field: 'vehicleTypeId', errors: { vehicleTypeId: 'Please select a vehicle type.' } });
+    }
+
+    const vt = await VehicleType.findByPk(vehicleTypeId);
+    if (!vt) {
+      return res.status(404).json({ success: false, message: 'Vehicle type not found', field: 'vehicleTypeId' });
+    }
+    if (vt.tenantId && vt.tenantId !== tenantId && vt.tenantId !== ROOT_TENANT_ID) {
+      return res.status(403).json({ success: false, message: 'Selected vehicle type does not belong to your fleet', field: 'vehicleTypeId' });
+    }
+
+    const cleanVehicleName = nameCheck.normalized;
+    const existing = await Vehicle.findOne({ where: { vehicleTypeId, vehicleName: cleanVehicleName, tenantId, isDeleted: false } });
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'This vehicle model is already registered in this fleet.', field: 'vehicleName', errors: { vehicleName: 'This vehicle model is already registered in this fleet.' } });
+    }
 
     const vehicle = await Vehicle.create({
-      vehicleName,
+      vehicleName: cleanVehicleName,
       vehicleTypeId,
-      manufacturing,
+      manufacturing: manufacturing || 'Commercial',
       vehicleImg,
-      availableStatus,
+      availableStatus: availableStatus || 'available',
       tenantId
     });
 
-    res.status(201).json({ message: 'Registered successfully', vehicle });
-    return;
-
+    return res.status(201).json({ success: true, message: 'Vehicle added successfully', vehicle });
   } catch (err: any) {
     if (isTenantError(err)) {
-      return res.status(403).json({ message: err.message });
+      return res.status(403).json({ success: false, message: err.message });
     }
-    res.status(500).json({ error: err.message || err });
+    return handleDatabaseError(err, res, 'Failed to create vehicle.');
   }
 };
 
@@ -1054,11 +1079,38 @@ export const createVehicleMaster = async (req: any, res: Response) => {
   try {
     const role = req.role;
     if (role === ROLES.USER) {
-      return res.status(403).json({ message: 'Not Authorized' });
+      return res.status(403).json({ success: false, message: 'Not Authorized' });
     }
 
     const ctx = getTenantContext();
     const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+
+    const regCheck = validateVehicleRegistration(vehicleNumber);
+    if (!regCheck.valid) {
+      return res.status(400).json({ success: false, message: regCheck.error || 'Please enter a valid vehicle registration number.', field: 'vehicleNumber', errors: { vehicleNumber: regCheck.error || 'Please enter a valid vehicle registration number.' } });
+    }
+    const cleanVehicleNumber = regCheck.normalized;
+
+    if (!vehicleId) {
+      return res.status(400).json({ success: false, message: 'Please select a vehicle model.', field: 'vehicleId', errors: { vehicleId: 'Please select a vehicle model.' } });
+    }
+
+    if (!vendorId) {
+      return res.status(400).json({ success: false, message: 'Please select an owner.', field: 'vendorId', errors: { vendorId: 'Please select an owner.' } });
+    }
+
+    // Check duplicate vehicle registration within this tenant
+    const existingVehicleNumber = await VehicleMaster.findOne({
+      where: { vehicleNumber: cleanVehicleNumber, tenantId, isDeleted: 0 }
+    });
+    if (existingVehicleNumber) {
+      return res.status(409).json({
+        success: false,
+        message: 'This vehicle number is already registered.',
+        field: 'vehicleNumber',
+        errors: { vehicleNumber: 'This vehicle number is already registered.' }
+      });
+    }
 
     // Fetch vehicle details + validate tenant
     const vehicleData = await Vehicle.findByPk(vehicleId, {
@@ -1066,23 +1118,23 @@ export const createVehicleMaster = async (req: any, res: Response) => {
     });
 
     if (!vehicleData) {
-      return res.status(404).json({ message: 'Vehicle not found' });
+      return res.status(404).json({ success: false, message: 'Vehicle model not found' });
     }
     if (vehicleData.tenantId && vehicleData.tenantId !== tenantId) {
-      return res.status(403).json({ message: 'Selected vehicle model does not belong to your fleet' });
+      return res.status(403).json({ success: false, message: 'Selected vehicle model does not belong to your fleet' });
     }
 
     // Fetch owner details + validate tenant
     const vendorData = await Vendor.findByPk(vendorId);
     if (!vendorData) {
-      return res.status(404).json({ message: 'Owner not found' });
+      return res.status(404).json({ success: false, message: 'Owner not found' });
     }
     if (vendorData.tenantId && vendorData.tenantId !== tenantId) {
-      return res.status(403).json({ message: 'Selected owner does not belong to your fleet' });
+      return res.status(403).json({ success: false, message: 'Selected owner does not belong to your fleet' });
     }
 
     const vehicleMaster = await VehicleMaster.create({
-      vehicleNumber,
+      vehicleNumber: cleanVehicleNumber,
       vehicleId,
       vendorId,
       vehicleModelName: vehicleData.vehicleName,
@@ -1092,13 +1144,12 @@ export const createVehicleMaster = async (req: any, res: Response) => {
       tenantId
     });
 
-    res.status(201).json({ message: 'Registered successfully', vehicleMaster });
+    return res.status(201).json({ success: true, message: 'Vehicle registered successfully', vehicleMaster });
   } catch (err: any) {
     if (isTenantError(err)) {
-      return res.status(403).json({ message: err.message });
+      return res.status(403).json({ success: false, message: err.message });
     }
-    console.error("Error creating vehicle master:", err);
-    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    return handleDatabaseError(err, res, 'Failed to register vehicle.');
   }
 };
 

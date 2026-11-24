@@ -27,6 +27,7 @@ import { InvoiceSequence } from "../models/invoice_sequence";
 import { assertTenantOwnership, isTenantError } from "../utils/tenantGuard";
 import { getTenantContext, ROOT_TENANT_ID } from "../context/tenantContext";
 import { getFleetDocumentBranding } from './fleetBrandingService';
+import { handleDatabaseError } from '../utils/validationUtils';
 //const logoPath = path.join(__dirname, "..", "images", "logo.png");
 // const logoPath = path.join(process.cwd(), "public", "images", "logo.png");
 // const logoBase64 = fs.readFileSync(logoPath, "base64");
@@ -1375,19 +1376,9 @@ export const createClosePending = async (req: any, res: Response) => {
           message: 'Invalid packageDataId provided - foreign key constraint failed'
         });
       }
-      if (error.name === 'SequelizeValidationError') {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation error',
-          details: error.message
-        });
-      }
     }
 
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    return handleDatabaseError(error, res, 'Failed to close trip order. Please try again.');
   }
 };
 const n = (v: any) => {

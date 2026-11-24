@@ -8,13 +8,20 @@ import { User } from '../models/user';
 import { Drivers } from '../models/drivers';
 import { OTP } from '../models/otp';
 import { USERS } from "../utils/costants";
-import { Op } from 'sequelize';
+import { Op, Sequelize } from 'sequelize';
 import { sendEmailFromTemplate, fetchAllEmailConfs } from "../services/emailConfServices";
 import { sendNotification } from './notificationService';
 const { ROLES } = USERS;
 import { normalizeManagerEmails } from '../utils/email';
 import { ROOT_TENANT_ID, getTenantContext } from '../context/tenantContext';
 import { generateUniqueCompanySlug } from '../utils/slugUtils';
+import {
+  validateRequired,
+  validateMobileRecipient,
+  validateEmailRecipient,
+  validatePinCode,
+  handleDatabaseError,
+} from '../utils/validationUtils';
 
 
 // Helper function to find user by mobile and return user data with type
@@ -312,23 +319,83 @@ export const registerUser = async (req: Request, res: Response) => {
  costCenter
     } = req.body;
 
-    const normalizedEmail = String(email || "").trim().toLowerCase();
-
-    const existingUserByEmail = await User.findOne({ where: { email: normalizedEmail } });
-    if (existingUserByEmail) {
+    // Field validations
+    const nameCheck = validateRequired(username, 'Full name', 2);
+    if (!nameCheck.valid) {
       return res.status(400).json({
         success: false,
-        message: "User with this email already exists"
+        message: nameCheck.error,
+        field: 'username',
+        errors: { username: nameCheck.error }
       });
     }
-const existingUserByMobile = await User.findOne({ where: { mobile } });
 
-if (existingUserByMobile) {
-  return res.status(400).json({
-    success: false,
-    message: "Phone number already exists"
-  });
-}
+    const emailCheck = validateEmailRecipient(email);
+    if (!emailCheck.valid) {
+      return res.status(400).json({
+        success: false,
+        message: emailCheck.error,
+        field: 'email',
+        errors: { email: emailCheck.error }
+      });
+    }
+    const normalizedEmail = emailCheck.normalizedEmail;
+
+    const phoneCheck = validateMobileRecipient(mobile);
+    if (!phoneCheck.valid) {
+      return res.status(400).json({
+        success: false,
+        message: phoneCheck.error,
+        field: 'mobile',
+        errors: { mobile: phoneCheck.error }
+      });
+    }
+    const normalizedMobile = phoneCheck.normalizedPhone;
+
+    if (!companyId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select a company.',
+        field: 'companyId',
+        errors: { companyId: 'Please select a company.' }
+      });
+    }
+
+    if (pinCode) {
+      const pinCheck = validatePinCode(pinCode);
+      if (!pinCheck.valid) {
+        return res.status(400).json({
+          success: false,
+          message: pinCheck.error,
+          field: 'pinCode',
+          errors: { pinCode: pinCheck.error }
+        });
+      }
+    }
+
+    // Check duplicate email
+    const existingUserByEmail = await User.findOne({
+      where: Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('email')), normalizedEmail)
+    });
+    if (existingUserByEmail) {
+      return res.status(409).json({
+        success: false,
+        message: 'This email address is already registered.',
+        field: 'email',
+        errors: { email: 'This email address is already registered.' }
+      });
+    }
+
+    // Check duplicate mobile
+    const existingUserByMobile = await User.findOne({ where: { mobile: normalizedMobile } });
+    if (existingUserByMobile) {
+      return res.status(409).json({
+        success: false,
+        message: 'This mobile number is already registered.',
+        field: 'mobile',
+        errors: { mobile: 'This mobile number is already registered.' }
+      });
+    }
     const company = await Company.findByPk(companyId, {
       attributes: ["companyId", "companyName", "managerEmail", "tenantId", "seoUrl"]
     });
@@ -434,12 +501,7 @@ if (existingUserByMobile) {
     });
 
   } catch (error: any) {
-    console.error("Register user error:", error);
-    return res.status(400).json({
-      success: false,
-      message: "User with this Ph_no already exists",
-      error: error.message,
-    });
+    return handleDatabaseError(error, res, "Failed to register user. Please try again.");
   }
 };
 

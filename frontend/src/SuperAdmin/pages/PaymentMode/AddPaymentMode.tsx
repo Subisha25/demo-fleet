@@ -3,6 +3,7 @@
 // import InputBox, { getFormStore } from '../../../components/InputBox';
 // import CommonButton from '../../../components/CommonButton';
 // import { showToast, AlertContainer } from '../../../components/AlertBox';
+import { extractApiErrorMessage } from '../../../utils/validation';
 // import axiosInstance from '../../../utils/axiosInstance';
 // import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 // import {
@@ -162,7 +163,7 @@ export default function AddPaymentMode() {
       navigate('/paymentmode/list');
     } catch (error: any) {
       console.error("API Error:", error.response?.data || error.message);
-      showToast("Payment mode with this name already exists.", "error");
+      showToast(extractApiErrorMessage(error, "Payment mode with this name already exists."), "error");
     } finally {
       setLoading(false);
     }

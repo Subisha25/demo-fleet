@@ -4,7 +4,7 @@ import { Employee } from '../models/employee';
 import { Tenant } from '../models/tenant';
 import { Company } from '../models/company';
 import { Booking } from '../models/booking';
-import { Op } from 'sequelize';                    
+import { Op, Sequelize } from 'sequelize';                    
 import { sendEmailFromTemplate } from "../services/emailConfServices"; 
 import { MapCount } from '../models/mapCount';
 import XLSX from "xlsx";
@@ -14,6 +14,13 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
+import {
+  validateRequired,
+  validateMobileRecipient,
+  validateEmailRecipient,
+  validatePinCode,
+  handleDatabaseError,
+} from '../utils/validationUtils';
 
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
@@ -29,12 +36,19 @@ export const getAllUsers = async (req: Request, res: Response) => {
         : { tenantId };
 
     const query: any = {
-      where: tenantCondition,
+      where: {
+        ...tenantCondition,
+        companyId: { [Op.ne]: null },
+        [Op.or]: [
+          { role: { [Op.notIn]: ['fleet_admin', 'superadmin', 'admin'] } },
+          { role: null },
+        ],
+      },
       include: [
         {
           model: Company,
           as: "company", 
-          required: false,
+          required: true,
           attributes: ["companyId", "companyName"],
         },
       ],
@@ -447,6 +461,62 @@ export const updateUser = async (req: Request, res: Response) => {
     }
     assertTenantOwnership(user);
 
+    // Validate name if provided
+    if (username !== undefined && username !== null) {
+      const nameCheck = validateRequired(username, 'Full name', 2);
+      if (!nameCheck.valid) {
+        return res.status(400).json({
+          success: false,
+          message: nameCheck.error,
+          field: 'username',
+          errors: { username: nameCheck.error }
+        });
+      }
+    }
+
+    // Validate email if provided
+    let normalizedEmail: string | undefined;
+    if (email !== undefined && email !== null && String(email).trim() !== '') {
+      const emailCheck = validateEmailRecipient(email);
+      if (!emailCheck.valid) {
+        return res.status(400).json({
+          success: false,
+          message: emailCheck.error,
+          field: 'email',
+          errors: { email: emailCheck.error }
+        });
+      }
+      normalizedEmail = emailCheck.normalizedEmail;
+    }
+
+    // Validate mobile if provided
+    let normalizedMobile: string | undefined;
+    if (mobile !== undefined && mobile !== null && String(mobile).trim() !== '') {
+      const phoneCheck = validateMobileRecipient(mobile);
+      if (!phoneCheck.valid) {
+        return res.status(400).json({
+          success: false,
+          message: phoneCheck.error,
+          field: 'mobile',
+          errors: { mobile: phoneCheck.error }
+        });
+      }
+      normalizedMobile = phoneCheck.normalizedPhone;
+    }
+
+    // Validate PIN code if provided
+    if (pinCode !== undefined && pinCode !== null && String(pinCode).trim() !== '') {
+      const pinCheck = validatePinCode(pinCode);
+      if (!pinCheck.valid) {
+        return res.status(400).json({
+          success: false,
+          message: pinCheck.error,
+          field: 'pinCode',
+          errors: { pinCode: pinCheck.error }
+        });
+      }
+    }
+
     // Validate gender if provided
     if (gender && !['male', 'female', 'other'].includes(gender)) {
       return res.status(400).json({
@@ -454,7 +524,7 @@ export const updateUser = async (req: Request, res: Response) => {
         message: 'Invalid gender. Must be one of: male, female, other',
       });
     }
-let companyName = "";
+    let companyName = "";
     // Validate companyId if provided
     if (companyId) {
       const existingCompany = await Company.findByPk(companyId);
@@ -464,38 +534,43 @@ let companyName = "";
           message: 'Company not found with the provided companyId',
         });
       }
-        companyName = existingCompany.companyName;
-
+      companyName = existingCompany.companyName;
     }
 
     // Check for duplicate email (excluding current user)
-    if (email) {
+    if (normalizedEmail) {
       const existingUserByEmail = await User.findOne({
         where: {
-          email,
-          userId: { [Op.ne]: id }
+          [Op.and]: [
+            Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('email')), normalizedEmail),
+            { userId: { [Op.ne]: id } }
+          ]
         }
       });
       if (existingUserByEmail) {
-        return res.status(400).json({
+        return res.status(409).json({
           success: false,
-          message: 'User with this email already exists',
+          message: 'This email address is already registered to another user.',
+          field: 'email',
+          errors: { email: 'This email address is already registered to another user.' }
         });
       }
     }
 
     // Check for duplicate mobile (excluding current user)
-    if (mobile) {
+    if (normalizedMobile) {
       const existingUserByMobile = await User.findOne({
         where: {
-          mobile,
+          mobile: normalizedMobile,
           userId: { [Op.ne]: id }
         }
       });
       if (existingUserByMobile) {
-        return res.status(400).json({
+        return res.status(409).json({
           success: false,
-          message: 'User with this mobile number already exists',
+          message: 'This mobile number is already registered to another user.',
+          field: 'mobile',
+          errors: { mobile: 'This mobile number is already registered to another user.' }
         });
       }
     }
@@ -505,9 +580,9 @@ let companyName = "";
     }
     //  Update user with new fields
     await user.update({
-      username,
-      email,
-      mobile,
+      username: username ? String(username).trim() : user.username,
+      email: normalizedEmail || user.email,
+      mobile: normalizedMobile || user.mobile,
       gender,
       country,
       city,
@@ -518,10 +593,10 @@ let companyName = "";
       companyManager,
       state,
       pinCode,
-        danfossuserId: danfossuserId || null,
-  managerId: managerId || null,
-  managerEmail: managerEmail || null,
-  costCenter: costCenter || null 
+      danfossuserId: danfossuserId || null,
+      managerId: managerId || null,
+      managerEmail: managerEmail || null,
+      costCenter: costCenter || null 
     });
 
     // Fetch updated user with company details
@@ -536,11 +611,7 @@ let companyName = "";
     if (isTenantError(error)) {
       return res.status(403).json({ message: error.message });
     }
-    return res.status(400).json({
-      success: false,
-      message: 'Error updating user',
-      error: error.message,
-    });
+    return handleDatabaseError(error, res, "Failed to update user. Please try again.");
   }
 };
 
@@ -1281,11 +1352,31 @@ export const getUsersByStatus = async (req: Request, res: Response) => {
       });
     }
 
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     const users = await User.findAll({
-      where: { status },
+      where: {
+        ...tenantCondition,
+        status,
+        companyId: { [Op.ne]: null },
+        [Op.or]: [
+          { role: { [Op.notIn]: ['fleet_admin', 'superadmin', 'admin'] } },
+          { role: null },
+        ],
+      },
       include: [
         {
           model: Company,
+          as: 'company',
+          required: true,
           attributes: ['companyId', 'companyName']
         }
       ],
@@ -1313,11 +1404,31 @@ export const getUsersByConfirmationStatus = async (req: Request, res: Response) 
 
     const isConfirmed = confirmed === 'true';
 
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     const users = await User.findAll({
-      where: { isConfirmed },
+      where: {
+        ...tenantCondition,
+        isConfirmed,
+        companyId: { [Op.ne]: null },
+        [Op.or]: [
+          { role: { [Op.notIn]: ['fleet_admin', 'superadmin', 'admin'] } },
+          { role: null },
+        ],
+      },
       include: [
         {
           model: Company,
+          as: 'company',
+          required: true,
           attributes: ['companyId', 'companyName']
         }
       ],
@@ -1392,8 +1503,34 @@ export const getUsersByGender = async (req: Request, res: Response) => {
       });
     }
 
+    const ctx = getTenantContext();
+    const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
+    const isPlatformAdmin = ctx?.isPlatformSuperAdmin;
+
+    const tenantCondition = isPlatformAdmin && !req.headers['x-tenant-id']
+      ? {}
+      : tenantId === ROOT_TENANT_ID
+        ? { [Op.or]: [{ tenantId: ROOT_TENANT_ID }, { tenantId: null }] }
+        : { tenantId };
+
     const users = await User.findAll({
-      where: { gender },
+      where: {
+        ...tenantCondition,
+        gender,
+        companyId: { [Op.ne]: null },
+        [Op.or]: [
+          { role: { [Op.notIn]: ['fleet_admin', 'superadmin', 'admin'] } },
+          { role: null },
+        ],
+      },
+      include: [
+        {
+          model: Company,
+          as: 'company',
+          required: true,
+          attributes: ['companyId', 'companyName']
+        }
+      ],
     });
 
     return res.status(200).json({

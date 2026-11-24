@@ -8,6 +8,10 @@ import { ActionModal, showToast, AlertContainer } from "../../../../components/A
 import axiosInstance from "../../../../utils/axiosInstance";
 import CommonButton from "../../../../components/CommonButton";
 import config from "../../../../config/config";
+import {
+  validateVehicleReg,
+  extractApiErrorMessage,
+} from "../../../../utils/validation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCar,
@@ -233,8 +237,9 @@ const ListVehicleMaster: React.FC = () => {
       await axiosInstance.delete(`/vehicleMaster/${targetRow.id}/delete`);
       showToast("Vehicle deleted", "success");
       fetchVehicleMasters();
-    } catch {
-      showToast("Delete failed", "error");
+    } catch (err: any) {
+      const msg = extractApiErrorMessage(err, "Failed to delete vehicle. Please try again.");
+      showToast(msg, "error");
     } finally {
       setModalType(null);
       setTargetRow(null);
@@ -245,14 +250,15 @@ const ListVehicleMaster: React.FC = () => {
     if (!targetRow) return;
     try {
       await axiosInstance.put(`/vehicleMaster/${targetRow.id}/restore`);
-      showToast("Vehicle restored", "success");
+      showToast(`Vehicle '${targetRow.vehicleNumber}' restored successfully.`, "success");
       if (showTrashed) {
         setVehicleMasters((prev) => prev.filter((v) => v.id !== targetRow.id));
       } else {
         fetchVehicleMasters();
       }
-    } catch {
-      showToast("Restore failed", "error");
+    } catch (err: any) {
+      const msg = extractApiErrorMessage(err, "Failed to restore vehicle. Please try again.");
+      showToast(msg, "error");
     } finally {
       setModalType(null);
       setTargetRow(null);
@@ -324,27 +330,28 @@ const ListVehicleMaster: React.FC = () => {
 
   const saveEdit = async () => {
     if (!editData.id) return;
-    if (!editData.vehicleNumber?.trim()) {
-      showToast("Vehicle registration number is required.", "warn");
+    const regCheck = validateVehicleReg(editData.vehicleNumber);
+    if (!regCheck.valid) {
+      showToast(regCheck.error || "Please enter a valid vehicle registration number.", "warn");
       return;
     }
     if (!editData.vehicleType) {
-      showToast("Vehicle type is required.", "warn");
+      showToast("Please select a vehicle type.", "warn");
       return;
     }
     if (!editData.vehicleModel) {
-      showToast("Vehicle model is required.", "warn");
+      showToast("Please select a vehicle model.", "warn");
       return;
     }
     if (!editData.vendorName && !editData.vendorId) {
-      showToast("Vehicle owner is required.", "warn");
+      showToast("Please select a vehicle owner.", "warn");
       return;
     }
 
     setEditSaving(true);
     try {
       await axiosInstance.put(`/vehicleMaster/${editData.id}/update`, {
-        vehicleNumber: editData.vehicleNumber.trim().toUpperCase(),
+        vehicleNumber: (editData.vehicleNumber || '').trim().toUpperCase(),
         vehicleModelName: editData.vehicleModel,
         vehicleType: editData.vehicleType,
         vendorName: editData.vendorName,
@@ -354,11 +361,11 @@ const ListVehicleMaster: React.FC = () => {
         manufacturing: editData.manufacturing,
       });
 
-      showToast("Vehicle updated successfully in your fleet!", "success");
+      showToast("Vehicle updated successfully.", "success");
       await fetchVehicleMasters();
       setEditModalOpen(false);
     } catch (e: any) {
-      const msg = e.response?.data?.message || "Failed to update vehicle.";
+      const msg = extractApiErrorMessage(e, "Failed to update vehicle. Please try again.");
       showToast(msg, "error");
     } finally {
       setEditSaving(false);

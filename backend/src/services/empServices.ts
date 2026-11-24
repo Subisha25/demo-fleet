@@ -29,6 +29,14 @@ import crypto from "crypto";
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
 import { generateUniqueCompanySlug } from '../utils/slugUtils';
+import {
+  validateMobileRecipient as validateMobile,
+  validateEmailRecipient as validateEmail,
+  validateGstin,
+  validateRequired,
+  validatePositiveNumber,
+  handleDatabaseError,
+} from '../utils/validationUtils';
 
 
 
@@ -36,29 +44,63 @@ export const createVendor = async (req: any, res: Response) => {
   const { vendorName, email, phno, password, address, country, state, city, vehicleId, companyId, vehicleCount, refererVendor } = req.body;
 
   try {
+    if (req.role === ROLES.USER) {
+      return res.status(403).json({ success: false, message: 'Not Authorized' });
+    }
+
     const ctx = getTenantContext();
     const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
 
-    const existing = await Vendor.findOne({ where: { email, tenantId } });
-
-    if (req.role === ROLES.USER) {
-      return res.status(403).json({ message: 'Not Authorized' });
+    const nameCheck = validateRequired(vendorName, 'Vendor name', 2);
+    if (!nameCheck.valid) {
+      return res.status(400).json({ success: false, message: nameCheck.error, field: 'vendorName', errors: { vendorName: nameCheck.error } });
     }
+
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.valid) {
+      return res.status(400).json({ success: false, message: emailCheck.error, field: 'email', errors: { email: emailCheck.error } });
+    }
+
+    const existing = await Vendor.findOne({ where: { email: emailCheck.normalizedEmail, tenantId, isDeleted: false } });
     if (existing) {
-      return res.status(400).json({ message: 'Vendor already registered' });
+      return res.status(409).json({ success: false, message: 'This email address is already registered.', field: 'email', errors: { email: 'This email address is already registered.' } });
     }
+
+    const phoneCheck = validateMobile(phno);
+    if (!phoneCheck.valid) {
+      return res.status(400).json({ success: false, message: phoneCheck.error, field: 'phno', errors: { phno: phoneCheck.error } });
+    }
+
+    const existingPhone = await Vendor.findOne({ where: { phno: phoneCheck.normalizedPhone, tenantId, isDeleted: false } });
+    if (existingPhone) {
+      return res.status(409).json({ success: false, message: 'This phone number is already registered.', field: 'phno', errors: { phno: 'This phone number is already registered.' } });
+    }
+
+    const rawPassword = (password && String(password).trim()) ? String(password).trim() : 'Vendor@123';
     const role = ROLES.ADMIN;
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
     const createdBy = req.user?.employeeId;
-    const vendor = await Vendor.create({ vendorName, email, phno, password: hashedPassword,
-       address, country, state, city, vehicleId, companyId, vehicleCount, role, refererVendor, createdBy, tenantId });
+    const vendor = await Vendor.create({
+      vendorName: nameCheck.normalized,
+      email: emailCheck.normalizedEmail,
+      phno: phoneCheck.normalizedPhone,
+      password: hashedPassword,
+      address,
+      country,
+      state,
+      city,
+      vehicleId,
+      companyId,
+      vehicleCount,
+      role,
+      refererVendor,
+      createdBy,
+      tenantId
+    });
 
-    res.status(201).json({ message: 'Registered successfully', vendor });
-
-
+    return res.status(201).json({ success: true, message: 'Registered successfully', vendor });
   } catch (err: any) {
-    console.error('Create Vendor Error:', err);
-    res.status(500).json({ error: err.message || 'Something went wrong' });
+    return handleDatabaseError(err, res, 'Failed to create vendor. Please try again.');
   }
 };
 
@@ -387,10 +429,7 @@ const user = await User.findByPk(userId);
     });
   } catch (err: any) {
     console.error("Create Booking Error:", err);
-    return res.status(500).json({
-      success: false,
-      message: err.message || "Something went wrong",
-    });
+    return handleDatabaseError(err, res, "Failed to create booking. Please try again.");
   }
 };
 export const createBookingForWebOnCall = async (req: any, res: Response) => {
@@ -718,11 +757,8 @@ const user = await User.findByPk(userId);
       booking: bookingWithDetails,
     });
   } catch (err: any) {
-    console.error("Create Booking Error:", err);
-    return res.status(500).json({
-      success: false,
-      message: err.message || "Something went wrong",
-    });
+    console.error("Create OnCall Booking Error:", err);
+    return handleDatabaseError(err, res, "Failed to create on-call booking. Please try again.");
   }
 };
 export const createBooking = async (req: any, res: Response) => {
@@ -1008,10 +1044,7 @@ const bookingWithVehicle = (await Booking.findByPk(booking.bookingId)) || bookin
     console.error('Create Booking Error:', err);
 
     // ERROR response
-    return res.status(500).json({
-      success: false,
-      message: err.message || 'Something went wrong',
-    });
+    return handleDatabaseError(err, res, "Failed to create monthly booking. Please try again.");
   }
 };
 
@@ -1277,10 +1310,11 @@ export const createCompany = async (req: any, res: Response) => {
     const ctx = getTenantContext();
     const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
 
-    const cleanCompanyName = String(companyName || '').trim();
-    if (!cleanCompanyName || cleanCompanyName.length < 2) {
-      return res.status(400).json({ success: false, message: "Company name is required (minimum 2 characters)." });
+    const nameCheck = validateRequired(companyName, "Company name", 2);
+    if (!nameCheck.valid) {
+      return res.status(400).json({ success: false, message: nameCheck.error, field: 'companyName', errors: { companyName: nameCheck.error } });
     }
+    const cleanCompanyName = nameCheck.normalized;
 
     const existing = await Company.findOne({
       where: {
@@ -1294,7 +1328,54 @@ export const createCompany = async (req: any, res: Response) => {
       },
     });
     if (existing) {
-      return res.status(409).json({ success: false, message: `Company '${cleanCompanyName}' already exists in this fleet.` });
+      return res.status(409).json({ success: false, message: "This company name is already registered.", field: 'companyName', errors: { companyName: "This company name is already registered." } });
+    }
+
+    const codeCheck = validateRequired(companyCode, "Company code", 2);
+    if (!codeCheck.valid) {
+      return res.status(400).json({ success: false, message: codeCheck.error, field: 'companyCode', errors: { companyCode: codeCheck.error } });
+    }
+    const cleanCompanyCode = codeCheck.normalized.toUpperCase();
+    const existingCode = await Company.findOne({
+      where: { tenantId, companyCode: cleanCompanyCode, isDeleted: 0 }
+    });
+    if (existingCode) {
+      return res.status(409).json({ success: false, message: "This company code is already in use.", field: 'companyCode', errors: { companyCode: "This company code is already in use." } });
+    }
+
+    let cleanCompanyPhno = companyPhno;
+    if (companyPhno && String(companyPhno).trim()) {
+      const phoneCheck = validateMobile(companyPhno);
+      if (!phoneCheck.valid) {
+        return res.status(400).json({ success: false, message: phoneCheck.error, field: 'companyPhno', errors: { companyPhno: phoneCheck.error } });
+      }
+      cleanCompanyPhno = phoneCheck.normalizedPhone;
+      const existingPhone = await Company.findOne({
+        where: { tenantId, companyPhno: cleanCompanyPhno, isDeleted: 0 }
+      });
+      if (existingPhone) {
+        return res.status(409).json({
+          success: false,
+          message: "This company phone number is already registered.",
+          field: 'companyPhno',
+          errors: { companyPhno: "This company phone number is already registered." }
+        });
+      }
+    }
+
+    let cleanGstNo = gstNo ? String(gstNo).trim().toUpperCase() : null;
+    if (cleanGstNo) {
+      const gstCheck = validateGstin(cleanGstNo);
+      if (!gstCheck.valid) {
+        return res.status(400).json({ success: false, message: "Please enter a valid GST number.", field: 'gstNo', errors: { gstNo: "Please enter a valid GST number." } });
+      }
+      cleanGstNo = gstCheck.normalized;
+      const existingGst = await Company.findOne({
+        where: { tenantId, gstNo: cleanGstNo, isDeleted: 0 }
+      });
+      if (existingGst) {
+        return res.status(409).json({ success: false, message: "This GST number is already registered.", field: 'gstNo', errors: { gstNo: "This GST number is already registered." } });
+      }
     }
 
     //  normalize/split and store as array
@@ -1320,20 +1401,20 @@ export const createCompany = async (req: any, res: Response) => {
     }
 
     const company = await Company.create({
-      companyName,
-      companyPhno,
+      companyName: cleanCompanyName,
+      companyPhno: cleanCompanyPhno,
       employeeId: resolvedEmployeeId,
       companyLogo,
       domainName,
       managerEmail: managerEmails.length ? managerEmails.join(', ') : '', // stored as array/JSON column
       seoUrl: finalSeoUrl,
-      gstNo,
+      gstNo: cleanGstNo,
       allowTax,
       needEmail: req.body.needEmail !== undefined ? (req.body.needEmail === 'true' || req.body.needEmail === true) : true,
       userId: resolvedUserId,
       startTime,
       closeTime,
-      companyCode,
+      companyCode: cleanCompanyCode,
       priorMinutes,
       companyAddress, 
       managerApproval: false,
@@ -1355,10 +1436,9 @@ export const createCompany = async (req: any, res: Response) => {
 
     return res
       .status(201)
-      .json({ message: "Company created successfully", company });
+      .json({ success: true, message: "Company created successfully", company });
   } catch (err) {
-    console.error("Create Company Error:", err);
-    return res.status(500).json({ error: "Internal server error" });
+    return handleDatabaseError(err, res, "Failed to create company. Please try again.");
   }
 };
 
@@ -1796,7 +1876,7 @@ export const addTax = async (req: any, res: Response) => {
 
   } catch (err: any) {
     console.error('Create Tax Error:', err);
-    res.status(500).json({ error: err.message || 'Something went wrong' });
+    return handleDatabaseError(err, res, "Failed to register tax.");
   }
 };
 
@@ -1859,7 +1939,7 @@ export const editTax = async (req: any, res: Response) => {
       return res.status(403).json({ message: err.message });
     }
     console.error('Edit Tax Error:', err);
-    res.status(500).json({ error: err.message || 'Something went wrong' });
+    return handleDatabaseError(err, res, "Failed to update tax.");
   }
 };
 

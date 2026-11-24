@@ -2,12 +2,19 @@ import { Request, Response } from 'express';
 import { Company, Employee, Invoice, Tax, Vendor, User, Booking, Tenant } from '../models';
 import { USERS } from "../utils/costants";
 const { ROLES } = USERS;
-import { Op } from 'sequelize';
+import { Op, Sequelize } from 'sequelize';
 import {normalizeManagerEmails } from '../utils/email';
 import { ORDER } from '../utils/costants';
 import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 import { generateUniqueCompanySlug } from '../utils/slugUtils';
+import {
+  validateMobileRecipient as validateMobile,
+  validateEmailRecipient as validateEmail,
+  validateGstin,
+  validateRequired,
+  handleDatabaseError,
+} from '../utils/validationUtils';
 
 /**
  * Resolve Company and Fleet by two-slug URL: /company/:fleetSlug/:companySlug
@@ -417,48 +424,133 @@ export const updateCompany = async (req: any, res: Response) => {
     const companyLogoPath = req.file ? req.file.filename : null;
 
     if (!id) {
-      return res.status(400).json({ message: "Company ID is required" });
+      return res.status(400).json({ success: false, message: "Company ID is required" });
     }
 
     const company = await Company.findOne({ where: { companyId: id } });
 
-    const needEmailBoolean =
-      needEmail === "true" || needEmail === true ? 1 : 0;
-
     if (!company) {
-      return res.status(404).json({ message: "Company not found" });
+      return res.status(404).json({ success: false, message: "Company not found" });
     }
     assertTenantOwnership(company);
 
-       const oldManagers = company.managerEmail
+    const tenantId = company.tenantId || ROOT_TENANT_ID;
+
+    // Validate and check duplicate companyName excluding current company
+    let cleanCompanyName = company.companyName;
+    if (companyName !== undefined && companyName !== null) {
+      const nameCheck = validateRequired(companyName, "Company name", 2);
+      if (!nameCheck.valid) {
+        return res.status(400).json({ success: false, message: nameCheck.error, field: 'companyName', errors: { companyName: nameCheck.error } });
+      }
+      cleanCompanyName = nameCheck.normalized;
+
+      const existing = await Company.findOne({
+        where: {
+          tenantId,
+          companyId: { [Op.ne]: id },
+          isDeleted: 0,
+          [Op.and]: [
+            Sequelize.where(
+              Sequelize.fn('LOWER', Sequelize.fn('TRIM', Sequelize.col('companyName'))),
+              cleanCompanyName.toLowerCase()
+            ),
+          ],
+        },
+      });
+      if (existing) {
+        return res.status(409).json({ success: false, message: "This company name is already registered.", field: 'companyName', errors: { companyName: "This company name is already registered." } });
+      }
+    }
+
+    // Validate and check duplicate companyCode excluding current company
+    let cleanCompanyCode = company.companyCode;
+    if (companyCode !== undefined && companyCode !== null && String(companyCode).trim() !== '') {
+      const codeCheck = validateRequired(companyCode, "Company code", 2);
+      if (!codeCheck.valid) {
+        return res.status(400).json({ success: false, message: codeCheck.error, field: 'companyCode', errors: { companyCode: codeCheck.error } });
+      }
+      cleanCompanyCode = codeCheck.normalized.toUpperCase();
+      const existingCode = await Company.findOne({
+        where: {
+          tenantId,
+          companyCode: cleanCompanyCode,
+          companyId: { [Op.ne]: id },
+          isDeleted: 0,
+        }
+      });
+      if (existingCode) {
+        return res.status(409).json({ success: false, message: "This company code is already in use.", field: 'companyCode', errors: { companyCode: "This company code is already in use." } });
+      }
+    }
+
+    // Validate companyPhno
+    let cleanCompanyPhno = company.companyPhno;
+    if (companyPhno !== undefined && companyPhno !== null && String(companyPhno).trim() !== '') {
+      const phoneCheck = validateMobile(companyPhno);
+      if (!phoneCheck.valid) {
+        return res.status(400).json({ success: false, message: phoneCheck.error, field: 'companyPhno', errors: { companyPhno: phoneCheck.error } });
+      }
+      cleanCompanyPhno = phoneCheck.normalizedPhone;
+      const existingPhone = await Company.findOne({
+        where: {
+          tenantId,
+          companyPhno: cleanCompanyPhno,
+          companyId: { [Op.ne]: id },
+          isDeleted: 0,
+        },
+      });
+      if (existingPhone) {
+        return res.status(409).json({
+          success: false,
+          message: "This company phone number is already registered.",
+          field: 'companyPhno',
+          errors: { companyPhno: "This company phone number is already registered." }
+        });
+      }
+    }
+
+    // Validate and check duplicate gstNo excluding current company
+    let cleanGstNo = company.gstNo;
+    if (gstNo !== undefined && gstNo !== null && String(gstNo).trim() !== '') {
+      const gstCheck = validateGstin(gstNo);
+      if (!gstCheck.valid) {
+        return res.status(400).json({ success: false, message: "Please enter a valid GST number.", field: 'gstNo', errors: { gstNo: "Please enter a valid GST number." } });
+      }
+      cleanGstNo = gstCheck.normalized;
+      const existingGst = await Company.findOne({
+        where: {
+          tenantId,
+          gstNo: cleanGstNo,
+          companyId: { [Op.ne]: id },
+          isDeleted: 0,
+        }
+      });
+      if (existingGst) {
+        return res.status(409).json({ success: false, message: "This GST number is already registered.", field: 'gstNo', errors: { gstNo: "This GST number is already registered." } });
+      }
+    }
+
+    const oldManagers = company.managerEmail
       ? normalizeManagerEmails(company.managerEmail)
       : [];
 
-        let normalizedManagers: string[] = oldManagers;
+    let normalizedManagers: string[] = oldManagers;
     if (managerEmail !== undefined) {
       normalizedManagers = normalizeManagerEmails(managerEmail);
     }
-
-    // ✅ normalize manager emails (same logic as createCompany)
-    // let normalizedManagers: string[] = company.managerEmail
-    //   ? normalizeManagerEmails(company.managerEmail)
-    //   : [];
-
-    // if (managerEmail !== undefined) {
-    //   normalizedManagers = normalizeManagerEmails(managerEmail);
-    // }
 
     let finalSeoUrl = company.seoUrl;
     if (seoUrl && seoUrl.trim() !== "" && seoUrl !== company.seoUrl) {
       finalSeoUrl = await generateUniqueCompanySlug(seoUrl, company.tenantId, id);
     } else if (!finalSeoUrl) {
-      finalSeoUrl = await generateUniqueCompanySlug(companyName || company.companyName || "company", company.tenantId, id);
+      finalSeoUrl = await generateUniqueCompanySlug(cleanCompanyName || company.companyName || "company", company.tenantId, id);
     }
 
     const updateData: any = {
-      companyName: companyName || company.companyName,
-      companyPhno: companyPhno || company.companyPhno,
-      domainName: domainName || company.domainName,
+      companyName: cleanCompanyName,
+      companyPhno: cleanCompanyPhno,
+      domainName: domainName !== undefined ? domainName : company.domainName,
       managerEmail: normalizedManagers.join(", "),
       seoUrl: finalSeoUrl,
       allowTax: allowTax ?? company.allowTax,
@@ -466,17 +558,17 @@ export const updateCompany = async (req: any, res: Response) => {
         needEmail !== undefined
           ? (needEmail === "true" || needEmail === true)
           : (company.needEmail ?? true),
-      gstNo: gstNo ?? company.gstNo,
+      gstNo: cleanGstNo,
       companyAddress: companyAddress ?? company.companyAddress,
       managerApproval: false,
       startTime: startTime || company.startTime,
       closeTime: closeTime || company.closeTime,
-      companyCode: companyCode || company.companyCode,
-     priorMinutes: priorMinutes || company.priorMinutes
+      companyCode: cleanCompanyCode,
+      priorMinutes: priorMinutes || company.priorMinutes
     };
 
     if (bookingRules) {
-      updateData.bookingRules = JSON.parse(bookingRules);
+      updateData.bookingRules = typeof bookingRules === 'string' ? JSON.parse(bookingRules) : bookingRules;
     }
 
     if (companyLogoPath) {
@@ -485,19 +577,6 @@ export const updateCompany = async (req: any, res: Response) => {
 
     // ✅ update company
     await company.update(updateData);
-
-    // ✅ NEW LOGIC → update users if their email exists in manager list
-    // if (normalizedManagers.length) {
-    //   await User.update(
-    //     { companyManager: 1 },
-    //     {
-    //       where: {
-    //         email: normalizedManagers
-    //       }
-    //     }
-    //   );
-    // }
-
 
     const removedManagers = oldManagers.filter(
       email => !normalizedManagers.includes(email)
@@ -517,20 +596,16 @@ export const updateCompany = async (req: any, res: Response) => {
       );
     }
     
-    res.status(200).json({
+    return res.status(200).json({
+      success: true,
       message: "Company updated successfully",
       data: company
     });
-
-
   } catch (error: any) {
     if (isTenantError(error)) {
-      return res.status(403).json({ message: error.message });
+      return res.status(403).json({ success: false, message: error.message });
     }
-    res.status(500).json({
-      message: "Error updating company",
-      error: error.message
-    });
+    return handleDatabaseError(error, res, "Failed to update company. Please try again.");
   }
 };
 

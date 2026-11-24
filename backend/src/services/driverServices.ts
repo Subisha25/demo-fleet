@@ -8,6 +8,12 @@ import { ORDER } from '../utils/costants';
 import { Op } from 'sequelize';
 import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
+import {
+  validateMobileRecipient as validateMobile,
+  validateEmailRecipient as validateEmail,
+  validateRequired,
+  handleDatabaseError,
+} from '../utils/validationUtils';
 const { ROLES } = USERS;
 
 
@@ -109,43 +115,61 @@ export const  updateDriver = async (req: any, res: Response) => {
     const ctx = getTenantContext();
     const tenantId = driver.tenantId || ctx?.tenantId || ROOT_TENANT_ID;
 
+    // Validate driver name if provided
+    if (updateData.driverName !== undefined) {
+      const nameCheck = validateRequired(updateData.driverName, 'Driver name', 2);
+      if (!nameCheck.valid) {
+        return res.status(400).json({ success: false, message: nameCheck.error, field: 'driverName', errors: { driverName: nameCheck.error } });
+      }
+    }
+
     // Check if email is being updated and if it already exists in this fleet
     if (updateData.driverEmail && updateData.driverEmail !== driver.driverEmail) {
+      const emailCheck = validateEmail(updateData.driverEmail);
+      if (!emailCheck.valid) {
+        return res.status(400).json({ success: false, message: emailCheck.error, field: 'driverEmail', errors: { driverEmail: emailCheck.error } });
+      }
       const existingDriver = await Drivers.unscoped().findOne({
         where: {
-          driverEmail: updateData.driverEmail,
+          driverEmail: emailCheck.normalizedEmail,
           tenantId,
           isDeleted: false,
           driverId: { [Op.ne]: driverId }
         }
       });
       if (existingDriver) {
-        return res.status(400).json({ message: 'Email already exists for another driver in this fleet', field: 'driverEmail' });
+        return res.status(409).json({ success: false, message: 'This email address is already registered.', field: 'driverEmail', errors: { driverEmail: 'This email address is already registered.' } });
       }
+      updateData.driverEmail = emailCheck.normalizedEmail;
     }
 
     // Check if phone number is being updated and already exists in this fleet
     if (updateData.phno && updateData.phno !== driver.phno) {
+      const phoneCheck = validateMobile(updateData.phno);
+      if (!phoneCheck.valid) {
+        return res.status(400).json({ success: false, message: phoneCheck.error, field: 'phno', errors: { phno: phoneCheck.error } });
+      }
       const existingDriverWithPhone = await Drivers.unscoped().findOne({
         where: {
-          phno: updateData.phno,
+          phno: phoneCheck.normalizedPhone,
           tenantId,
           isDeleted: false,
           driverId: { [Op.ne]: driverId }
         }
       });
       if (existingDriverWithPhone) {
-        return res.status(400).json({ message: 'Mobile number already exists in this fleet', field: 'phno' });
+        return res.status(409).json({ success: false, message: 'This phone number is already registered.', field: 'phno', errors: { phno: 'This phone number is already registered.' } });
       }
+      updateData.phno = phoneCheck.normalizedPhone;
     }
 
     if (updateData.vehicleTypeId) {
       const vt = await VehicleType.findByPk(updateData.vehicleTypeId);
       if (!vt) {
-        return res.status(404).json({ message: 'Vehicle type not found', field: 'vehicleTypeId' });
+        return res.status(404).json({ success: false, message: 'Vehicle type not found', field: 'vehicleTypeId' });
       }
       if (vt.tenantId && vt.tenantId !== tenantId && vt.tenantId !== ROOT_TENANT_ID) {
-        return res.status(403).json({ message: 'Selected vehicle type does not belong to your fleet', field: 'vehicleTypeId' });
+        return res.status(403).json({ success: false, message: 'Selected vehicle type does not belong to your fleet', field: 'vehicleTypeId' });
       }
     }
 
@@ -153,12 +177,12 @@ export const  updateDriver = async (req: any, res: Response) => {
       ...updateData,
       trackingsource: updateData.trackingSource ?? driver.trackingsource,
     });
-    res.status(200).json({ message: 'Driver updated successfully', driver });
+    return res.status(200).json({ success: true, message: 'Driver updated successfully', driver });
   } catch (err: any) {
     if (isTenantError(err)) {
-      return res.status(403).json({ message: err.message });
+      return res.status(403).json({ success: false, message: err.message });
     }
-    res.status(500).json({ error: err.message || err });
+    return handleDatabaseError(err, res, 'Failed to update driver. Please try again.');
   }
 };
 

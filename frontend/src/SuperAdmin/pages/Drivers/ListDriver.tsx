@@ -20,6 +20,14 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import InputBox from '../../../components/InputBox';
 import CommonButton from '../../../components/CommonButton';
+import {
+  validateMobile,
+  validateEmail,
+  validateName,
+  validatePinCode,
+  extractApiErrorMessage,
+  extractFieldErrors,
+} from '../../../utils/validation';
 
 // Driver Type
 type Driver = {
@@ -221,33 +229,61 @@ trackingSource: fullDriverData.trackingsource || "",
 
   const saveEdit = async () => {
     if (!editData) return;
+
+    const nameCheck = validateName(editData.driverName, "Driver name", 2);
+    if (!nameCheck.valid) {
+      showToast(nameCheck.error || "Driver name is required.", "warn");
+      return;
+    }
+
+    const phoneCheck = validateMobile(editData.phno);
+    if (!phoneCheck.valid) {
+      showToast(phoneCheck.error || "Phone number must be exactly 10 digits.", "warn");
+      return;
+    }
+
+    if (editData.driverEmail && editData.driverEmail.trim()) {
+      const emailCheck = validateEmail(editData.driverEmail);
+      if (!emailCheck.valid) {
+        showToast("Please enter a valid email address.", "warn");
+        return;
+      }
+    }
+
+    if (editData.pincode && editData.pincode.trim()) {
+      const pinCheck = validatePinCode(editData.pincode);
+      if (!pinCheck.valid) {
+        showToast(pinCheck.error || "PIN code must be exactly 6 digits.", "warn");
+        return;
+      }
+    }
     
     // Combine address lines
-    const fullAddress = `${editData.address1}${editData.address2 ? `, ${editData.address2}` : ''}`;
+    const fullAddress = `${editData.address1 || ''}${editData.address2 ? `, ${editData.address2}` : ''}`;
 
     const payload = {
-      driverName: editData.driverName,
-      driverEmail: editData.driverEmail,
-      phno: editData.phno,
-      address: fullAddress,
+      driverName: editData.driverName.trim(),
+      driverEmail: editData.driverEmail?.trim() || '',
+      phno: editData.phno.trim().replace(/\D/g, ''),
+      address: fullAddress.trim(),
       city: editData.city,
       state: editData.state,
       country: editData.country,
       pincode: editData.pincode,
       vehicleTypeId: editData.vehicleTypeId,
-        licenseNo: editData.licenseNo,    
-  licExpDate: editData.licExpDate, 
-  trackingSource: editData.trackingSource,
+      licenseNo: editData.licenseNo,    
+      licExpDate: editData.licExpDate, 
+      trackingSource: editData.trackingSource,
     };
 
     try {
       await axiosInstance.put(`/driver/update/${editData.driverId}`, payload);
-      showToast("Driver updated successfully!", "success");
+      showToast("Driver updated successfully.", "success");
       setEditModalOpen(false);
       setEditData(null);
       fetchDrivers();
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'Failed to update driver.';
+      const errorMessage = extractApiErrorMessage(error, 'Failed to update driver. Please try again.');
       showToast(errorMessage, 'error');
     }
   };

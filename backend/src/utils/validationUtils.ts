@@ -256,3 +256,193 @@ export function validateVehicleRegistration(reg?: string | null): { valid: boole
   }
   return { valid: true, normalized };
 }
+
+/**
+ * Validates non-empty string with optional minimum length.
+ */
+export function validateRequired(
+  val?: any,
+  fieldLabel = 'This field',
+  minLength = 1
+): { valid: boolean; error?: string; normalized: string } {
+  if (val === undefined || val === null) {
+    return { valid: false, error: `${fieldLabel} is required.`, normalized: '' };
+  }
+  const str = String(val).trim();
+  if (str.length === 0) {
+    return { valid: false, error: `${fieldLabel} cannot be empty.`, normalized: '' };
+  }
+  if (str.length < minLength) {
+    return {
+      valid: false,
+      error: `${fieldLabel} must be at least ${minLength} characters.`,
+      normalized: str,
+    };
+  }
+  return { valid: true, normalized: str };
+}
+
+/**
+ * Validates numeric fields (e.g., amounts, rates, distances, capacities).
+ */
+export function validatePositiveNumber(
+  val?: any,
+  fieldLabel = 'Amount',
+  allowZero = false
+): { valid: boolean; error?: string; value: number } {
+  if (val === undefined || val === null || val === '') {
+    return { valid: false, error: `${fieldLabel} is required.`, value: NaN };
+  }
+  const num = Number(val);
+  if (isNaN(num)) {
+    return { valid: false, error: `${fieldLabel} must be a valid number.`, value: NaN };
+  }
+  if (allowZero ? num < 0 : num <= 0) {
+    return {
+      valid: false,
+      error: allowZero
+        ? `${fieldLabel} cannot be negative.`
+        : `${fieldLabel} must be greater than zero.`,
+      value: num,
+    };
+  }
+  return { valid: true, value: num };
+}
+
+/**
+ * Validates integer values (e.g. seat count, passenger count, duration).
+ */
+export function validateInteger(
+  val?: any,
+  fieldLabel = 'Value',
+  min = 1
+): { valid: boolean; error?: string; value: number } {
+  const result = validatePositiveNumber(val, fieldLabel, min <= 0);
+  if (!result.valid) return result;
+  if (!Number.isInteger(result.value)) {
+    return { valid: false, error: `${fieldLabel} must be a whole number (integer).`, value: result.value };
+  }
+  if (result.value < min) {
+    return { valid: false, error: `${fieldLabel} must be at least ${min}.`, value: result.value };
+  }
+  return { valid: true, value: result.value };
+}
+
+/**
+ * Validates date ranges (e.g., start date vs end date).
+ */
+export function validateDateRange(
+  startVal: any,
+  endVal: any,
+  startLabel = 'Start date',
+  endLabel = 'End date'
+): { valid: boolean; error?: string } {
+  if (!startVal) return { valid: false, error: `${startLabel} is required.` };
+  if (!endVal) return { valid: false, error: `${endLabel} is required.` };
+
+  const start = new Date(startVal);
+  const end = new Date(endVal);
+
+  if (isNaN(start.getTime())) return { valid: false, error: `Invalid ${startLabel} format.` };
+  if (isNaN(end.getTime())) return { valid: false, error: `Invalid ${endLabel} format.` };
+
+  if (end < start) {
+    return { valid: false, error: `${endLabel} cannot be before ${startLabel}.` };
+  }
+  return { valid: true };
+}
+
+/**
+ * Authoritative Database Error and Unique Constraint Handler.
+ * Catches MySQL 1062 duplicate-entry and Sequelize UniqueConstraintError,
+ * maps them to precise, field-specific error messages with HTTP 409,
+ * and handles Sequelize ValidationError with HTTP 400.
+ */
+export function handleDatabaseError(
+  err: any,
+  res: any,
+  fallbackMessage = 'An unexpected error occurred. Please try again.'
+) {
+  // Check for Sequelize UniqueConstraintError or MySQL 1062 ER_DUP_ENTRY
+  const isUniqueConstraint =
+    err?.name === 'SequelizeUniqueConstraintError' ||
+    err?.original?.code === 'ER_DUP_ENTRY' ||
+    err?.original?.errno === 1062 ||
+    err?.code === 'ER_DUP_ENTRY' ||
+    err?.errno === 1062 ||
+    (typeof err?.message === 'string' && err.message.includes('Duplicate entry'));
+
+  if (isUniqueConstraint) {
+    const errorMsg = String(err?.original?.sqlMessage || err?.message || '');
+    let field = 'item';
+    let specificMsg = 'A record with this value already exists.';
+
+    if (err?.errors && Array.isArray(err.errors) && err.errors.length > 0) {
+      field = err.errors[0]?.path || field;
+    } else {
+      const keyMatch = errorMsg.match(/for key ['`]([^'`]+)['`]/i);
+      if (keyMatch) {
+        field = keyMatch[1];
+      }
+    }
+
+    const lowerField = field.toLowerCase();
+    if (lowerField.includes('phone') || lowerField.includes('phno') || lowerField.includes('mobile')) {
+      specificMsg = 'This phone number is already registered.';
+      field = 'phone';
+    } else if (lowerField.includes('email')) {
+      specificMsg = 'This email address is already registered.';
+      field = 'email';
+    } else if (lowerField.includes('gst') || lowerField.includes('gstin')) {
+      specificMsg = 'This GST number is already registered.';
+      field = 'gstNo';
+    } else if (lowerField.includes('vehiclenumber') || lowerField.includes('reg') || lowerField.includes('plate')) {
+      specificMsg = 'This vehicle number is already registered.';
+      field = 'vehicleNumber';
+    } else if (lowerField.includes('companyname') || lowerField.includes('name')) {
+      specificMsg = 'This name is already registered.';
+      field = 'companyName';
+    } else if (lowerField.includes('companycode') || lowerField.includes('code') || lowerField.includes('businesscode')) {
+      specificMsg = 'This business code is already in use.';
+      field = 'companyCode';
+    } else if (lowerField.includes('pan')) {
+      specificMsg = 'This PAN is already registered.';
+      field = 'pan';
+    } else if (lowerField.includes('subdomain') || lowerField.includes('slug')) {
+      specificMsg = 'This domain or URL slug is already taken.';
+      field = 'subdomain';
+    } else if (lowerField.includes('transaction')) {
+      specificMsg = 'This transaction ID has already been recorded.';
+      field = 'transactionId';
+    }
+
+    return res.status(409).json({
+      success: false,
+      message: specificMsg,
+      field,
+      errors: { [field]: specificMsg },
+    });
+  }
+
+  // Handle Sequelize validation errors
+  if (err?.name === 'SequelizeValidationError' && Array.isArray(err.errors)) {
+    const errors: Record<string, string> = {};
+    err.errors.forEach((e: any) => {
+      if (e.path) errors[e.path] = e.message;
+    });
+    const firstMsg = Object.values(errors)[0] || 'Validation failed. Please correct the highlighted fields.';
+    return res.status(400).json({
+      success: false,
+      message: firstMsg,
+      errors,
+    });
+  }
+
+  // Log internal error safely without returning stack traces or database credentials
+  console.error('[Database Operation Error]:', err?.message || err);
+  return res.status(500).json({
+    success: false,
+    message: fallbackMessage,
+  });
+}
+

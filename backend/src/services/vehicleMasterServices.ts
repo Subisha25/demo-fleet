@@ -11,6 +11,10 @@ import { Op, fn, col, where } from "sequelize";
 import sequelize from '../config/dbConfig';
 import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
+import {
+  validateVehicleRegistration,
+  handleDatabaseError,
+} from '../utils/validationUtils';
 // GET All Vehicle Masters
 export const getAllVehicleMaster = async (req: any, res: Response) => {
   try {
@@ -137,8 +141,39 @@ export const updateVehicleMaster = async (req: any, res: Response) => {
       resolvedVendorName = o.vendorName;
     }
 
+    let cleanVehicleNumber = vm.vehicleNumber;
+    if (vehicleNumber !== undefined && vehicleNumber !== null && String(vehicleNumber).trim() !== '') {
+      const regCheck = validateVehicleRegistration(vehicleNumber);
+      if (!regCheck.valid) {
+        return res.status(400).json({
+          success: false,
+          message: regCheck.error || 'Please enter a valid vehicle registration number.',
+          field: 'vehicleNumber',
+          errors: { vehicleNumber: regCheck.error || 'Please enter a valid vehicle registration number.' }
+        });
+      }
+      cleanVehicleNumber = regCheck.normalized;
+
+      const existingVehicleNumber = await VehicleMaster.findOne({
+        where: {
+          vehicleNumber: cleanVehicleNumber,
+          tenantId,
+          vehicleMasterId: { [Op.ne]: id },
+          isDeleted: 0,
+        }
+      });
+      if (existingVehicleNumber) {
+        return res.status(409).json({
+          success: false,
+          message: 'This vehicle number is already registered.',
+          field: 'vehicleNumber',
+          errors: { vehicleNumber: 'This vehicle number is already registered.' }
+        });
+      }
+    }
+
     await vm.update({
-      vehicleNumber: vehicleNumber ?? vm.vehicleNumber,
+      vehicleNumber: cleanVehicleNumber,
       vehicleId:     vehicleId     ?? vm.vehicleId,
       vehicleTypeId: resolvedTypeId,
       vehicleModelName: resolvedModelName,    //  correct column
@@ -147,13 +182,12 @@ export const updateVehicleMaster = async (req: any, res: Response) => {
       vendorName:        resolvedVendorName,    //  correct column
     });
 
-    return res.status(200).json({ message: "Vehicle updated successfully", data: vm });
+    return res.status(200).json({ success: true, message: "Vehicle updated successfully", data: vm });
   } catch (err: any) {
     if (isTenantError(err)) {
-      return res.status(err.status).json({ message: err.message });
+      return res.status(err.status).json({ success: false, message: err.message });
     }
-    console.error("Error updating vehicle:", err);
-    return res.status(500).json({ error: "Internal server error" });
+    return handleDatabaseError(err, res, "Failed to update vehicle.");
   }
 };
 
@@ -419,15 +453,21 @@ export const createUnifiedVehicle = async (req: any, res: Response) => {
     }
 
     if (!manufacturing || !String(manufacturing).trim()) {
-      return res.status(400).json({ success: false, message: 'Manufacturer is required.' });
+      return res.status(400).json({ success: false, message: 'Manufacturer is required.', field: 'manufacturing' });
     }
 
-    if (!vehicleNumber || !String(vehicleNumber).trim()) {
-      return res.status(400).json({ success: false, message: 'Vehicle Number is required.' });
+    const regCheck = validateVehicleRegistration(vehicleNumber);
+    if (!regCheck.valid) {
+      return res.status(400).json({
+        success: false,
+        message: regCheck.error || 'Please enter a valid vehicle registration number.',
+        field: 'vehicleNumber',
+        errors: { vehicleNumber: regCheck.error || 'Please enter a valid vehicle registration number.' }
+      });
     }
 
     if (!vendorId || !String(vendorId).trim()) {
-      return res.status(400).json({ success: false, message: 'Vehicle Owner is required.' });
+      return res.status(400).json({ success: false, message: 'Vehicle Owner is required.', field: 'vendorId' });
     }
 
     // Collect uploaded images or image strings
@@ -446,7 +486,7 @@ export const createUnifiedVehicle = async (req: any, res: Response) => {
       advanceBookingHours: AdvanceBookingHours,
       vehicleModelName,
       manufacturing,
-      vehicleNumber,
+      vehicleNumber: regCheck.normalized,
       vendorId,
       uploadedImages,
     });
@@ -461,11 +501,16 @@ export const createUnifiedVehicle = async (req: any, res: Response) => {
     if (isTenantError(err)) {
       return res.status(err.status).json({ success: false, message: err.message });
     }
-    console.error('Error creating unified vehicle:', err);
-    return res.status(400).json({
-      success: false,
-      message: err.message || 'Error creating vehicle.',
-    });
+    const errMsg = String(err?.message || '');
+    if (errMsg.includes('already registered')) {
+      return res.status(409).json({
+        success: false,
+        message: 'This vehicle number is already registered.',
+        field: 'vehicleNumber',
+        errors: { vehicleNumber: 'This vehicle number is already registered.' },
+      });
+    }
+    return handleDatabaseError(err, res, 'Failed to register vehicle. Please try again.');
   }
 };
 

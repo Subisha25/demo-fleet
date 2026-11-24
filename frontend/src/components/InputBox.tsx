@@ -237,7 +237,7 @@ useEffect(() => {
   }}
             required={required}
             disabled={disabled}
-            className={`w-full border border-gray-300 rounded px-4 py-2 focus:ring-2 focus:ring-purple-600 focus:border-purple-600 outline-none ${icon ? 'pl-10' : ''} ${error ? 'border-red-500' : ''}`}
+            className={`w-full border rounded px-4 py-2 outline-none ${icon ? 'pl-10' : ''} ${error ? 'border-red-500 ring-1 ring-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-2 focus:ring-purple-600 focus:border-purple-600'}`}
           >
             <option value="">-- Select --</option>
             {renderOptions()}
@@ -254,7 +254,7 @@ useEffect(() => {
             placeholder={placeholder}
             required={required}
             disabled={disabled}
-            className={`w-full border border-gray-300 rounded px-4 py-2 h-20 focus:ring-2 focus:ring-purple-600 focus:border-purple-600 outline-none ${icon ? 'pl-10' : ''} ${error ? 'border-red-500' : ''}`}
+            className={`w-full border rounded px-4 py-2 h-20 outline-none ${icon ? 'pl-10' : ''} ${error ? 'border-red-500 ring-1 ring-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-2 focus:ring-purple-600 focus:border-purple-600'}`}
           />
         </div>
       ) : type === "checkbox" ? (
@@ -276,7 +276,7 @@ useEffect(() => {
           type="file"
           onChange={handleChange}
           disabled={disabled}
-          className={`w-full px-4 py-2 ${error ? 'border-red-500' : ''}`}
+          className={`w-full px-4 py-2 ${error ? 'border border-red-500 rounded ring-1 ring-red-500' : ''}`}
         />
       ) : (
         <div className="relative">
@@ -295,7 +295,7 @@ useEffect(() => {
    onKeyDown={(e) => {
     if (e.key === "Enter") onEnterPress?.(); // 🔥 Enter press triggers callback
   }}
-  className={`w-full border border-gray-300 rounded px-4 py-2 focus:ring-2 focus:ring-purple-600 focus:border-purple-600 outline-none ${icon ? 'pl-10' : ''} ${error ? 'border-red-500' : ''} ${type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''}`}
+  className={`w-full border rounded px-4 py-2 outline-none ${icon ? 'pl-10' : ''} ${error ? 'border-red-500 ring-1 ring-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-2 focus:ring-purple-600 focus:border-purple-600'} ${type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''}`}
 />
         </div>
       )}

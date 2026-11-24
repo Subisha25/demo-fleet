@@ -2,6 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { showToast } from '../../../components/AlertBox';
 import {
+  validateName,
+  validateEmail,
+  validateMobile,
+  validateSelect,
+  extractApiErrorMessage,
+  extractFieldErrors,
+} from '../../../utils/validation';
+import {
   Pencil,
   User,
   Mail,
@@ -93,6 +101,8 @@ export default function UserDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+  const clearEditError = (field: string) => setEditErrors((prev) => { const n = { ...prev }; delete n[field]; return n; });
 
   useEffect(() => {
     if (searchParams.get('edit') === 'true') {
@@ -683,9 +693,10 @@ const handleUpdateUser = async (e: React.FormEvent) => {
                         name="username"
                         type="text"
                         value={formData.username}
-                        onChange={handleInputChange}
-                        className="mt-1 block w-full px-3 py-2 border rounded"
+                        onChange={(e) => { handleInputChange(e); clearEditError("username"); }}
+                        className={`mt-1 block w-full px-3 py-2 border rounded ${editErrors.username ? "border-red-500 ring-1 ring-red-500" : "border-gray-300"}`}
                       />
+                      {editErrors.username && <p className="mt-1 text-xs text-red-600">{editErrors.username}</p>}
                     </div>
 
                     <div>
@@ -694,9 +705,10 @@ const handleUpdateUser = async (e: React.FormEvent) => {
                         name="email"
                         type="email"
                         value={formData.email}
-                        onChange={handleInputChange}
-                        className="mt-1 block w-full px-3 py-2 border rounded"
+                        onChange={(e) => { handleInputChange(e); clearEditError("email"); }}
+                        className={`mt-1 block w-full px-3 py-2 border rounded ${editErrors.email ? "border-red-500 ring-1 ring-red-500" : "border-gray-300"}`}
                       />
+                      {editErrors.email && <p className="mt-1 text-xs text-red-600">{editErrors.email}</p>}
                     </div>
 
                     <div>
@@ -705,9 +717,10 @@ const handleUpdateUser = async (e: React.FormEvent) => {
                         name="mobile"
                         type="text"
                         value={formData.mobile}
-                        onChange={handleInputChange}
-                        className="mt-1 block w-full px-3 py-2 border rounded"
+                        onChange={(e) => { handleInputChange(e); clearEditError("mobile"); }}
+                        className={`mt-1 block w-full px-3 py-2 border rounded ${editErrors.mobile ? "border-red-500 ring-1 ring-red-500" : "border-gray-300"}`}
                       />
+                      {editErrors.mobile && <p className="mt-1 text-xs text-red-600">{editErrors.mobile}</p>}
                     </div>
 
                     <div>
@@ -731,8 +744,8 @@ const handleUpdateUser = async (e: React.FormEvent) => {
   <select
     name="companyId"
     value={formData.companyId}
-    onChange={handleInputChange}
-    className="mt-1 block w-full px-3 py-2 border rounded"
+    onChange={(e) => { handleInputChange(e); clearEditError("companyId"); }}
+    className={`mt-1 block w-full px-3 py-2 border rounded ${editErrors.companyId ? "border-red-500 ring-1 ring-red-500" : "border-gray-300"}`}
   >
     <option value="">Select Company</option>
     {companyList.map((company) => (
@@ -741,6 +754,7 @@ const handleUpdateUser = async (e: React.FormEvent) => {
       </option>
     ))}
   </select>
+  {editErrors.companyId && <p className="mt-1 text-xs text-red-600">{editErrors.companyId}</p>}
 </div>
 
 

@@ -583,6 +583,15 @@ import CommonButton from "../../../components/CommonButton";
 import InputBox from "../../../components/InputBox";
 import { showToast, AlertContainer } from "../../../components/AlertBox";
 import axiosInstance from "../../../utils/axiosInstance";
+import {
+  validateMobile,
+  validateEmail,
+  validateName,
+  validateRequired,
+  validatePinCode,
+  extractApiErrorMessage,
+  extractFieldErrors,
+} from "../../../utils/validation";
 
 interface DriverFormData {
   name: string;
@@ -759,74 +768,66 @@ const AddDriverForm: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!formData.name.trim()) {
-      showToast("Driver name is required", "warn");
-      return;
+    const newErrors: FormErrors = {};
+
+    const nameCheck = validateName(formData.name, "Driver name", 2);
+    if (!nameCheck.valid) {
+      newErrors.name = nameCheck.error || "Driver name is required.";
     }
 
-    if (!formData.password) {
-      showToast("Password is required", "warn");
-      return;
+    if (!formData.password || formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters long.";
     }
 
-    if (!formData.phone.trim()) {
-      showToast("Phone number is required", "warn");
-      return;
+    const phoneCheck = validateMobile(formData.phone);
+    if (!phoneCheck.valid) {
+      newErrors.phone = phoneCheck.error || "Phone number must be exactly 10 digits.";
     }
 
-    if (!/^[6-9]\d{9}$/.test(formData.phone)) {
-      showToast("Phone number must be 10 digits starting with 6-9", "warn");
-      return;
+    if (formData.email.trim()) {
+      const emailCheck = validateEmail(formData.email);
+      if (!emailCheck.valid) {
+        newErrors.email = "Please enter a valid email address.";
+      }
     }
 
     if (!formData.address1.trim()) {
-      showToast("Address Line 1 is required", "warn");
-      return;
+      newErrors.address1 = "Address Line 1 is required.";
     }
 
     if (!formData.country) {
-      showToast("Please select a country", "warn");
-      return;
+      newErrors.country = "Please select a country.";
     }
 
     if (!formData.state) {
-      showToast("Please select a state", "warn");
-      return;
+      newErrors.state = "Please select a state.";
     }
 
     if (!formData.city) {
-      showToast("Please select a city", "warn");
-      return;
+      newErrors.city = "Please select a city.";
     }
 
-    if (!formData.pincode.trim()) {
-      showToast("Pincode is required", "warn");
-      return;
-    }
-
-    if (!/^\d{6}$/.test(formData.pincode)) {
-      showToast("Pincode must be 6 digits", "warn");
-      return;
-    }
-
-    // Email validation (only if provided)
-    if (formData.email.trim() && !/\S+@\S+\.\S+/.test(formData.email)) {
-      showToast("Please enter a valid email address", "warn");
-      return;
+    const pinCheck = validatePinCode(formData.pincode);
+    if (!pinCheck.valid) {
+      newErrors.pincode = pinCheck.error || "PIN code must be exactly 6 digits.";
     }
 
     if (!formData.licenseNo.trim()) {
-      showToast("License number is required", "warn");
-      return;
+      newErrors.licenseNo = "License number is required.";
     }
 
     if (!formData.licExpDate.trim()) {
-      showToast("License expiry date is required", "warn");
-      return;
+      newErrors.licExpDate = "License expiry date is required.";
     }
 
     if (!formData.trackingSource) {
-      showToast("Please select Tracking Source", "warn");
+      newErrors.trackingSource = "Please select a tracking source.";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      const firstError = Object.values(newErrors)[0];
+      showToast(firstError, "warn");
       return;
     }
 
@@ -835,23 +836,23 @@ const AddDriverForm: React.FC = () => {
     setSubmitting(true);
 
     const payload = {
-      driverName: formData.name,
+      driverName: formData.name.trim(),
       password: formData.password,
-      driverEmail: formData.email,
-      phno: formData.phone,
+      driverEmail: formData.email.trim(),
+      phno: formData.phone.trim().replace(/\D/g, ""),
       city: formData.city,
       state: formData.state,
       country: formData.country,
-      pincode: formData.pincode,
-      address: `${formData.address1}${formData.address2 ? ", " + formData.address2 : ""}`,
-      licenseNo: formData.licenseNo,
+      pincode: formData.pincode.trim(),
+      address: `${formData.address1.trim()}${formData.address2 ? ", " + formData.address2.trim() : ""}`,
+      licenseNo: formData.licenseNo.trim(),
       licExpDate: formData.licExpDate,
       trackingSource: formData.trackingSource,
     };
 
     try {
       await axiosInstance.post("/vendor/createDriver", payload);
-      showToast("Driver created successfully!", "success");
+      showToast("Driver created successfully.", "success");
 
       setFormData({
         name: "",
@@ -871,11 +872,20 @@ const AddDriverForm: React.FC = () => {
 
       setTimeout(() => navigate("/drivers/list"), 1000);
     } catch (error: any) {
-      if (error.response && error.response.data) {
-        showToast(error.response.data.message || "An error occurred while adding driver.", "error");
-      } else {
-        showToast("Network error. Please try again.", "error");
+      const fieldErrors = extractFieldErrors(error);
+      if (Object.keys(fieldErrors).length > 0) {
+        const mapped: FormErrors = {};
+        if (fieldErrors.phno) mapped.phone = fieldErrors.phno;
+        if (fieldErrors.phone) mapped.phone = fieldErrors.phone;
+        if (fieldErrors.driverEmail) mapped.email = fieldErrors.driverEmail;
+        if (fieldErrors.email) mapped.email = fieldErrors.email;
+        if (fieldErrors.driverName) mapped.name = fieldErrors.driverName;
+        if (fieldErrors.name) mapped.name = fieldErrors.name;
+        if (fieldErrors.licenseNo) mapped.licenseNo = fieldErrors.licenseNo;
+        setErrors((prev) => ({ ...prev, ...mapped }));
       }
+      const msg = extractApiErrorMessage(error, "Failed to create driver. Please try again.");
+      showToast(msg, "error");
     } finally {
       isSubmittingRef.current = false;
       setSubmitting(false);

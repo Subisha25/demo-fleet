@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import axiosInstance from "../../../utils/axiosInstance";
 import { useAuth } from "../../../context/AuthContext";
 import { showToast, AlertContainer } from "../../../components/AlertBox";
+import { validateEmail, extractApiErrorMessage } from "../../../utils/validation";
 import UserLoginHeader from "./userloginheader";
 import Footer from "../../../components/Homepage/Footer";
 import { Eye, EyeOff, Mail, Lock, Building2 } from "lucide-react";
@@ -99,10 +100,13 @@ const UserLogin: React.FC = () => {
   /* ===== Login Validation ===== */
   const validate = () => {
     const err: any = {};
-    if (!email.trim()) err.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(email)) err.email = "Enter valid email";
-    if (!password.trim()) err.password = "Password is required";
+    const emailRes = validateEmail(email);
+    if (!emailRes.valid) err.email = emailRes.error;
+    if (!password.trim()) err.password = "Please enter your password.";
     setErrors(err);
+    if (Object.keys(err).length > 0) {
+      showToast(Object.values(err)[0] as string, "warn");
+    }
     return Object.keys(err).length === 0;
   };
 
@@ -173,9 +177,11 @@ const UserLogin: React.FC = () => {
 
     showToast("Login successful", "success");
   } catch (err: any) {
+    const errorMsg = extractApiErrorMessage(err, "Invalid email or password.");
     setErrors({
-      server: err?.response?.data?.message || "Login failed",
+      server: errorMsg,
     });
+    showToast(errorMsg, "error");
   } finally {
     isSubmittingRef.current = false;
     setSubmitting(false);

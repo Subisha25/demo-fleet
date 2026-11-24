@@ -140,6 +140,13 @@ import InputBox from '../../../../components/InputBox';
 import { showToast, AlertContainer } from '../../../../components/AlertBox';
 import axiosInstance from '../../../../utils/axiosInstance';
 import { useNavigate } from 'react-router-dom';
+import {
+  validateRequired,
+  validateInteger,
+  validatePositiveNumber,
+  extractApiErrorMessage,
+  extractFieldErrors,
+} from '../../../../utils/validation';
 
 const AddVehicleType: React.FC = () => {
   const navigate = useNavigate();
@@ -160,21 +167,31 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
   e.preventDefault();
 
   const newErrors: typeof errors = {};
-  if (!vehicleType.trim()) newErrors.vehicleType = "Vehicle Type is required";
-  if (!seatCapacity.trim()) newErrors.seatCapacity = "Seat Capacity is required";
-  if (!priorMinutes.trim())
-    newErrors.priorMinutes = "Advance Booking Hours is required";
+  const typeCheck = validateRequired(vehicleType, "Vehicle type", 2);
+  if (!typeCheck.valid) newErrors.vehicleType = typeCheck.error || "Vehicle type is required.";
+
+  const seatCheck = validateInteger(seatCapacity, "Seat capacity", 1);
+  if (!seatCheck.valid) newErrors.seatCapacity = seatCheck.error || "Please enter a valid seat capacity.";
+
+  if (priorMinutes && priorMinutes.trim()) {
+    const priorCheck = validatePositiveNumber(priorMinutes, "Advance booking hours", true);
+    if (!priorCheck.valid) newErrors.priorMinutes = priorCheck.error || "Please enter a valid advance booking hour value.";
+  }
 
   setErrors(newErrors);
-  if (Object.keys(newErrors).length !== 0) return;
+  if (Object.keys(newErrors).length !== 0) {
+    const firstError = Object.values(newErrors)[0];
+    showToast(firstError, "warn");
+    return;
+  }
 
   try {
     setLoading(true);
 
     const formData = new FormData();
-    formData.append("vehicleType", vehicleType);
-    formData.append("seatCapacity", seatCapacity);
-    formData.append("priorMinutes", priorMinutes);
+    formData.append("vehicleType", vehicleType.trim());
+    formData.append("seatCapacity", seatCapacity.trim());
+    formData.append("priorMinutes", priorMinutes.trim() || "0");
 
     vehicleImages.forEach((file) => {
       formData.append("vehicleImg", file); // 🔥 same name as backend
@@ -188,15 +205,17 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
       }
     );
 
-    if (res.status === 201) {
-      showToast("Vehicle Type added successfully!", "success");
+    if (res.status === 201 || res.status === 200) {
+      showToast("Vehicle type added successfully.", "success");
       navigate("/vehicle/vehicletype/list");
     }
   } catch (err: any) {
-    showToast(
-      err.response?.data?.message || "Something went wrong",
-      "error"
-    );
+    const fieldErrors = extractFieldErrors(err);
+    if (Object.keys(fieldErrors).length > 0) {
+      setErrors((prev) => ({ ...prev, ...fieldErrors }));
+    }
+    const msg = extractApiErrorMessage(err, "Failed to create vehicle type. Please try again.");
+    showToast(msg, "error");
   } finally {
     setLoading(false);
   }

@@ -4,6 +4,7 @@ import { USERS } from "../utils/costants";
 import { Op } from 'sequelize';
 import { assertTenantOwnership, isTenantError } from '../utils/tenantGuard';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
+import { handleDatabaseError, validateRequired } from '../utils/validationUtils';
 const { ROLES } = USERS;
 
 // Helper to get tenant condition for queries
@@ -24,6 +25,10 @@ export const createPaymentMode = async (req: any, res: Response) => {
   const { modelname, sortorder, isOnline, isActive } = req.body;
   
   try {
+    const nameCheck = validateRequired(modelname, 'Payment mode name', 2);
+    if (!nameCheck.valid) {
+      return res.status(400).json({ success: false, message: nameCheck.error, field: 'modelname' });
+    }
     const role = req.role;
     if (role === ROLES.USER) {
       return res.status(403).json({ message: 'Not Authorized' });
@@ -55,10 +60,7 @@ export const createPaymentMode = async (req: any, res: Response) => {
     if (isTenantError(err)) {
       return res.status(403).json({ message: err.message });
     }
-    res.status(500).json({
-      message: 'Error creating Payment mode',
-      error: err.message,
-    });
+    return handleDatabaseError(err, res, 'Failed to create payment mode.');
   }
 };
 
@@ -157,10 +159,7 @@ export const updatePaymentMode = async (req: any, res: Response) => {
     if (isTenantError(err)) {
       return res.status(403).json({ message: err.message });
     }
-    res.status(500).json({ 
-      message: 'Error updating Payment modes',
-      error: err.message,
-    });
+    return handleDatabaseError(err, res, 'Failed to update payment mode.');
   }
 };
 

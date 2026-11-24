@@ -278,6 +278,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { AlertContainer, showToast } from "../../../../components/AlertBox";
 import axiosInstance from "../../../../utils/axiosInstance";
+import { extractApiErrorMessage } from "../../../../utils/validation";
 
 import {
   Country,
@@ -399,9 +400,9 @@ const AddPickupCity: React.FC = () => {
       setStates([]);
 
       navigate("/master/pickupcity/list");
-    } catch (error) {
+    } catch (error: any) {
       showToast(
-        "Pickup city could not be added. This name may already exist.",
+        extractApiErrorMessage(error, "Pickup city could not be added. Please try again."),
         "error"
       );
     }

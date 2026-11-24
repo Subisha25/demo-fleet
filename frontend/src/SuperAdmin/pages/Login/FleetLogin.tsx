@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, Shield, MapPin, AlertCircle, ArrowLeft, Building2 } from 'lucide-react';
 import axiosInstance from '../../../utils/axiosInstance';
 import { useAuth } from '../../../context/AuthContext';
+import { validateEmail, extractApiErrorMessage } from '../../../utils/validation';
+import { showToast, AlertContainer } from '../../../components/AlertBox';
 import config from '../../../config/config';
 
 interface FleetPublicProfile {
@@ -84,17 +86,14 @@ export default function FleetLogin() {
 
   const validate = () => {
     const errors: { email?: string; password?: string } = {};
-    if (!email.trim()) {
-      errors.email = 'Email address is required.';
-    } else if (!/\S+@\S+\.\S+/.test(email.trim())) {
-      errors.email = 'Please enter a valid email address.';
-    }
-
-    if (!password.trim()) {
-      errors.password = 'Password is required.';
-    }
+    const emailRes = validateEmail(email);
+    if (!emailRes.valid) errors.email = emailRes.error;
+    if (!password.trim()) errors.password = 'Please enter your password.';
 
     setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      showToast(Object.values(errors)[0] as string, "warn");
+    }
     return Object.keys(errors).length === 0;
   };
 
@@ -149,8 +148,9 @@ export default function FleetLogin() {
         setErrorMessage(res.data?.message || 'Login failed. Please verify your credentials.');
       }
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Authentication failed. Please verify your email and password.';
+      const msg = extractApiErrorMessage(err, 'Invalid email or password.');
       setErrorMessage(msg);
+      showToast(msg, 'error');
     } finally {
       isSubmittingRef.current = false;
       setSubmitting(false);
@@ -401,6 +401,7 @@ export default function FleetLogin() {
           Powered by CABZ &bull; All Rights Reserved
         </div>
       </footer>
+      <AlertContainer />
     </div>
   );
 }

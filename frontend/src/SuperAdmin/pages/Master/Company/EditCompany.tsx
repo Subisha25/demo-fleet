@@ -7,10 +7,18 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBuilding,
   faChain,
+  faCircleExclamation,
 } from "@fortawesome/free-solid-svg-icons";
 import { showToast } from "../../../../components/AlertBox";
 import axiosInstance from "../../../../utils/axiosInstance";
 import config from "../../../../config/config";
+import {
+  validateName,
+  validateRequired,
+  validateGstin,
+  extractApiErrorMessage,
+  extractFieldErrors,
+} from "../../../../utils/validation";
 
 interface DayBookingRule {
   day: string;
@@ -71,6 +79,7 @@ export default function EditCompany() {
 
   const [submitting, setSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Handle logo change
 const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,6 +104,14 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 ) => {
   const { name, value, type } = e.target;
   const checked = e.target instanceof HTMLInputElement ? e.target.checked : false;
+
+  if (formErrors[name]) {
+    setFormErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[name];
+      return copy;
+    });
+  }
 
   setCompanyForm((prev) => ({
     ...prev,
@@ -156,29 +173,46 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
     if (isSubmittingRef.current || submitting) return;
 
-    if (!companyForm.companyName) {
-      showToast("Company Name is required", "warn");
+    const newErrors: Record<string, string> = {};
+
+    const nameCheck = validateName(companyForm.companyName, "Company name", 2);
+    if (!nameCheck.valid) {
+      newErrors.companyName = nameCheck.error || "Please enter the company name.";
+    }
+
+    const codeCheck = validateRequired(companyForm.companyCode, "Company code", 2);
+    if (!codeCheck.valid) {
+      newErrors.companyCode = codeCheck.error || "Please enter the company code.";
+    }
+
+    if (companyForm.gstNo && String(companyForm.gstNo).trim() !== "") {
+      const gstCheck = validateGstin(companyForm.gstNo);
+      if (!gstCheck.valid) {
+        newErrors.gstNo = "Please enter a valid GST number.";
+      }
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setFormErrors(newErrors);
+      const firstError = Object.values(newErrors)[0];
+      showToast(firstError, "warn");
       return;
     }
 
-    if (!companyForm.companyCode || !companyForm.companyCode.trim()) {
-      showToast("Company Code is required", "warn");
-      return;
-    }
-
+    setFormErrors({});
     isSubmittingRef.current = true;
     setSubmitting(true);
 
     try {
       const formData = new FormData();
-      formData.append("companyName", companyForm.companyName);
+      formData.append("companyName", companyForm.companyName.trim());
       formData.append("seoUrl", companyForm.seoUrl);
       formData.append("domainName", companyForm.domainName);
       formData.append("companyAddress", companyForm.companyAddress); // ✅ ADD
       formData.append("allowTax", companyForm.allowTax ? "Yes" : "No");
       formData.append("needEmail", "true");
       formData.append("managerApproval", "false");
-      formData.append("gstNo", companyForm.gstNo);
+      formData.append("gstNo", companyForm.gstNo.trim());
       formData.append("startTime", companyForm.startTime);
       formData.append("closeTime", companyForm.endTime);
       formData.append("priorMinutes", companyForm.priorMinutes);
@@ -194,10 +228,15 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      showToast("Company updated successfully!", "success");
+      showToast("Company updated successfully.", "success");
       navigate("/master/company/list");
     } catch (error: any) {
-      showToast(error.response?.data?.message || "Update failed. Please try again.", "error");
+      const fieldErrors = extractFieldErrors(error);
+      if (Object.keys(fieldErrors).length > 0) {
+        setFormErrors((prev) => ({ ...prev, ...fieldErrors }));
+      }
+      const msg = extractApiErrorMessage(error, "Failed to update company. Please try again.");
+      showToast(msg, "error");
     } finally {
       isSubmittingRef.current = false;
       setSubmitting(false);
@@ -233,16 +272,20 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 ">
               <div className="w-full">
-                <label className="block mb-1 font-medium">Company Name</label>
+                <label className="block mb-1 font-medium">Company Name <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   name="companyName"
                   value={companyForm.companyName}
                   onChange={handleInputChange}
-                  className="w-full border p-2 rounded"
+                  className={`w-full border p-2 rounded outline-none ${formErrors.companyName ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'}`}
                   placeholder="Company Name"
                 />
-                
+                {formErrors.companyName && (
+                  <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                    <FontAwesomeIcon icon={faCircleExclamation} /> {formErrors.companyName}
+                  </p>
+                )}
               </div>
 <div className="w-full">
   <label className="block mb-1 font-medium">
@@ -253,9 +296,14 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     name="companyCode"
     value={companyForm.companyCode}
     onChange={handleInputChange}
-    className="w-full border p-2 rounded"
+    className={`w-full border p-2 rounded outline-none ${formErrors.companyCode ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'}`}
     placeholder="Enter company code"
   />
+  {formErrors.companyCode && (
+    <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+      <FontAwesomeIcon icon={faCircleExclamation} /> {formErrors.companyCode}
+    </p>
+  )}
 </div>
 
               <div className="w-full">
@@ -302,9 +350,14 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     name="gstNo"
     value={companyForm.gstNo}
     onChange={handleInputChange}
-    className="w-full border p-2 rounded"
+    className={`w-full border p-2 rounded outline-none ${formErrors.gstNo ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'}`}
     placeholder="Enter GST Number"
   />
+  {formErrors.gstNo && (
+    <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+      <FontAwesomeIcon icon={faCircleExclamation} /> {formErrors.gstNo}
+    </p>
+  )}
 </div>
 
               <div className="w-full">
