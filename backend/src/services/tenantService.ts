@@ -36,6 +36,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import sequelize from '../config/dbConfig';
 import config from '../config/config';
+import { calculateDemoCallStatus } from '../utils/demoCallUtils';
 
 const WEB_BASE_URL = config.baseurl?.webbaseurl || 'http://localhost:3000';
 
@@ -49,6 +50,25 @@ export const getAllTenants = async (req: Request, res: Response) => {
       include: [{ model: TenantSubscription }],
       order: [['createdAt', 'DESC']],
     });
+
+    // Authoritative lookup of registration requests for Demo Call details & status
+    const allRegs = await TenantRegistrationRequest.findAll({
+      attributes: ['requestId', 'tenantId', 'contactEmail', 'demoCallDate', 'demoCallTime', 'demoCallStatus', 'createdAt', 'reviewedAt'],
+      order: [['createdAt', 'DESC']],
+    });
+    const regByTenantId = new Map<string, any>();
+    const regByEmail = new Map<string, any>();
+    for (const reg of allRegs) {
+      if (reg.tenantId && !regByTenantId.has(reg.tenantId)) {
+        regByTenantId.set(reg.tenantId, reg);
+      }
+      if (reg.contactEmail) {
+        const lowerEmail = reg.contactEmail.trim().toLowerCase();
+        if (!regByEmail.has(lowerEmail)) {
+          regByEmail.set(lowerEmail, reg);
+        }
+      }
+    }
 
     const enrichedTenants = await Promise.all(
       tenants.map(async (t: any) => {
@@ -70,6 +90,9 @@ export const getAllTenants = async (req: Request, res: Response) => {
 
         const plain = t.toJSON();
         const sub = plain.subscription || {};
+
+        const reg = (tenantId && regByTenantId.get(tenantId)) || (plain.contactEmail && regByEmail.get(plain.contactEmail.trim().toLowerCase())) || null;
+        const demoCall = calculateDemoCallStatus(reg?.demoCallDate, reg?.demoCallTime);
 
         const now = new Date();
         const trialStartDate = sub.trialStartDate || sub.currentPeriodStart || plain.createdAt;
@@ -160,6 +183,14 @@ export const getAllTenants = async (req: Request, res: Response) => {
               transactionReference: lastPaidInvoice.transactionReference,
             }
             : null,
+          demoCallDate: demoCall.demoCallDate,
+          demoCallTime: demoCall.demoCallTime,
+          demoCallStatus: demoCall.demoCallStatus,
+          demoCall: {
+            ...demoCall,
+            registrationDate: reg?.createdAt || plain.createdAt,
+            approvalDate: reg?.reviewedAt || plain.createdAt,
+          },
         };
       })
     );
@@ -454,53 +485,39 @@ export const createTenant = async (req: Request, res: Response) => {
       activationUrl = `${WEB_BASE_URL}/activate-account?token=${rawToken}`;
     }
 
-    // Generate Official SaaS Plan Summary Agreement PDF after transaction commits
-    let pdfResult: any = null;
     if (applicantEmail && applicantEmail.includes('@')) {
-      try {
-        pdfResult = await generatePlanSummaryPDF({
-          tenantId,
-          fleetName: newTenant.name,
-          businessCode: cleanCode,
-          ownerName: adminDisplayName,
-          contactEmail: applicantEmail,
-          planName: plan?.name || `${normalizedTier} Mobility Plan`,
-          planTier: normalizedTier,
-          billingCycle: cleanBillingCycle,
-          agreedPrice,
-          currency: 'INR',
-          startDate: new Date(),
-          renewalDate: periodEnd,
-          quotas: {
-            vehicles: limits.vehicles,
-            drivers: limits.drivers,
-            companies: limits.companies,
-            trips: limits.trips,
-          },
-          features: plan?.features || [],
-        });
-      } catch (pdfErr) {
-        console.warn('[ProvisionTenant] Plan Summary PDF generation note:', pdfErr);
-      }
-
       const fleetLoginUrl = getFleetLoginUrl(slug || newTenant.slug || code.toLowerCase());
-      const downloadPdfUrl = pdfResult?.downloadToken
-        ? `${WEB_BASE_URL}/api/tenants/public/plans/download/${pdfResult.downloadToken}`
-        : undefined;
+      const now = new Date();
+      const trialEndsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const formattedStart = now.toLocaleString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true,
+      });
+      const formattedEnd = trialEndsAt.toLocaleString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true,
+      });
 
       await sendNotification({
         channel: 'EMAIL',
         recipient: applicantEmail,
         templateCode: 'TENANT_ADMIN_ACTIVATION_LINK',
-        subject: `🎉 Congratulations! Your CABZ Account is Approved: ${newTenant.name}`,
-        body: `Dear ${adminDisplayName},\n\nYour fleet operator account for ${newTenant.name} on CABZ Mobility Platform has been approved and provisioned.\n\n` +
+        subject: `CABZ – Your Fleet Registration Is Approved | 7-Day Free Trial Activated`,
+        body: `Dear ${adminDisplayName},\n\n` +
+          `Congratulations! Your fleet account for ${newTenant.name} has been provisioned on CABZ Mobility Platform with an active 7-Day Free Trial.\n\n` +
+          `7-DAY FREE TRIAL DETAILS:\n` +
+          `• Trial Status: FREE TRIAL ACTIVE\n` +
+          `• Start Date & Time: ${formattedStart}\n` +
+          `• Duration: 7 Days\n` +
+          `• End Date & Time: ${formattedEnd}\n` +
+          `• Validity: Full access to all fleet mobility features\n\n` +
+          `EXPLORE & OPERATE WITHOUT RESTRICTIONS:\n` +
+          `During your 7-day free trial, you can explore and operate all platform features without restriction. You can select a paid plan anytime directly from your dashboard.\n\n` +
           `STEP 1 — ACTIVATE YOUR ACCOUNT:\n` +
           `Click your secure activation link to set your administrator password:\n` +
           `${activationUrl || `${WEB_BASE_URL}/activate-account`}\n\n` +
           `STEP 2 — DEDICATED FLEET LOGIN PORTAL:\n` +
           `Once password is set, log in to your fleet portal at:\n` +
           `${fleetLoginUrl}\n\n` +
-          `Note: This link will expire in 24 hours.\n\nBest regards,\nCABZ SaaS Team`,
+          `Note: This link will expire in 24 hours.\n\nBest regards,\nCABZ SaaS Platform Team`,
         referenceEntity: 'TENANT',
         referenceId: tenantId,
         idempotencyKey: `tenant_activation_${tenantId}`,
@@ -508,14 +525,15 @@ export const createTenant = async (req: Request, res: Response) => {
           tenantId,
           fleetName: newTenant.name,
           ownerName: adminDisplayName,
-          planTier: normalizedTier,
-          billingCycle: cleanBillingCycle,
-          agreedPrice: String(agreedPrice),
+          trialStartDate: formattedStart,
+          trialEndDate: formattedEnd,
+          trialEndsAt: trialEndsAt.toISOString(),
+          trialDurationDays: '7',
+          trialStatus: 'FREE TRIAL ACTIVE',
+          approvalStatus: 'Approved',
           activationUrl,
           loginUrl: fleetLoginUrl,
           fleetLoginUrl,
-          planSummaryPdfUrl: downloadPdfUrl,
-          attachments: pdfResult?.filePath ? [{ filename: pdfResult.fileName, path: pdfResult.filePath }] : undefined,
           actionText: 'Set Up Administrator Password',
         },
       });
@@ -559,7 +577,32 @@ export const getTenantById = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: 'Tenant not found.' });
     }
 
-    return res.status(200).json({ success: true, data: tenant });
+    const reg = await TenantRegistrationRequest.findOne({
+      where: {
+        [Op.or]: [
+          { tenantId },
+          ...(tenant.contactEmail ? [{ contactEmail: tenant.contactEmail }] : []),
+        ],
+      },
+      order: [['createdAt', 'DESC']],
+    });
+    const demoCall = calculateDemoCallStatus(reg?.demoCallDate, reg?.demoCallTime);
+    const plainTenant = tenant.toJSON();
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        ...plainTenant,
+        demoCallDate: demoCall.demoCallDate,
+        demoCallTime: demoCall.demoCallTime,
+        demoCallStatus: demoCall.demoCallStatus,
+        demoCall: {
+          ...demoCall,
+          registrationDate: reg?.createdAt || plainTenant.createdAt,
+          approvalDate: reg?.reviewedAt || plainTenant.createdAt,
+        },
+      },
+    });
   } catch (error) {
     console.error('Error fetching tenant:', error);
     return res.status(500).json({ success: false, message: 'Internal Server Error' });
@@ -1812,6 +1855,17 @@ export const getFleetInspectionProfile = async (req: Request, res: Response) => 
 
     const branding = tenant.brandingTokens || {};
 
+    const reg = await TenantRegistrationRequest.findOne({
+      where: {
+        [Op.or]: [
+          { tenantId },
+          ...(tenant.contactEmail ? [{ contactEmail: tenant.contactEmail }] : []),
+        ],
+      },
+      order: [['createdAt', 'DESC']],
+    });
+    const demoCall = calculateDemoCallStatus(reg?.demoCallDate, reg?.demoCallTime);
+
     return res.status(200).json({
       success: true,
       data: {
@@ -1841,6 +1895,16 @@ export const getFleetInspectionProfile = async (req: Request, res: Response) => 
         state: tenant.state || '',
         pinCode: tenant.pinCode || '',
         createdAt: tenant.createdAt,
+        registrationDate: reg?.createdAt || tenant.createdAt,
+        approvalDate: reg?.reviewedAt || tenant.createdAt,
+        demoCallDate: demoCall.demoCallDate,
+        demoCallTime: demoCall.demoCallTime,
+        demoCallStatus: demoCall.demoCallStatus,
+        demoCall: {
+          ...demoCall,
+          registrationDate: reg?.createdAt || tenant.createdAt,
+          approvalDate: reg?.reviewedAt || tenant.createdAt,
+        },
         subscription: {
           subscriptionId: sub.subscriptionId,
           planTier: sub.planTier,

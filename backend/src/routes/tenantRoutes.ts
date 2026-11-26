@@ -58,6 +58,15 @@ import {
   runLifecycleEvaluation,
   getLifecycleStatus,
 } from '../services/subscriptionLifecycleService';
+import {
+  requestTrialExtension,
+  getTenantTrialExtensionHistory,
+  getSuperAdminTrialExtensionRequests,
+  getSuperAdminTrialManagementOverview,
+  approveTrialExtensionRequest,
+  rejectTrialExtensionRequest,
+  manualExtendTrial,
+} from '../services/trialExtensionService';
 import { authMiddleware, requireSuperAdmin } from '../middleware/authMiddleware';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 
@@ -207,15 +216,33 @@ router.get('/:tenantId/billing-history', authMiddleware, getTenantBillingHistory
 router.get('/:tenantId/subscription-history', authMiddleware, getTenantBillingHistory);
 
 // =============================================================================
-// PLATFORM TENANT MANAGEMENT (SuperAdmin)
+// PLATFORM TENANT MANAGEMENT & FREE TRIAL EXTENSION WORKFLOW (SuperAdmin & Fleet)
 // =============================================================================
+// Fleet Admin Trial Extension Request Endpoints:
+router.post('/trial-extension/request', authMiddleware, requestTrialExtension);
+router.post('/subscription/trial-extension/request', authMiddleware, requestTrialExtension);
+router.get('/trial-extension/history', authMiddleware, getTenantTrialExtensionHistory);
+router.get('/subscription/trial-extension/history', authMiddleware, getTenantTrialExtensionHistory);
+
+// SuperAdmin Free Trial Management & Request Review Endpoints:
+router.get('/admin/trial-management', authMiddleware, requireSuperAdmin, getSuperAdminTrialManagementOverview);
+router.get('/trial-management', authMiddleware, requireSuperAdmin, getSuperAdminTrialManagementOverview);
+router.get('/admin/trial-extensions', authMiddleware, requireSuperAdmin, getSuperAdminTrialExtensionRequests);
+router.get('/trial-extensions', authMiddleware, requireSuperAdmin, getSuperAdminTrialExtensionRequests);
+router.post('/admin/trial-extensions/:requestId/approve', authMiddleware, requireSuperAdmin, approveTrialExtensionRequest);
+router.post('/trial-extensions/:requestId/approve', authMiddleware, requireSuperAdmin, approveTrialExtensionRequest);
+router.post('/admin/trial-extensions/:requestId/reject', authMiddleware, requireSuperAdmin, rejectTrialExtensionRequest);
+router.post('/trial-extensions/:requestId/reject', authMiddleware, requireSuperAdmin, rejectTrialExtensionRequest);
+router.post('/admin/trial-management/:tenantId/extend', authMiddleware, requireSuperAdmin, manualExtendTrial);
+router.post('/trial-management/:tenantId/extend', authMiddleware, requireSuperAdmin, manualExtendTrial);
+
 router.get('/', authMiddleware, requireSuperAdmin, getAllTenants);
 router.post('/', authMiddleware, requireSuperAdmin, createTenant);
 router.get('/:tenantId', authMiddleware, getTenantById);
 router.put('/:tenantId/subscription', authMiddleware, requireSuperAdmin, updateTenantSubscription);
 router.post('/:tenantId/subscription/renew', authMiddleware, requireSuperAdmin, renewTenantSubscription);
-router.post('/:tenantId/extend-trial', authMiddleware, requireSuperAdmin, extendTenantTrial);
-router.post('/admin/tenants/:tenantId/extend-trial', authMiddleware, requireSuperAdmin, extendTenantTrial);
-router.post('/admin/:tenantId/extend-trial', authMiddleware, requireSuperAdmin, extendTenantTrial);
+router.post('/:tenantId/extend-trial', authMiddleware, requireSuperAdmin, manualExtendTrial);
+router.post('/admin/tenants/:tenantId/extend-trial', authMiddleware, requireSuperAdmin, manualExtendTrial);
+router.post('/admin/:tenantId/extend-trial', authMiddleware, requireSuperAdmin, manualExtendTrial);
 
 export default router;

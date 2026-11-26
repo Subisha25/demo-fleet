@@ -790,42 +790,29 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
       }, { transaction: t });
     });
 
-    // 2. Generate Official SaaS Plan Summary Document PDF (after transaction succeeds)
-    let pdfResult: any = null;
-    try {
-      pdfResult = await generatePlanSummaryPDF({
-        tenantId,
-        fleetName: reg.fleetName,
-        businessCode: reg.businessCode,
-        ownerName: reg.ownerName,
-        contactEmail: reg.contactEmail,
-        planName: plan?.name || `${reg.requestedPlanTier} Mobility Plan`,
-        planTier: reg.requestedPlanTier,
-        billingCycle,
-        agreedPrice,
-        currency: 'INR',
-        startDate: approvalNow,
-        renewalDate: trialEndsAt,
-        quotas: {
-          vehicles: limits.vehicles,
-          drivers: limits.drivers,
-          companies: limits.companies,
-          trips: limits.trips,
-        },
-        features: plan?.features || [],
-      });
-    } catch (pdfErr) {
-      console.warn('Notice: PDF generation error handled gracefully:', pdfErr);
-    }
-
-    // 3. Strict Recipient Separation: Dispatch activation & approval email to applicant only
+    // 2. Strict Recipient Separation: Dispatch 7-Day Free Trial activation & approval email to applicant only
     // EVENT 3: SuperAdmin Approves Fleet — sent ONLY to registered applicant / Fleet Admin email
+    // Free Trial details ONLY: No paid plans (BASIC, PRO, ENTERPRISE), No pricing/rates, No billing cycle, No plan summary PDF
     const applicantEmail = reg.contactEmail.trim().toLowerCase();
     const activationUrl = `${WEB_BASE_URL}/activate-account?token=${rawToken}`;
     const fleetLoginUrl = getFleetLoginUrl(tenantSlug);
-    const downloadPdfUrl = pdfResult
-      ? `${config.baseurl?.apibaseurl || 'http://localhost:5000'}/api/tenants/plan-summary/download/${pdfResult.fileName}?token=${pdfResult.downloadToken}`
-      : '';
+
+    const formattedStart = approvalNow.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+    const formattedEnd = trialEndsAt.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
 
     if (!applicantEmail || !EMAIL_REGEX.test(applicantEmail)) {
       console.error('[Approval] Cannot dispatch activation email: missing or invalid contactEmail on request', reg.requestId);
@@ -834,23 +821,23 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
         channel: 'EMAIL',
         recipient: applicantEmail,
         templateCode: 'TENANT_ADMIN_ACTIVATION_LINK',
-        subject: `🎉 Congratulations! Your CABZ Account is Approved: ${reg.fleetName}`,
-        body: `Dear ${reg.ownerName},\n\nYour application for ${reg.fleetName} has been approved!\n\n` +
-          `FREE TRIAL DETAILS:\n` +
-          `• Approval Status: Approved\n` +
-          `• Trial Start Date: ${approvalNow.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}\n` +
-          `• Trial Expiry Date: ${trialEndsAt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}\n` +
-          `• Total Free Trial Duration: 7 Days (Full Operational Access)\n\n` +
-          `PLAN SUMMARY:\n` +
-          `• Plan: ${plan?.name || reg.requestedPlanTier}\n` +
-          `• Agreed Price: ₹${agreedPrice} / ${billingCycle.toLowerCase()}\n` +
-          `• Included Quotas: Up to ${limits.vehicles} Vehicles, ${limits.drivers} Drivers, ${limits.companies} Corporate Accounts\n\n` +
+        subject: `CABZ – Your Fleet Registration Is Approved | 7-Day Free Trial Activated`,
+        body: `Dear ${reg.ownerName},\n\n` +
+          `Congratulations! Your fleet registration application for ${reg.fleetName} has been approved by the platform administrator.\n\n` +
+          `Your 7-day Free Trial is now active with full operational access to all CABZ mobility features!\n\n` +
+          `7-DAY FREE TRIAL DETAILS:\n` +
+          `• Trial Status: FREE TRIAL ACTIVE\n` +
+          `• Start Date & Time: ${formattedStart}\n` +
+          `• Duration: 7 Days\n` +
+          `• End Date & Time: ${formattedEnd}\n` +
+          `• Validity: Full access to all fleet mobility features (vehicles, drivers, companies, bookings & dispatch)\n\n` +
+          `EXPLORE & OPERATE WITHOUT RESTRICTIONS:\n` +
+          `During your 7-day free trial, you can explore and operate all platform features without restriction. You can select and upgrade to a paid subscription plan anytime directly from your dashboard before or at trial expiry.\n\n` +
           `STEP 1 — ACTIVATE YOUR ACCOUNT:\n` +
           `Click the secure activation link below to set your administrator password:\n${activationUrl}\n` +
           `(Note: This link will expire in 24 hours. Never share this link with anyone.)\n\n` +
           `STEP 2 — DEDICATED FLEET LOGIN PORTAL:\n` +
           `Access your branded fleet operator dashboard at your unique URL:\n${fleetLoginUrl}\n\n` +
-          (downloadPdfUrl ? `STEP 3 — DOWNLOAD PLAN SUMMARY PDF:\nView and download your official subscription agreement: ${downloadPdfUrl}\n\n` : '') +
           `Best regards,\nCABZ SaaS Platform Team`,
         referenceEntity: 'TENANT',
         referenceId: tenantId,
@@ -858,18 +845,15 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
           tenantId,
           fleetName: reg.fleetName,
           ownerName: reg.ownerName,
-          planTier: reg.requestedPlanTier,
-          billingCycle,
-          agreedPrice: String(agreedPrice),
-          trialStartDate: approvalNow.toISOString(),
+          trialStartDate: formattedStart,
+          trialEndDate: formattedEnd,
           trialEndsAt: trialEndsAt.toISOString(),
           trialDurationDays: '7',
+          trialStatus: 'FREE TRIAL ACTIVE',
           approvalStatus: 'Approved',
           activationUrl,
           loginUrl: fleetLoginUrl,
           fleetLoginUrl,
-          planSummaryPdfUrl: downloadPdfUrl,
-          attachments: pdfResult?.filePath ? [{ filename: pdfResult.fileName, path: pdfResult.filePath }] : undefined,
           actionText: 'Set Up Administrator Password',
         },
       });
@@ -877,20 +861,16 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
 
     return res.status(200).json({
       success: true,
-      message: 'Application approved successfully, plan summary generated, and activation link dispatched.',
+      message: 'Application approved successfully, 7-day free trial activated, and activation link dispatched.',
       tenantId,
-      planSummaryPdfPath: pdfResult?.filePath,
-      planSummaryPdfUrl: downloadPdfUrl,
       data: {
         tenantId,
-        fleetName: tenant!.name,
-        code: tenant!.code,
-        rawToken, // Provided in development for automated verification
+        fleetName: reg.fleetName,
+        tenantSlug,
         activationUrl,
-        loginUrl: fleetLoginUrl,
         fleetLoginUrl,
-        planSummaryPdfUrl: downloadPdfUrl,
-        planSummaryPdfPath: pdfResult?.filePath,
+        trialEndsAt,
+        status: 'APPROVED',
       },
     });
   } catch (error: any) {

@@ -57,6 +57,21 @@ interface InspectionData {
   state?: string;
   pinCode?: string;
   createdAt: string;
+  registrationDate?: string;
+  approvalDate?: string;
+  demoCallDate?: string | null;
+  demoCallTime?: string | null;
+  demoCallStatus?: 'ACTIVE' | 'INACTIVE' | 'NOT SCHEDULED';
+  demoCall?: {
+    demoCallDate: string | null;
+    demoCallTime: string | null;
+    demoCallStatus: 'ACTIVE' | 'INACTIVE' | 'NOT SCHEDULED';
+    appointmentIso: string | null;
+    formattedAppointment: string | null;
+    isUpcoming: boolean;
+    registrationDate?: string | null;
+    approvalDate?: string | null;
+  };
   subscription: {
     subscriptionId?: string;
     planTier: string;
@@ -561,6 +576,89 @@ const FleetInspection: React.FC = () => {
       {/* TAB 1: OVERVIEW */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          {/* Dedicated Demo Call Details Card */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700">
+                  <FontAwesomeIcon icon={faCalendarAlt} className="text-sm" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider">
+                    Demo Call Details
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Preferred onboarding consultation & demo appointment schedule
+                  </p>
+                </div>
+              </div>
+              <div>
+                {(() => {
+                  const status = data.demoCallStatus || data.demoCall?.demoCallStatus || 'NOT SCHEDULED';
+                  if (status === 'ACTIVE') {
+                    return (
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 tracking-wider shadow-sm">
+                        <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                        ACTIVE
+                      </span>
+                    );
+                  }
+                  if (status === 'INACTIVE') {
+                    return (
+                      <span className="inline-flex items-center text-[11px] font-extrabold uppercase px-3 py-1 rounded-full bg-gray-100 text-gray-700 border border-gray-300 tracking-wider">
+                        INACTIVE
+                      </span>
+                    );
+                  }
+                  return (
+                    <span className="inline-flex items-center text-[11px] font-bold uppercase px-3 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200 tracking-wider">
+                      NOT SCHEDULED
+                    </span>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5 text-xs">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Demo Call Status</span>
+                <span className="font-extrabold text-slate-900 mt-1 block">
+                  {data.demoCallStatus || data.demoCall?.demoCallStatus || 'NOT SCHEDULED'}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Preferred Demo Call Date</span>
+                <span className="font-bold text-slate-900 mt-1 block">
+                  {data.demoCall?.demoCallDate || data.demoCallDate || 'Not Scheduled'}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Preferred Demo Call Time</span>
+                <span className="font-bold text-slate-900 mt-1 block">
+                  {data.demoCall?.demoCallTime || data.demoCallTime || 'Not Specified'}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Appointment Date & Time</span>
+                <span className="font-bold text-slate-900 mt-1 block">
+                  {data.demoCall?.formattedAppointment || (data.demoCallDate && data.demoCallTime ? `${data.demoCallDate} at ${data.demoCallTime}` : '—')}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Registration Date</span>
+                <span className="font-bold text-slate-900 mt-1 block">
+                  {formatDate(data.demoCall?.registrationDate || data.registrationDate || data.createdAt)}
+                </span>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Fleet Approval Date</span>
+                <span className="font-bold text-slate-900 mt-1 block">
+                  {formatDate(data.demoCall?.approvalDate || data.approvalDate || data.createdAt)}
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* Fleet Verified Business Identity Card */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
             <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">

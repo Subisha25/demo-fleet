@@ -20,6 +20,7 @@ import SubscriptionCheckout from './SuperAdmin/pages/Billing/SubscriptionCheckou
 import FleetInspection from './SuperAdmin/pages/Tenants/FleetInspection';
 import PlanManagement from './SuperAdmin/pages/Tenants/PlanManagement';
 import TenantBillingHistory from './SuperAdmin/pages/Tenants/TenantBillingHistory';
+import FreeTrialManagement from './SuperAdmin/pages/Tenants/FreeTrialManagement';
 
 // SaaS Subscriptions & Billing
 import CurrentPlan from './SuperAdmin/pages/Billing/CurrentPlan';
@@ -301,6 +302,7 @@ const Layout = () => {
         taxAmount={lockModalDetail.taxAmount}
         periodEnd={lockModalDetail.periodEnd}
         message={lockModalDetail.message}
+        trialDetails={lockModalDetail.trialDetails}
         onPaymentSuccess={() => {
           setLockModalOpen(false);
           window.location.reload();
@@ -379,6 +381,10 @@ const Layout = () => {
           <Route path="/tenants/billing-history/:tenantId" element={<SuperAdminRoute><TenantBillingHistory /></SuperAdminRoute>} />
           <Route path="/tenants/registrations" element={<SuperAdminRoute><RegistrationsQueue /></SuperAdminRoute>} />
           <Route path="/admin/registrations" element={<SuperAdminRoute><RegistrationsQueue /></SuperAdminRoute>} />
+          <Route path="/tenants/trial-management" element={<SuperAdminRoute><FreeTrialManagement /></SuperAdminRoute>} />
+          <Route path="/admin/trial-management" element={<SuperAdminRoute><FreeTrialManagement /></SuperAdminRoute>} />
+          <Route path="/tenants/trial-extensions" element={<SuperAdminRoute><FreeTrialManagement /></SuperAdminRoute>} />
+          <Route path="/admin/trial-extensions" element={<SuperAdminRoute><FreeTrialManagement /></SuperAdminRoute>} />
           <Route path="/admin/billing" element={<SuperAdminRoute><SubscriptionCheckout /></SuperAdminRoute>} />
           <Route path="/admin/billing/reports" element={<SuperAdminRoute><SuperAdminSubscriptionReports /></SuperAdminRoute>} />
           <Route path="/admin/notifications/audit" element={<SuperAdminRoute><NotificationAuditLogs /></SuperAdminRoute>} />

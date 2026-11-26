@@ -53,6 +53,19 @@ interface EnrichedTenant extends TenantInfo {
     invoiceNumber: string | null;
     transactionReference: string | null;
   } | null;
+  demoCallDate?: string | null;
+  demoCallTime?: string | null;
+  demoCallStatus?: 'ACTIVE' | 'INACTIVE' | 'NOT SCHEDULED';
+  demoCall?: {
+    demoCallDate: string | null;
+    demoCallTime: string | null;
+    demoCallStatus: 'ACTIVE' | 'INACTIVE' | 'NOT SCHEDULED';
+    appointmentIso: string | null;
+    formattedAppointment: string | null;
+    isUpcoming: boolean;
+    registrationDate?: string | null;
+    approvalDate?: string | null;
+  };
 }
 
 const TenantList: React.FC = () => {
@@ -283,6 +296,59 @@ const TenantList: React.FC = () => {
           {tenant.status}
         </span>
       ),
+    },
+    {
+      header: 'Demo Call Date',
+      accessor: 'demoCallDate',
+      render: (tenant: EnrichedTenant) => {
+        const date = tenant.demoCallDate || tenant.demoCall?.demoCallDate;
+        return (
+          <div className="text-xs font-semibold text-slate-800 flex items-center gap-1.5 whitespace-nowrap">
+            <FontAwesomeIcon icon={faCalendarAlt} className="text-slate-400 text-[11px]" />
+            <span>{date || 'Not Scheduled'}</span>
+          </div>
+        );
+      },
+    },
+    {
+      header: 'Demo Call Time',
+      accessor: 'demoCallTime',
+      render: (tenant: EnrichedTenant) => {
+        const time = tenant.demoCallTime || tenant.demoCall?.demoCallTime;
+        return (
+          <div className="text-xs font-semibold text-slate-800 flex items-center gap-1.5 whitespace-nowrap">
+            <FontAwesomeIcon icon={faClock} className="text-slate-400 text-[11px]" />
+            <span>{time || '—'}</span>
+          </div>
+        );
+      },
+    },
+    {
+      header: 'Demo Call Status',
+      accessor: 'demoCallStatus',
+      render: (tenant: EnrichedTenant) => {
+        const status = tenant.demoCallStatus || tenant.demoCall?.demoCallStatus || 'NOT SCHEDULED';
+        if (status === 'ACTIVE') {
+          return (
+            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 tracking-wider shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+              ACTIVE
+            </span>
+          );
+        }
+        if (status === 'INACTIVE') {
+          return (
+            <span className="inline-flex items-center text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-300 tracking-wider">
+              INACTIVE
+            </span>
+          );
+        }
+        return (
+          <span className="inline-flex items-center text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 tracking-wider">
+            NOT SCHEDULED
+          </span>
+        );
+      },
     },
     {
       header: 'Resource Usage (Used / Quota)',

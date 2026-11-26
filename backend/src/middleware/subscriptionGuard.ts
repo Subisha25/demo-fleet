@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 import { TenantSubscription } from '../models/tenantSubscription';
 import { SubscriptionInvoice } from '../models/subscriptionInvoice';
+import { TrialExtensionRequest } from '../models/trialExtensionRequest';
 import { PLAN_CATALOG, getOrCreateSubscription } from '../services/quotaService';
 
 export interface SubscriptionLockEvaluation {
@@ -27,6 +28,8 @@ export interface SubscriptionLockEvaluation {
     remainingDays: number;
     remainingMs: number;
     trialExtensionHistory?: any[];
+    latestExtensionRequest?: any;
+    pendingExtensionRequest?: any;
     isDemo?: boolean;
   };
 }
@@ -136,6 +139,16 @@ export async function evaluateTenantSubscriptionLock(
     const remainingMs = trialEnd ? Math.max(0, trialEnd.getTime() - now.getTime()) : 0;
     const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
 
+    let latestExtensionRequest: any = null;
+    try {
+      latestExtensionRequest = await TrialExtensionRequest.findOne({
+        where: { tenantId },
+        order: [['requestedAt', 'DESC']],
+      });
+    } catch (e) {
+      // Non-fatal
+    }
+
     const trialDetails = {
       trialStatus: isTrialValid ? 'TRIAL_ACTIVE' : 'TRIAL_EXPIRED',
       originalTrialDays,
@@ -147,6 +160,21 @@ export async function evaluateTenantSubscriptionLock(
       remainingDays,
       remainingMs,
       trialExtensionHistory: sub.trialExtensionHistory || [],
+      latestExtensionRequest: latestExtensionRequest ? {
+        requestId: latestExtensionRequest.requestId,
+        requestedDays: latestExtensionRequest.requestedDays,
+        approvedDays: latestExtensionRequest.approvedDays,
+        status: latestExtensionRequest.status,
+        reason: latestExtensionRequest.reason,
+        adminNotes: latestExtensionRequest.adminNotes,
+        requestedAt: latestExtensionRequest.requestedAt,
+        reviewedAt: latestExtensionRequest.reviewedAt,
+      } : null,
+      pendingExtensionRequest: latestExtensionRequest?.status === 'PENDING' ? {
+        requestId: latestExtensionRequest.requestId,
+        requestedDays: latestExtensionRequest.requestedDays,
+        requestedAt: latestExtensionRequest.requestedAt,
+      } : null,
     };
 
     if (isTrialValid) {

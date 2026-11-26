@@ -42,6 +42,7 @@ import { NotificationLog } from './notificationLog';
 import { SaaSPlan } from './saasPlan';
 import { SmsTemplate } from './smsTemplate';
 import { TenantSmsConfig } from './tenantSmsConfig';
+import { TrialExtensionRequest } from './trialExtensionRequest';
 import { encryptSmsApiKey, maskApiKey } from '../utils/cryptoUtils';
 
 const connectDB = async () => {
@@ -58,6 +59,7 @@ const connectDB = async () => {
     await NotificationLog.sync();
     try { await SaaSPlan.sync(); } catch (pErr) {}
     try { await TenantSmsConfig.sync(); } catch (smsErr) {}
+    try { await TrialExtensionRequest.sync(); } catch (extErr) {}
 
     // Seed canonical SaaS plans if saas_plans is empty
     try {
@@ -252,6 +254,6 @@ export { sequelize, connectDB, Employee, Company, Drivers,Vehicle,Vendor,User, B
   ClosePending, BookingSequence, PaymentSequence, InvoiceSequence, ShortLink, MonthlyBookingSequence, MapCount, OnCallInvoice,
   OnCallInvoiceItems, MonthlyInvoice, MonthlyInvoiceItems, Tenant, TenantSubscription, TenantUsageMeter,
   TenantRegistrationRequest, TenantActivationToken, TenantInitialAllowance, SubscriptionInvoice, NotificationLog, SaaSPlan, SmsTemplate,
-  TenantSmsConfig
+  TenantSmsConfig, TrialExtensionRequest
 };
 

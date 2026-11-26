@@ -114,6 +114,7 @@ app.use('/uploads/profileImg', express.static(path.join(process.cwd(), 'uploads'
 app.use('/api/public/booking', publicBookingRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/tenants', tenantRoutes);
+app.use('/api/subscriptions', tenantRoutes);
 app.use('/api/public', tenantRoutes);
 app.use('/api/admin', tenantRoutes);
 app.use('/api/emp', requireSubscriptionAccess, empRoutes);

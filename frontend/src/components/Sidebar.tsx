@@ -39,6 +39,7 @@ const menu: MenuItem[] = [
     children: [
       { label: 'Fleet Operators', path: '/tenants/list', icon: faList },
       { label: 'Registration Queue', path: '/tenants/registrations', icon: faClipboardCheck },
+      { label: 'Free Trial Management', path: '/tenants/trial-management', icon: faCalendarCheck },
       { label: 'SaaS Plans', path: '/tenants/plans', icon: faCrown },
       { label: 'Provision Tenant', path: '/tenants/add', icon: faPlus },
       { label: 'Subscription & Billing', path: '/admin/billing', icon: faReceipt },
@@ -229,7 +230,12 @@ const Sidebar: React.FC = () => {
   const tenantName = localStorage.getItem('tenantName') || 'CABZ Operator';
 
   const isPlatformSuperAdmin = isSuperAdmin && !isInspecting;
-  const fleetName = currentTenant?.displayName || currentTenant?.name || tenantName || 'Fleet Mobility';
+  const rawFleetName = currentTenant?.displayName || currentTenant?.name || tenantName || localStorage.getItem('fleetName') || localStorage.getItem('username') || '';
+  const fleetName = isPlatformSuperAdmin
+    ? 'CABZ SaaS Platform'
+    : (rawFleetName && rawFleetName !== 'CABZ Primary'
+        ? rawFleetName
+        : (localStorage.getItem('fleetName') || localStorage.getItem('username') || 'Fleet Mobility'));
   const fleetLogo = currentTenant?.brandingTokens?.logoUrl || currentTenant?.logoUrl;
 
   const getFleetInitials = (name?: string, code?: string) => {
@@ -363,9 +369,23 @@ const Sidebar: React.FC = () => {
             <span className="text-xs font-semibold text-gray-200 truncate max-w-[150px]">
               {isPlatformSuperAdmin ? 'CABZ SaaS Platform' : fleetName}
             </span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-950/70 text-purple-300 border border-purple-700/50 uppercase tracking-wider">
-              {isPlatformSuperAdmin ? 'Platform Admin' : `${currentTenant?.planTier || 'PRO'} Plan`}
-            </span>
+            {isPlatformSuperAdmin ? (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-950/70 text-purple-300 border border-purple-700/50 uppercase tracking-wider">
+                Platform Admin
+              </span>
+            ) : currentTenant?.subscription?.status === 'ACTIVE' ? (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-950/70 text-purple-300 border border-purple-700/50 uppercase tracking-wider">
+                {`${currentTenant?.planTier || 'PRO'} Plan`}
+              </span>
+            ) : currentTenant?.subscription?.status === 'PAST_DUE' ? (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-950/70 text-rose-300 border border-rose-700/50 uppercase tracking-wider">
+                Trial Expired
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-950/70 text-blue-300 border border-blue-700/50 uppercase tracking-wider">
+                Free Trial
+              </span>
+            )}
           </div>
         )}
         {!collapsed && isInspecting && (

@@ -134,9 +134,47 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return localStorage.getItem('selectedTenantId') || 'all';
   });
 
-  const [currentTenant, setCurrentTenant] = useState<TenantInfo | null>(
-    isDemo ? DEMO_TENANT : (selectedFleet === 'all' ? ALL_FLEETS_TENANT : DEFAULT_ROOT_TENANT)
-  );
+  const [currentTenant, setCurrentTenant] = useState<TenantInfo | null>(() => {
+    if (isDemo) return DEMO_TENANT;
+    if (isSuperAdmin) {
+      return selectedFleet === 'all' ? ALL_FLEETS_TENANT : DEFAULT_ROOT_TENANT;
+    }
+    const savedName = localStorage.getItem('fleetName') || localStorage.getItem('tenantName');
+    const savedUserStr = localStorage.getItem('user');
+    let userFleetName = savedName;
+    if (!userFleetName && savedUserStr) {
+      try {
+        const u = JSON.parse(savedUserStr);
+        if (u.username && u.username !== 'SuperAdmin' && u.username !== 'CABZ Primary') {
+          userFleetName = u.username;
+        }
+      } catch {}
+    }
+    const tenantId = localStorage.getItem('tenantId') || 'e7b8a1c0-0000-0000-0000-000000000001';
+    return {
+      tenantId,
+      name: userFleetName || 'My Fleet',
+      displayName: userFleetName || 'My Fleet',
+      code: 'FL',
+      subdomain: '',
+      status: 'ACTIVE',
+      planTier: 'PRO',
+      brandingTokens: {
+        primaryColor: '#7C3AED',
+        secondaryColor: '#0B0B0F',
+        portalTitle: userFleetName || 'Fleet Operations Portal',
+      },
+      subscription: {
+        planTier: 'PRO',
+        status: 'TRIALING',
+        vehicleQuota: 75,
+        driverQuota: 75,
+        companyQuota: 20,
+        monthlyTripQuota: 2500,
+        allowOverage: false,
+      },
+    };
+  });
   const [tenantList, setTenantList] = useState<TenantInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [fleetChangeVersion, setFleetChangeVersion] = useState<number>(0);
@@ -177,10 +215,30 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (res.data && res.data.tenant) {
         setCurrentTenant(res.data.tenant);
         applyBranding(res.data.tenant);
+        if (res.data.tenant.name) {
+          localStorage.setItem('fleetName', res.data.tenant.displayName || res.data.tenant.name);
+        }
       }
     } catch (err) {
       // Fallback
-      if (selectedFleet === 'all') {
+      if (!isSuperAdmin) {
+        const fallbackName = localStorage.getItem('fleetName') || 'My Fleet';
+        const fallbackTenant: TenantInfo = {
+          tenantId: localStorage.getItem('tenantId') || '',
+          name: fallbackName,
+          displayName: fallbackName,
+          code: 'FL',
+          subdomain: '',
+          status: 'ACTIVE',
+          planTier: 'PRO',
+          brandingTokens: {
+            primaryColor: '#7C3AED',
+            portalTitle: fallbackName,
+          },
+        };
+        setCurrentTenant(fallbackTenant);
+        applyBranding(fallbackTenant);
+      } else if (selectedFleet === 'all') {
         setCurrentTenant(ALL_FLEETS_TENANT);
         applyBranding(ALL_FLEETS_TENANT);
       } else {

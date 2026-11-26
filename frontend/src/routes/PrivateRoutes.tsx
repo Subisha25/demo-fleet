@@ -97,6 +97,7 @@ export const SubscriptionProtectedRoute = ({ children }: { children: JSX.Element
           taxAmount={lockStatus.taxAmount}
           periodEnd={lockStatus.periodEnd}
           message={lockStatus.message}
+          trialDetails={lockStatus.trialDetails}
           onPaymentSuccess={() => {
             setLockStatus(null);
             window.location.reload();
