@@ -12,9 +12,30 @@ import {
   validatePinCode,
   validatePan,
   validateGstin,
+  validateEmail,
+  scrollToFirstError,
   extractApiErrorMessage,
   extractFieldErrors,
 } from '../../utils/validation';
+
+const FIELD_ORDER = [
+  'fleetName',
+  'legalName',
+  'businessCode',
+  'gstin',
+  'panNumber',
+  'sacCode',
+  'registeredAddress',
+  'ownerName',
+  'contactEmail',
+  'contactPhone',
+  'city',
+  'state',
+  'pinCode',
+  'demoCallDate',
+  'demoCallTime',
+  'termsConsent',
+];
 
 interface PlanDetail {
   tier: 'BASIC' | 'PRO' | 'ENTERPRISE';
@@ -64,6 +85,11 @@ export default function FleetRegistration() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const maxDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const maxDateStr = `${maxDate.getFullYear()}-${String(maxDate.getMonth() + 1).padStart(2, '0')}-${String(maxDate.getDate()).padStart(2, '0')}`;
+
   const [formData, setFormData] = useState({
     fleetName: '',
     legalName: '',
@@ -87,6 +113,8 @@ export default function FleetRegistration() {
     requestedPlanTier: 'PRO' as 'BASIC' | 'PRO' | 'ENTERPRISE',
     billingCycle: 'MONTHLY' as 'MONTHLY' | 'ANNUAL',
     fleetSize: '16-75',
+    demoCallDate: todayStr,
+    demoCallTime: '11:00 AM',
     termsConsent: false,
   });
 
@@ -191,33 +219,27 @@ export default function FleetRegistration() {
   const validateInputs = () => {
     const errors: Record<string, string> = {};
 
-    if (formData.businessCode.length < 2) {
+    if (!formData.fleetName.trim()) {
+      errors.fleetName = 'Please enter the fleet name.';
+    }
+
+    if (!formData.businessCode.trim()) {
+      errors.businessCode = 'Please enter the business code.';
+    } else if (formData.businessCode.length < 2) {
       errors.businessCode = 'Business code must be at least 2 alphanumeric characters.';
     }
 
-    const phoneVal = validateMobile(formData.contactPhone);
-    if (!phoneVal.valid) {
-      errors.contactPhone = phoneVal.error || 'Please enter a valid 10-digit mobile number.';
-    }
-
-    if (formData.pinCode) {
-      const pinVal = validatePinCode(formData.pinCode);
-      if (!pinVal.valid) {
-        errors.pinCode = pinVal.error || 'Please enter a valid 6-digit PIN code.';
-      }
-    }
-
-    if (formData.gstin) {
+    if (formData.gstin.trim()) {
       const gstinVal = validateGstin(formData.gstin);
       if (!gstinVal.valid) {
-        errors.gstin = gstinVal.error || 'Invalid GSTIN format. Expected 15 characters (e.g., 33AAACA1111A1Z1).';
+        errors.gstin = gstinVal.error || 'Please enter a valid 15-character GST number.';
       }
     }
 
-    if (formData.panNumber) {
+    if (formData.panNumber.trim()) {
       const panVal = validatePan(formData.panNumber);
       if (!panVal.valid) {
-        errors.panNumber = panVal.error || 'Invalid PAN format. Expected 10 characters (e.g., AAACA1111A).';
+        errors.panNumber = panVal.error || 'Please enter a valid 10-character PAN number.';
       }
     }
 
@@ -225,19 +247,66 @@ export default function FleetRegistration() {
       errors.sacCode = 'Invalid SAC code. Expected 6 digits (default: 996609).';
     }
 
+    if (!formData.ownerName.trim()) {
+      errors.ownerName = 'Please enter the contact person name.';
+    }
+
+    const emailVal = validateEmail(formData.contactEmail);
+    if (!emailVal.valid) {
+      errors.contactEmail = emailVal.error || 'Please enter a valid email address.';
+    }
+
+    const phoneVal = validateMobile(formData.contactPhone);
+    if (!phoneVal.valid) {
+      errors.contactPhone = phoneVal.error || 'Phone number must be exactly 10 digits.';
+    }
+
+    if (!formData.city.trim()) {
+      errors.city = 'Please enter the city.';
+    }
+
+    if (!formData.state.trim()) {
+      errors.state = 'Please enter the state.';
+    }
+
+    if (formData.pinCode.trim()) {
+      const pinVal = validatePinCode(formData.pinCode);
+      if (!pinVal.valid) {
+        errors.pinCode = pinVal.error || 'Please enter a valid 6-digit pincode.';
+      }
+    }
+
+    if (!formData.demoCallDate || !formData.demoCallDate.trim() || !formData.demoCallTime || !formData.demoCallTime.trim()) {
+      errors.demoCallDate = 'Please select your preferred demo call date and time.';
+    } else if (formData.demoCallDate < todayStr) {
+      errors.demoCallDate = 'Demo call date cannot be in the past.';
+    } else if (formData.demoCallDate > maxDateStr) {
+      errors.demoCallDate = 'Please select a demo call time within the next 7 days.';
+    }
+
+    if (!formData.termsConsent) {
+      errors.termsConsent = 'You must agree to the Terms of Service and Privacy Policy to proceed.';
+    }
+
     setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
+
+    const errorKeys = FIELD_ORDER.filter((key) => errors[key]);
+    if (errorKeys.length > 0) {
+      const firstKey = errorKeys[0];
+      const firstMsg = errors[firstKey];
+      setErrorMessage(firstMsg);
+      showToast(firstMsg, 'error');
+      scrollToFirstError(errorKeys);
+      return false;
+    }
+
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.termsConsent) {
-      setErrorMessage('You must agree to the Terms of Service and Privacy Policy to proceed.');
-      return;
-    }
 
     if (!validateInputs()) {
-      setErrorMessage('Please fix the errors highlighted below.');
       return;
     }
 
@@ -271,6 +340,10 @@ export default function FleetRegistration() {
       const backendFieldErrors = extractFieldErrors(err);
       if (Object.keys(backendFieldErrors).length > 0) {
         setFieldErrors((prev) => ({ ...prev, ...backendFieldErrors }));
+        const backendErrorKeys = FIELD_ORDER.filter((key) => backendFieldErrors[key]);
+        if (backendErrorKeys.length > 0) {
+          scrollToFirstError(backendErrorKeys);
+        }
       }
     } finally {
       setLoading(false);
@@ -310,8 +383,12 @@ export default function FleetRegistration() {
                 <span className="font-mono font-bold text-[#17171D] text-xs">{successData.requestId}</span>
               </div>
               <div className="flex justify-between py-1 text-sm border-b border-[#E5E7EB]">
-                <span className="text-[#5C5752]">Requested Plan</span>
-                <span className="font-semibold text-[#17171D]">{formData.requestedPlanTier} ({formData.billingCycle})</span>
+                <span className="text-[#5C5752]">Preferred Demo Call</span>
+                <span className="font-semibold text-[#17171D]">{formData.demoCallDate} at {formData.demoCallTime}</span>
+              </div>
+              <div className="flex justify-between py-1 text-sm border-b border-[#E5E7EB]">
+                <span className="text-[#5C5752]">Free Trial Duration</span>
+                <span className="font-semibold text-emerald-600">7 Days (Starts Upon Approval)</span>
               </div>
               <div className="flex justify-between py-1 text-sm">
                 <span className="text-[#5C5752]">Administrator Email</span>
@@ -324,7 +401,7 @@ export default function FleetRegistration() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>
-                <strong>Next Step:</strong> Once approved by SuperAdmin, you will receive an activation email with a secure 24-hour setup link to set your administrator password and start managing your fleet.
+                <strong>Next Step:</strong> Once reviewed and approved by SuperAdmin, your <strong>7-day free trial will automatically activate with full operational access</strong>. You will receive an activation email with a secure setup link to set your password and access your fleet.
               </span>
             </div>
 
@@ -359,7 +436,7 @@ export default function FleetRegistration() {
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 sm:p-10 space-y-8">
+            <form onSubmit={handleSubmit} noValidate className="p-6 sm:p-10 space-y-8">
               {errorMessage && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
                   <svg className="w-5 h-5 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -376,54 +453,63 @@ export default function FleetRegistration() {
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                    <label htmlFor="fleetName" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Fleet Display Name *
                     </label>
                     <input
                       type="text"
+                      id="fleetName"
                       name="fleetName"
-                      required
                       placeholder="e.g. Apex Express"
                       value={formData.fleetName}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
+                      className={`w-full px-4 py-2.5 rounded-lg border ${
+                        fieldErrors.fleetName ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                      } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
+                    {fieldErrors.fleetName && <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.fleetName}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                    <label htmlFor="legalName" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Legal Registered Entity Name
                     </label>
                     <input
                       type="text"
+                      id="legalName"
                       name="legalName"
                       placeholder="e.g. Apex Mobility Solutions Pvt. Ltd."
                       value={formData.legalName}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
+                      className={`w-full px-4 py-2.5 rounded-lg border ${
+                        fieldErrors.legalName ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                      } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
+                    {fieldErrors.legalName && <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.legalName}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                    <label htmlFor="businessCode" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Short Business Code (2–8 Chars) *
                     </label>
                     <div className="relative">
                       <input
                         type="text"
+                        id="businessCode"
                         name="businessCode"
-                        required
                         maxLength={8}
                         placeholder="e.g. APX, BLU"
                         value={formData.businessCode}
                         onChange={handleChange}
-                        className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.businessCode ? 'border-red-500' : 'border-[#E5E7EB]'} font-mono font-bold text-sm tracking-wider uppercase focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                        className={`w-full px-4 py-2.5 rounded-lg border ${
+                          fieldErrors.businessCode ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                        } font-mono font-bold text-sm tracking-wider uppercase focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                       />
                       <span className="absolute right-3 top-2.5 text-xs text-[#7A7570] font-mono">
                         {formData.businessCode.length}/8
                       </span>
                     </div>
-                    {fieldErrors.businessCode && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.businessCode}</p>}
+                    {fieldErrors.businessCode && <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.businessCode}</p>}
                   </div>
                 </div>
               </div>
@@ -435,66 +521,79 @@ export default function FleetRegistration() {
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                    <label htmlFor="gstin" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Fleet GSTIN (15 Chars)
                     </label>
                     <input
                       type="text"
+                      id="gstin"
                       name="gstin"
                       maxLength={15}
                       placeholder="e.g. 33AAACA1111A1Z1"
                       value={formData.gstin}
                       onChange={handleChange}
-                      className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.gstin ? 'border-red-500' : 'border-[#E5E7EB]'} font-mono uppercase text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                      className={`w-full px-4 py-2.5 rounded-lg border ${
+                        fieldErrors.gstin ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                      } font-mono uppercase text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
-                    {fieldErrors.gstin && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.gstin}</p>}
+                    {fieldErrors.gstin && <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.gstin}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                    <label htmlFor="panNumber" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Fleet PAN Number (10 Chars)
                     </label>
                     <input
                       type="text"
+                      id="panNumber"
                       name="panNumber"
                       maxLength={10}
                       placeholder="e.g. AAACA1111A"
                       value={formData.panNumber}
                       onChange={handleChange}
-                      className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.panNumber ? 'border-red-500' : 'border-[#E5E7EB]'} font-mono uppercase text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                      className={`w-full px-4 py-2.5 rounded-lg border ${
+                        fieldErrors.panNumber ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                      } font-mono uppercase text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
-                    {fieldErrors.panNumber && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.panNumber}</p>}
+                    {fieldErrors.panNumber && <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.panNumber}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                    <label htmlFor="sacCode" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       SAC Code (Passenger Transport)
                     </label>
                     <input
                       type="text"
+                      id="sacCode"
                       name="sacCode"
                       maxLength={6}
                       placeholder="996609"
                       value={formData.sacCode}
                       onChange={handleChange}
-                      className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.sacCode ? 'border-red-500' : 'border-[#E5E7EB]'} font-mono text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                      className={`w-full px-4 py-2.5 rounded-lg border ${
+                        fieldErrors.sacCode ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                      } font-mono text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
-                    {fieldErrors.sacCode && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.sacCode}</p>}
+                    {fieldErrors.sacCode && <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.sacCode}</p>}
                   </div>
                 </div>
 
                 <div className="mt-4">
-                  <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                  <label htmlFor="registeredAddress" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                     Registered Office Address (Invoice Footer)
                   </label>
                   <textarea
+                    id="registeredAddress"
                     name="registeredAddress"
                     rows={2}
                     placeholder="e.g. 101 Corporate Towers, Anna Salai, Guindy, Chennai - 600032"
                     value={formData.registeredAddress}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
+                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                      fieldErrors.registeredAddress ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                    } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                   />
+                  {fieldErrors.registeredAddress && <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.registeredAddress}</p>}
                 </div>
 
 
@@ -535,206 +634,211 @@ export default function FleetRegistration() {
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                    <label htmlFor="ownerName" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Owner / Admin Full Name *
                     </label>
                     <input
                       type="text"
+                      id="ownerName"
                       name="ownerName"
-                      required
                       placeholder="e.g. Rajesh Kumar"
                       value={formData.ownerName}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
+                      className={`w-full px-4 py-2.5 rounded-lg border ${
+                        fieldErrors.ownerName ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                      } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
+                    {fieldErrors.ownerName && <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.ownerName}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                    <label htmlFor="contactEmail" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Official Contact Email *
                     </label>
                     <input
                       type="email"
+                      id="contactEmail"
                       name="contactEmail"
-                      required
                       placeholder="admin@yourcompany.com"
                       value={formData.contactEmail}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
+                      className={`w-full px-4 py-2.5 rounded-lg border ${
+                        fieldErrors.contactEmail ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                      } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
+                    {fieldErrors.contactEmail && <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.contactEmail}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                    <label htmlFor="contactPhone" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Official Contact Phone *
                     </label>
                     <input
                       type="tel"
+                      id="contactPhone"
                       name="contactPhone"
-                      required
                       placeholder="+91 98765 43210"
                       value={formData.contactPhone}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
+                      className={`w-full px-4 py-2.5 rounded-lg border ${
+                        fieldErrors.contactPhone ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                      } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
+                    {fieldErrors.contactPhone && <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.contactPhone}</p>}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-4">
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                    <label htmlFor="city" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Primary Operating City *
                     </label>
                     <input
                       type="text"
+                      id="city"
                       name="city"
-                      required
                       placeholder="e.g. Chennai"
                       value={formData.city}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
+                      className={`w-full px-4 py-2.5 rounded-lg border ${
+                        fieldErrors.city ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                      } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
+                    {fieldErrors.city && <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.city}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                    <label htmlFor="state" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       Operating State *
                     </label>
                     <input
                       type="text"
+                      id="state"
                       name="state"
-                      required
                       placeholder="e.g. Tamil Nadu"
                       value={formData.state}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
+                      className={`w-full px-4 py-2.5 rounded-lg border ${
+                        fieldErrors.state ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                      } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
+                    {fieldErrors.state && <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.state}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                    <label htmlFor="pinCode" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                       PIN Code
                     </label>
                     <input
                       type="text"
+                      id="pinCode"
                       name="pinCode"
                       maxLength={6}
                       placeholder="600032"
                       value={formData.pinCode}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
+                      className={`w-full px-4 py-2.5 rounded-lg border ${
+                        fieldErrors.pinCode ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                      } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
+                    {fieldErrors.pinCode && <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.pinCode}</p>}
                   </div>
                 </div>
               </div>
 
-              {/* Section 4: Subscription Plan Selection */}
-              <div>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-2 border-b border-[#F7F7FB]">
-                  <h2 className="text-base font-bold uppercase tracking-wider text-[#7A7570]">
-                    4. Choose Your Mobility Plan
-                  </h2>
+              {/* Section 4: Preferred Demo Call Date & Time */}
+              <div className="bg-gradient-to-br from-[#F8F9FE] to-white p-6 rounded-2xl border border-[#E0E7FF] shadow-sm">
+                <div className="mb-4 pb-3 border-b border-[#E5E7EB]">
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg bg-[#5B3DF5] text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                      4
+                    </span>
+                    <h2 className="text-base font-bold uppercase tracking-wider text-[#17171D]">
+                      Preferred Demo Call Date & Time
+                    </h2>
+                  </div>
+                  <p className="text-xs text-[#5C5752] mt-1.5 leading-relaxed">
+                    Schedule a live 1-on-1 product demonstration of CABZ Smart Fleet Mobility with our platform specialists.
+                    Your 7-day free trial will automatically activate upon SuperAdmin review and approval.
+                  </p>
+                </div>
 
-                  {/* Billing Frequency Toggle */}
-                  <div className="inline-flex items-center p-1 bg-[#F7F7FB] border border-[#E5E7EB] rounded-xl">
-                    <button
-                      type="button"
-                      onClick={() => setFormData((prev) => ({ ...prev, billingCycle: 'MONTHLY' }))}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        formData.billingCycle === 'MONTHLY'
-                          ? 'bg-[#17171D] text-white shadow-sm'
-                          : 'text-[#5C5752] hover:text-[#17171D]'
-                      }`}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {/* Demo Call Date */}
+                  <div>
+                    <label htmlFor="demoCallDate" className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-1.5">
+                      Demo Call Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      id="demoCallDate"
+                      name="demoCallDate"
+                      min={todayStr}
+                      max={maxDateStr}
+                      value={formData.demoCallDate}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-3 rounded-xl border ${
+                        fieldErrors.demoCallDate ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                      } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                    />
+                    <p className="text-[11px] text-[#7A7570] mt-1">Select any date within the next 7 calendar days.</p>
+                    {fieldErrors.demoCallDate && (
+                      <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.demoCallDate}</p>
+                    )}
+                  </div>
+
+                  {/* Demo Call Time */}
+                  <div>
+                    <label htmlFor="demoCallTime" className="block text-xs font-bold text-[#17171D] uppercase tracking-wider mb-1.5">
+                      Preferred Time Slot <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="demoCallTime"
+                      name="demoCallTime"
+                      value={formData.demoCallTime}
+                      onChange={handleChange}
+                      className={`w-full px-4 py-3 rounded-xl border ${
+                        fieldErrors.demoCallTime ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                      } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     >
-                      Monthly
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormData((prev) => ({ ...prev, billingCycle: 'ANNUAL' }))}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                        formData.billingCycle === 'ANNUAL'
-                          ? 'bg-[#17171D] text-white shadow-sm'
-                          : 'text-[#5C5752] hover:text-[#17171D]'
-                      }`}
-                    >
-                      <span>Annual</span>
-                      <span className="text-[10px] px-1.5 py-0.2 bg-[#5B3DF5] text-white rounded-full">Save ~15%</span>
-                    </button>
+                      <option value="10:00 AM">10:00 AM - 10:45 AM (Morning)</option>
+                      <option value="11:00 AM">11:00 AM - 11:45 AM (Morning)</option>
+                      <option value="12:00 PM">12:00 PM - 12:45 PM (Afternoon)</option>
+                      <option value="02:00 PM">02:00 PM - 02:45 PM (Afternoon)</option>
+                      <option value="03:30 PM">03:30 PM - 04:15 PM (Evening)</option>
+                      <option value="05:00 PM">05:00 PM - 05:45 PM (Evening)</option>
+                      <option value="06:30 PM">06:30 PM - 07:15 PM (Late Evening)</option>
+                    </select>
+                    <p className="text-[11px] text-[#7A7570] mt-1">45-minute interactive video demo & onboarding session.</p>
+                    {fieldErrors.demoCallTime && (
+                      <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.demoCallTime}</p>
+                    )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  {(['BASIC', 'PRO', 'ENTERPRISE'] as const).map((tier) => {
-                    const plan = PLANS[tier];
-                    const isSelected = formData.requestedPlanTier === tier;
-                    const price = formData.billingCycle === 'ANNUAL' ? plan.annualINR : plan.monthlyINR;
-
-                    return (
-                      <div
-                        key={tier}
-                        onClick={() =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            requestedPlanTier: tier,
-                            fleetSize: tier === 'BASIC' ? '1-15' : tier === 'PRO' ? '16-75' : '76+',
-                          }))
-                        }
-                        className={`cursor-pointer rounded-xl p-5 border-2 transition-all relative ${
-                          isSelected
-                            ? 'border-[#5B3DF5] bg-[#FDF6F0] shadow-md ring-2 ring-[#F3D0BD]'
-                            : 'border-[#E5E7EB] hover:border-[#5B3DF5]/50 bg-white'
-                        }`}
-                      >
-                        {tier === 'PRO' && (
-                          <span className="absolute -top-3 right-4 px-2.5 py-0.5 bg-[#5B3DF5] text-white text-[10px] font-bold uppercase rounded-full">
-                            Most Popular
-                          </span>
-                        )}
-
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-bold text-[#17171D] text-base">{plan.name}</h3>
-                          <input
-                            type="radio"
-                            name="planRadio"
-                            checked={isSelected}
-                            onChange={() => {}}
-                            className="accent-[#5B3DF5] w-4 h-4"
-                          />
-                        </div>
-
-                        <div className="text-2xl font-extrabold text-[#5B3DF5] mb-1">
-                          ₹{price.toLocaleString('en-IN')}
-                          <span className="text-xs font-normal text-[#7A7570]">
-                            /{formData.billingCycle === 'ANNUAL' ? 'year' : 'month'}
-                          </span>
-                        </div>
-
-                        <ul className="text-xs text-[#5C5752] space-y-1.5 mt-3 pt-3 border-t border-[#E5E7EB]">
-                          <li className="flex items-center gap-1.5">
-                            <span className="text-[#5B3DF5] font-bold">✓</span> {plan.vehicles}
-                          </li>
-                          <li className="flex items-center gap-1.5">
-                            <span className="text-[#5B3DF5] font-bold">✓</span> {plan.drivers}
-                          </li>
-                          <li className="flex items-center gap-1.5">
-                            <span className="text-[#5B3DF5] font-bold">✓</span> {plan.clients}
-                          </li>
-                        </ul>
-                      </div>
-                    );
-                  })}
+                <div className="mt-4 p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-100 flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-[#5B3DF5] text-white flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
+                    i
+                  </div>
+                  <div className="text-xs text-[#4338CA] leading-relaxed">
+                    <span className="font-bold">No upfront payment required.</span> All approved fleet operators receive an automatic{' '}
+                    <span className="font-bold">7-day free trial with complete operational access</span> across vehicles, drivers, bookings, invoices, and reports.
+                  </div>
                 </div>
               </div>
 
               {/* Section 5: Terms Consent & Submission */}
               <div className="pt-2">
-                <label className="flex items-start gap-3 cursor-pointer">
+                <label htmlFor="termsConsent" className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
+                    id="termsConsent"
                     name="termsConsent"
                     checked={formData.termsConsent}
                     onChange={handleChange}
-                    className="mt-1 w-4 h-4 rounded border-[#E5E7EB] text-[#5B3DF5] focus:ring-[#5B3DF5]"
+                    className={`mt-1 w-4 h-4 rounded ${
+                      fieldErrors.termsConsent ? 'ring-2 ring-red-500 border-red-500' : 'border-[#E5E7EB]'
+                    } text-[#5B3DF5] focus:ring-[#5B3DF5]`}
                   />
                   <span className="text-xs text-[#5C5752] leading-relaxed">
                     I confirm that I am authorized to represent this fleet and agree to the{' '}
@@ -748,6 +852,7 @@ export default function FleetRegistration() {
                     . I understand that my application will be reviewed by SuperAdmin before account activation.
                   </span>
                 </label>
+                {fieldErrors.termsConsent && <p className="text-[11px] text-red-600 mt-1 font-semibold">{fieldErrors.termsConsent}</p>}
               </div>
 
               {/* Submit Button */}

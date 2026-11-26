@@ -11,11 +11,14 @@ export const VEHICLE_REG_REGEX = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$/;
 /**
  * Validates 10-digit Indian Mobile Number
  */
-export function validateMobile(val?: string | null): { valid: boolean; error?: string } {
-  if (!val || typeof val !== 'string') return { valid: false, error: 'Mobile number is required.' };
+export function validateMobile(val?: string | null, isRequired = true): { valid: boolean; error?: string } {
+  if (!val || typeof val !== 'string' || !val.trim()) {
+    if (isRequired) return { valid: false, error: 'Phone number must be exactly 10 digits.' };
+    return { valid: true };
+  }
   const digits = val.replace(/\D/g, '');
-  if (digits.length !== 10) return { valid: false, error: 'Mobile number must be exactly 10 digits.' };
-  if (!PHONE_REGEX.test(digits)) return { valid: false, error: 'Mobile number must start with 6, 7, 8, or 9.' };
+  if (digits.length !== 10) return { valid: false, error: 'Phone number must be exactly 10 digits.' };
+  if (!PHONE_REGEX.test(digits)) return { valid: false, error: 'Phone number must be exactly 10 digits.' };
   return { valid: true };
 }
 
@@ -30,11 +33,15 @@ export function formatMobileInput(val: string): string {
 /**
  * Validates Indian PAN
  */
-export function validatePan(val?: string | null): { valid: boolean; error?: string } {
-  if (!val || typeof val !== 'string') return { valid: false, error: 'PAN is required.' };
+export function validatePan(val?: string | null, isRequired = false): { valid: boolean; error?: string } {
+  if (!val || typeof val !== 'string' || !val.trim()) {
+    if (isRequired) return { valid: false, error: 'Please enter the PAN number.' };
+    return { valid: true };
+  }
   const cleaned = val.trim().toUpperCase();
-  if (cleaned.length !== 10) return { valid: false, error: 'PAN must be exactly 10 characters.' };
-  if (!PAN_REGEX.test(cleaned)) return { valid: false, error: 'Invalid PAN format (e.g. ABCDE1234F).' };
+  if (cleaned.length !== 10 || !PAN_REGEX.test(cleaned)) {
+    return { valid: false, error: 'Please enter a valid 10-character PAN number.' };
+  }
   return { valid: true };
 }
 
@@ -49,11 +56,15 @@ export function formatPanInput(val: string): string {
 /**
  * Validates Indian GSTIN
  */
-export function validateGstin(val?: string | null): { valid: boolean; error?: string } {
-  if (!val || typeof val !== 'string') return { valid: false, error: 'GSTIN is required.' };
+export function validateGstin(val?: string | null, isRequired = false): { valid: boolean; error?: string } {
+  if (!val || typeof val !== 'string' || !val.trim()) {
+    if (isRequired) return { valid: false, error: 'Please enter the GST number.' };
+    return { valid: true };
+  }
   const cleaned = val.trim().toUpperCase();
-  if (cleaned.length !== 15) return { valid: false, error: 'GSTIN must be exactly 15 characters.' };
-  if (!GSTIN_REGEX.test(cleaned)) return { valid: false, error: 'Invalid GSTIN format (e.g. 22AAAAA0000A1Z5).' };
+  if (cleaned.length !== 15 || !GSTIN_REGEX.test(cleaned)) {
+    return { valid: false, error: 'Please enter a valid 15-character GST number.' };
+  }
   return { valid: true };
 }
 
@@ -68,11 +79,15 @@ export function formatGstinInput(val: string): string {
 /**
  * Validates 6-digit PIN code
  */
-export function validatePinCode(val?: string | null): { valid: boolean; error?: string } {
-  if (!val || typeof val !== 'string') return { valid: false, error: 'PIN Code is required.' };
+export function validatePinCode(val?: string | null, isRequired = false): { valid: boolean; error?: string } {
+  if (!val || typeof val !== 'string' || !val.trim()) {
+    if (isRequired) return { valid: false, error: 'Please enter a valid 6-digit pincode.' };
+    return { valid: true };
+  }
   const digits = val.replace(/\D/g, '');
-  if (digits.length !== 6) return { valid: false, error: 'PIN Code must be exactly 6 digits.' };
-  if (!PINCODE_REGEX.test(digits)) return { valid: false, error: 'Invalid PIN Code format.' };
+  if (digits.length !== 6 || !PINCODE_REGEX.test(digits)) {
+    return { valid: false, error: 'Please enter a valid 6-digit pincode.' };
+  }
   return { valid: true };
 }
 
@@ -110,15 +125,35 @@ export const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-z
 /**
  * Validates Email address
  */
-export function validateEmail(val?: string | null): { valid: boolean; error?: string } {
+export function validateEmail(val?: string | null, isRequired = true): { valid: boolean; error?: string } {
   if (!val || typeof val !== 'string' || !val.trim()) {
-    return { valid: false, error: 'Please enter an email address.' };
+    if (isRequired) return { valid: false, error: 'Please enter a valid email address.' };
+    return { valid: true };
   }
   const trimmed = val.trim().toLowerCase();
   if (!EMAIL_REGEX.test(trimmed)) {
     return { valid: false, error: 'Please enter a valid email address.' };
   }
   return { valid: true };
+}
+
+/**
+ * Automatically scrolls to the first invalid input field and focuses it.
+ */
+export function scrollToFirstError(fieldNames: string[]) {
+  if (typeof document === 'undefined') return;
+  for (const name of fieldNames) {
+    const el = document.querySelector(`[name="${name}"], #${name}`) as HTMLElement | null;
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        try {
+          el.focus();
+        } catch {}
+      }, 250);
+      break;
+    }
+  }
 }
 
 /**

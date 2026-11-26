@@ -20,6 +20,27 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 interface EnrichedTenant extends TenantInfo {
+  createdAt?: string;
+  trialStartDate?: string;
+  originalTrialDays?: number;
+  extendedTrialDays?: number;
+  totalTrialDays?: number;
+  originalTrialExpiry?: string;
+  trialEndsAt?: string;
+  trialDurationDays?: number;
+  trialStatus?: string;
+  remainingTrialDays?: number;
+  remainingTrialMs?: number;
+  actualPlanDisplay?: string;
+  paymentStatusDisplay?: string;
+  trialExtensionHistory?: Array<{
+    extendedBy: string;
+    extendedAt: string;
+    daysAdded: number;
+    previousExpiry: string;
+    newExpiry: string;
+    reason: string;
+  }>;
   usage?: {
     vehicles: number;
     drivers: number;
@@ -48,6 +69,12 @@ const TenantList: React.FC = () => {
   const [editVehicleQuota, setEditVehicleQuota] = useState(75);
   const [editDriverQuota, setEditDriverQuota] = useState(75);
   const [editCompanyQuota, setEditCompanyQuota] = useState(20);
+
+  // Free Trial Extension Modal
+  const [selectedTenantForTrial, setSelectedTenantForTrial] = useState<EnrichedTenant | null>(null);
+  const [extensionDays, setExtensionDays] = useState(3);
+  const [extensionReason, setExtensionReason] = useState('');
+  const [extendingTrial, setExtendingTrial] = useState(false);
 
   const navigate = useNavigate();
   const { currentTenant, refreshTenant, loadAllTenants } = useTenant();
@@ -98,6 +125,29 @@ const TenantList: React.FC = () => {
     } catch (err: any) {
       console.error('Error updating tenant subscription:', err);
       showToast(err?.response?.data?.message || 'Failed to update subscription', 'error');
+    }
+  };
+
+  const handleExtendTrial = async () => {
+    if (!selectedTenantForTrial) return;
+    setExtendingTrial(true);
+    try {
+      const res = await axiosInstance.post(`/tenants/${selectedTenantForTrial.tenantId}/extend-trial`, {
+        additionalDays: extensionDays,
+        reason: extensionReason,
+      });
+      if (res.data?.success) {
+        showToast(res.data.message || 'Free trial extended successfully', 'success');
+        setSelectedTenantForTrial(null);
+        setExtensionReason('');
+        fetchTenants();
+      } else {
+        showToast(res.data?.message || 'Failed to extend trial', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Error extending trial', 'error');
+    } finally {
+      setExtendingTrial(false);
     }
   };
 
@@ -260,18 +310,68 @@ const TenantList: React.FC = () => {
       },
     },
     {
-      header: 'Subscription Dates',
+      header: 'Free Trial & Subscription',
       accessor: 'subscription',
-      render: (tenant: EnrichedTenant) => (
-        <div className="text-xs space-y-0.5">
-          <div className="text-slate-600">
-            Start: <strong className="text-slate-800">{formatDate(tenant.subscription?.currentPeriodStart)}</strong>
+      render: (tenant: EnrichedTenant) => {
+        const start = tenant.trialStartDate || (tenant.subscription as any)?.trialStartDate || tenant.createdAt;
+        const expiry = tenant.trialEndsAt || (tenant.subscription as any)?.trialEndsAt || (tenant.subscription as any)?.currentPeriodEnd;
+        const remaining = tenant.remainingTrialDays ?? (expiry ? Math.max(0, Math.ceil((new Date(expiry).getTime() - Date.now()) / (24 * 60 * 60 * 1000))) : 0);
+        const originalDays = tenant.originalTrialDays || 7;
+        const extendedDays = tenant.extendedTrialDays ?? Math.max(0, (tenant.totalTrialDays || tenant.trialDurationDays || 7) - 7);
+        const total = tenant.totalTrialDays || tenant.trialDurationDays || (originalDays + extendedDays);
+        const status = tenant.trialStatus || (tenant.status === 'TRIALING' ? (remaining > 0 ? 'TRIAL_ACTIVE' : 'TRIAL_EXPIRED') : tenant.status);
+        const planDisplay = tenant.actualPlanDisplay || (tenant.status === 'TRIALING' ? 'FREE TRIAL' : tenant.planTier);
+        const paymentDisplay = tenant.paymentStatusDisplay || (tenant.status === 'TRIALING' ? 'Unpaid (Trial)' : 'Active Verified');
+
+        return (
+          <div className="text-xs space-y-1.5 min-w-[200px]">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span
+                className={`inline-block text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                  status === 'TRIAL_ACTIVE' || status === 'TRIALING'
+                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                    : status === 'TRIAL_EXPIRED'
+                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                    : status === 'ACTIVE' || status === 'ACTIVE_PAID'
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                    : 'bg-rose-100 text-rose-800 border border-rose-200'
+                }`}
+              >
+                {status === 'TRIAL_ACTIVE' || status === 'TRIALING'
+                  ? 'FREE TRIAL ACTIVE'
+                  : status === 'TRIAL_EXPIRED'
+                  ? 'TRIAL EXPIRED'
+                  : status}
+              </span>
+              <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                {planDisplay}
+              </span>
+            </div>
+
+            {/* Trial Duration Breakdown: Separate 7 Days vs Extended Days */}
+            <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 text-[11px] space-y-0.5">
+              <div className="flex justify-between text-slate-600">
+                <span>Original Free Trial:</span>
+                <strong className="text-indigo-700">7 Days</strong>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Extra Extended:</span>
+                <strong className="text-purple-700">+{extendedDays} Days</strong>
+              </div>
+              <div className="flex justify-between text-slate-900 border-t border-slate-200 pt-0.5 font-bold">
+                <span>Total Duration:</span>
+                <span>{total} Days ({remaining}d left)</span>
+              </div>
+            </div>
+
+            <div className="text-[11px] text-slate-500 space-y-0.5">
+              <div>Start: <span className="text-slate-800 font-medium">{formatDate(start)}</span></div>
+              <div>Expiry: <span className="text-slate-800 font-medium">{formatDate(expiry)}</span></div>
+              <div>Payment: <span className="text-slate-700 font-medium">{paymentDisplay}</span></div>
+            </div>
           </div>
-          <div className="text-slate-600">
-            Renewal: <strong className="text-slate-800">{formatDate(tenant.subscription?.currentPeriodEnd)}</strong>
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       header: 'Last Payment',
@@ -317,6 +417,20 @@ const TenantList: React.FC = () => {
             title="Adjust Quotas & Plan Tier"
           >
             <FontAwesomeIcon icon={faSlidersH} />
+          </button>
+
+          {/* Extend Free Trial Action */}
+          <button
+            onClick={() => {
+              setSelectedTenantForTrial(tenant);
+              setExtensionDays(3);
+              setExtensionReason('');
+            }}
+            className="px-2 py-1 text-xs font-semibold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition flex items-center gap-1 shadow-sm"
+            title="Extend Free Trial (+Days)"
+          >
+            <FontAwesomeIcon icon={faClock} />
+            Extend
           </button>
         </div>
       ),
@@ -493,6 +607,208 @@ const TenantList: React.FC = () => {
                   Save Changes
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal: Extend Free Trial */}
+      {selectedTenantForTrial && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Extend Free Trial</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Grant additional free-trial days for <strong>{selectedTenantForTrial.name}</strong> ({selectedTenantForTrial.code})
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedTenantForTrial(null)}
+                className="text-slate-400 hover:text-slate-600 text-xl font-bold leading-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div>
+                  <span className="text-slate-500 font-medium block">Original Free Trial:</span>
+                  <span className="text-sm font-bold text-indigo-700">7 Days</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium block">Extra Extended:</span>
+                  <span className="text-sm font-bold text-purple-700">
+                    +{selectedTenantForTrial.extendedTrialDays ?? Math.max(0, (selectedTenantForTrial.trialDurationDays || 7) - 7)} Days
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium block">Total Days So Far:</span>
+                  <span className="text-sm font-bold text-slate-900">
+                    {selectedTenantForTrial.totalTrialDays || selectedTenantForTrial.trialDurationDays || 7} Days
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium block">Trial Started Date:</span>
+                  <span className="text-xs font-bold text-slate-800">
+                    {formatDate(
+                      selectedTenantForTrial.trialStartDate ||
+                      (selectedTenantForTrial.subscription as any)?.trialStartDate ||
+                      selectedTenantForTrial.createdAt
+                    )}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium block">Current Expiry Date:</span>
+                  <span className="text-xs font-bold text-slate-800">
+                    {formatDate(
+                      selectedTenantForTrial.trialEndsAt ||
+                      (selectedTenantForTrial.subscription as any)?.trialEndsAt ||
+                      (selectedTenantForTrial.subscription as any)?.currentPeriodEnd
+                    )}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium block">Remaining Days:</span>
+                  <span className="text-xs font-bold text-emerald-700">
+                    {selectedTenantForTrial.remainingTrialDays ?? '—'} Days
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Additional Free Trial Days <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="1"
+                    max="90"
+                    value={extensionDays}
+                    onChange={(e) => setExtensionDays(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-28 px-3 py-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <div className="flex gap-1.5">
+                    {[3, 7, 14, 30].map((quickDay) => (
+                      <button
+                        key={quickDay}
+                        type="button"
+                        onClick={() => setExtensionDays(quickDay)}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-md border transition ${
+                          extensionDays === quickDay
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        +{quickDay}d
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Calculated New Expiry and Duration Live Preview */}
+              <div className="bg-indigo-50/70 p-3.5 rounded-xl border border-indigo-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-indigo-900 font-bold block text-xs">New Trial Expiry Date Preview:</span>
+                    <span className="text-[11px] text-indigo-700">
+                      Calculated from current expiry (+{extensionDays} days)
+                    </span>
+                  </div>
+                  <div className="text-sm font-black text-indigo-950">
+                    {(() => {
+                      const existingStr =
+                        selectedTenantForTrial.trialEndsAt ||
+                        (selectedTenantForTrial.subscription as any)?.trialEndsAt ||
+                        (selectedTenantForTrial.subscription as any)?.currentPeriodEnd;
+                      const existingDate = existingStr ? new Date(existingStr) : new Date();
+                      const baseTime = existingDate.getTime() < Date.now() ? Date.now() : existingDate.getTime();
+                      const newExpiryDate = new Date(baseTime + extensionDays * 24 * 60 * 60 * 1000);
+                      return newExpiryDate.toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      });
+                    })()}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between border-t border-indigo-100 pt-1.5 text-[11px]">
+                  <span className="text-indigo-800">New Total Trial Duration:</span>
+                  <span className="font-bold text-indigo-950">
+                    {(selectedTenantForTrial.totalTrialDays || selectedTenantForTrial.trialDurationDays || 7) + extensionDays} Days
+                    (7 Original + {((selectedTenantForTrial.extendedTrialDays ?? Math.max(0, (selectedTenantForTrial.trialDurationDays || 7) - 7)) + extensionDays)} Extended)
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Reason for Extension (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={extensionReason}
+                  onChange={(e) => setExtensionReason(e.target.value)}
+                  placeholder="E.g., Customer requested extra evaluation time for route consolidation."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Extension History Table */}
+              {Array.isArray(selectedTenantForTrial.trialExtensionHistory) &&
+                selectedTenantForTrial.trialExtensionHistory.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-slate-100">
+                    <span className="font-bold text-slate-800 block mb-1.5">Trial Extension Audit History:</span>
+                    <div className="max-h-36 overflow-y-auto border border-slate-200 rounded-lg">
+                      <table className="w-full text-left border-collapse text-[11px]">
+                        <thead>
+                          <tr className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+                            <th className="p-2">Extended At</th>
+                            <th className="p-2">Days</th>
+                            <th className="p-2">Prev Expiry</th>
+                            <th className="p-2">New Expiry</th>
+                            <th className="p-2">Extended By</th>
+                            <th className="p-2">Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {selectedTenantForTrial.trialExtensionHistory.map((h, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50">
+                              <td className="p-2 text-slate-600">{new Date(h.extendedAt).toLocaleDateString('en-IN')}</td>
+                              <td className="p-2 font-bold text-indigo-700">+{h.daysAdded}d</td>
+                              <td className="p-2 text-slate-500">{new Date(h.previousExpiry).toLocaleDateString('en-IN')}</td>
+                              <td className="p-2 font-semibold text-slate-800">{new Date(h.newExpiry).toLocaleDateString('en-IN')}</td>
+                              <td className="p-2 font-medium text-slate-700">{h.extendedBy}</td>
+                              <td className="p-2 text-slate-600 italic">{h.reason || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2 mt-4">
+              <button
+                disabled={extendingTrial}
+                onClick={() => setSelectedTenantForTrial(null)}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50 text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={extendingTrial}
+                onClick={handleExtendTrial}
+                className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white rounded-lg font-bold text-xs shadow-sm flex items-center gap-1.5"
+              >
+                {extendingTrial && (
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                )}
+                Confirm Trial Extension
+              </button>
             </div>
           </div>
         </div>

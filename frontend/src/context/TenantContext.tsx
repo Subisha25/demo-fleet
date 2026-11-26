@@ -54,27 +54,52 @@ interface TenantContextType {
   loadAllTenants: () => Promise<void>;
 }
 
+const DEMO_TENANT: TenantInfo = {
+  tenantId: 'demo-tenant',
+  name: 'CABZ Smart Fleet Demo',
+  displayName: 'CABZ Demo Preview',
+  code: 'DEMO',
+  subdomain: 'demo',
+  status: 'DEMO_PREVIEW',
+  planTier: 'PRO',
+  contactEmail: 'demo@cabz.com',
+  brandingTokens: {
+    primaryColor: '#7C3AED',
+    secondaryColor: '#0B0B0F',
+    portalTitle: 'CABZ Demo Preview',
+  },
+  subscription: {
+    planTier: 'PRO',
+    status: 'DEMO_PREVIEW',
+    vehicleQuota: 75,
+    driverQuota: 75,
+    companyQuota: 20,
+    monthlyTripQuota: 2500,
+    allowOverage: false,
+  },
+};
+
 const DEFAULT_ROOT_TENANT: TenantInfo = {
   tenantId: 'e7b8a1c0-0000-0000-0000-000000000001',
-  name: 'CABZ Fleet Operations',
+  name: 'CABZ Primary',
   code: 'CZ',
   subdomain: 'cabz',
   status: 'ACTIVE',
-  planTier: 'ENTERPRISE',
+  planTier: 'PRO',
   contactEmail: 'subisha2002.m@gmail.com',
   brandingTokens: {
-    primaryColor: '#5B3DF5',
+    primaryColor: '#7C3AED',
     secondaryColor: '#0B0B0F',
     portalTitle: 'CABZ Mobility Platform',
   },
   subscription: {
-    planTier: 'ENTERPRISE',
-    status: 'ACTIVE',
-    vehicleQuota: 250,
-    driverQuota: 250,
-    companyQuota: 100,
-    monthlyTripQuota: 50000,
-    allowOverage: true,
+    planTier: 'PRO',
+    status: 'TRIALING',
+    vehicleQuota: 75,
+    driverQuota: 75,
+    companyQuota: 20,
+    monthlyTripQuota: 2500,
+    allowOverage: false,
   },
 };
 
@@ -99,8 +124,10 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const { isAuthenticated } = useAuth();
   const role = localStorage.getItem('role');
   const isSuperAdmin = role === 'superadmin';
+  const isDemo = localStorage.getItem('isDemoView') === 'true' || localStorage.getItem('isDemoMode') === 'true' || role === 'demo';
 
   const [selectedFleet, setSelectedFleet] = useState<string>(() => {
+    if (isDemo) return 'demo-tenant';
     if (!isSuperAdmin) {
       return localStorage.getItem('tenantId') || 'e7b8a1c0-0000-0000-0000-000000000001';
     }
@@ -108,14 +135,14 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   });
 
   const [currentTenant, setCurrentTenant] = useState<TenantInfo | null>(
-    selectedFleet === 'all' ? ALL_FLEETS_TENANT : DEFAULT_ROOT_TENANT
+    isDemo ? DEMO_TENANT : (selectedFleet === 'all' ? ALL_FLEETS_TENANT : DEFAULT_ROOT_TENANT)
   );
   const [tenantList, setTenantList] = useState<TenantInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [fleetChangeVersion, setFleetChangeVersion] = useState<number>(0);
 
   const applyBranding = (tenant: TenantInfo) => {
-    const primary = tenant.brandingTokens?.primaryColor || '#5B3DF5';
+    const primary = tenant.brandingTokens?.primaryColor || '#7C3AED';
     const title = tenant.brandingTokens?.portalTitle || tenant.displayName || tenant.name;
     document.documentElement.style.setProperty('--primary-tenant-color', primary);
     if (tenant.tenantId === 'all' || !tenant.tenantId || tenant.tenantId === 'e7b8a1c0-0000-0000-0000-000000000001') {
@@ -130,6 +157,15 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const refreshTenant = async () => {
     try {
       const currentRole = localStorage.getItem('role');
+      const isDemoSession = localStorage.getItem('isDemoView') === 'true' || localStorage.getItem('isDemoMode') === 'true' || currentRole === 'demo';
+
+      if (isDemoSession) {
+        setCurrentTenant(DEMO_TENANT);
+        applyBranding(DEMO_TENANT);
+        setLoading(false);
+        return;
+      }
+
       if (currentRole === 'superadmin' && selectedFleet === 'all') {
         setCurrentTenant(ALL_FLEETS_TENANT);
         applyBranding(ALL_FLEETS_TENANT);

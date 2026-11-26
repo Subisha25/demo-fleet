@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Eye, EyeOff, Mail, Lock, ShieldCheck, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../../../utils/axiosInstance';
@@ -32,6 +32,18 @@ const Login: React.FC = () => {
 
   const navigate = useNavigate();
   const { login } = useAuth();
+
+  useEffect(() => {
+    // Clear any previous demo preview flags so login operates on clean state
+    localStorage.removeItem('isDemoMode');
+    localStorage.removeItem('isDemoView');
+    if (localStorage.getItem('role') === 'demo') {
+      localStorage.removeItem('role');
+      localStorage.removeItem('token');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('username');
+    }
+  }, []);
 
   // ----- Login Validation -----
   const validate = () => {
@@ -89,6 +101,21 @@ const Login: React.FC = () => {
           token: accessToken,
         };
         localStorage.setItem('user', JSON.stringify(userObject));
+
+        // Clear any previous demo flags
+        localStorage.removeItem('isDemoMode');
+        localStorage.removeItem('isDemoView');
+
+        // Fetch latest tenant subscription / trial status from backend
+        if (role !== 'superadmin') {
+          try {
+            await axiosInstance.get('/tenants/current/subscription-lock-status', {
+              headers: { Authorization: `Bearer ${accessToken}`, 'X-Tenant-ID': tenantId },
+            });
+          } catch (e) {
+            // Subscription status will also be authoritatively verified by layout and backend guards
+          }
+        }
 
         login();
 
@@ -336,7 +363,8 @@ const Login: React.FC = () => {
                 loadingText="Signing In..."
                 variant="primary"
                 size="lg"
-                className="w-full shadow-md hover:shadow-lg"
+                disabled={submitting}
+                className="w-full shadow-md hover:shadow-lg cursor-pointer"
               >
                 Sign In to Enterprise Fleet
               </LoadingButton>

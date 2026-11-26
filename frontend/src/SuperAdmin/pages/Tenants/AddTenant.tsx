@@ -13,9 +13,27 @@ import {
   validatePinCode,
   validatePan,
   validateGstin,
+  validateEmail,
+  scrollToFirstError,
   extractApiErrorMessage,
   extractFieldErrors,
 } from '../../../utils/validation';
+
+const FIELD_ORDER = [
+  'fleetName',
+  'legalName',
+  'businessCode',
+  'gstin',
+  'panNumber',
+  'sacCode',
+  'registeredAddress',
+  'ownerName',
+  'contactEmail',
+  'contactPhone',
+  'city',
+  'state',
+  'pinCode',
+];
 
 interface PlanDetail {
   tier: 'BASIC' | 'PRO' | 'ENTERPRISE';
@@ -163,52 +181,55 @@ const AddTenant: React.FC = () => {
     const errors: Record<string, string> = {};
 
     if (!formData.fleetName.trim()) {
-      errors.fleetName = 'Fleet display name is required.';
+      errors.fleetName = 'Please enter the fleet name.';
     }
 
-    if (formData.businessCode.length < 2) {
+    if (!formData.businessCode.trim()) {
+      errors.businessCode = 'Please enter the business code.';
+    } else if (formData.businessCode.length < 2) {
       errors.businessCode = 'Business code must be at least 2 alphanumeric characters.';
     }
 
     if (!formData.ownerName.trim()) {
-      errors.ownerName = 'Owner / Admin full name is required.';
+      errors.ownerName = 'Please enter the contact person name.';
     }
 
-    if (!formData.contactEmail.trim() || !formData.contactEmail.includes('@')) {
-      errors.contactEmail = 'Valid official contact email is required.';
+    const emailVal = validateEmail(formData.contactEmail);
+    if (!emailVal.valid) {
+      errors.contactEmail = emailVal.error || 'Please enter a valid email address.';
     }
 
     const phoneVal = validateMobile(formData.contactPhone);
     if (!phoneVal.valid) {
-      errors.contactPhone = phoneVal.error || 'Please enter a valid 10-digit mobile number.';
+      errors.contactPhone = phoneVal.error || 'Phone number must be exactly 10 digits.';
     }
 
     if (!formData.city.trim()) {
-      errors.city = 'Primary operating city is required.';
+      errors.city = 'Please enter the city.';
     }
 
     if (!formData.state.trim()) {
-      errors.state = 'Operating state is required.';
+      errors.state = 'Please enter the state.';
     }
 
-    if (formData.pinCode) {
+    if (formData.pinCode.trim()) {
       const pinVal = validatePinCode(formData.pinCode);
       if (!pinVal.valid) {
-        errors.pinCode = pinVal.error || 'Please enter a valid 6-digit PIN code.';
+        errors.pinCode = pinVal.error || 'Please enter a valid 6-digit pincode.';
       }
     }
 
-    if (formData.gstin) {
+    if (formData.gstin.trim()) {
       const gstinVal = validateGstin(formData.gstin);
       if (!gstinVal.valid) {
-        errors.gstin = gstinVal.error || 'Invalid GSTIN format. Expected 15 characters (e.g., 33AAACA1111A1Z1).';
+        errors.gstin = gstinVal.error || 'Please enter a valid 15-character GST number.';
       }
     }
 
-    if (formData.panNumber) {
+    if (formData.panNumber.trim()) {
       const panVal = validatePan(formData.panNumber);
       if (!panVal.valid) {
-        errors.panNumber = panVal.error || 'Invalid PAN format. Expected 10 characters (e.g., AAACA1111A).';
+        errors.panNumber = panVal.error || 'Please enter a valid 10-character PAN number.';
       }
     }
 
@@ -217,14 +238,23 @@ const AddTenant: React.FC = () => {
     }
 
     setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
+
+    const errorKeys = FIELD_ORDER.filter((key) => errors[key]);
+    if (errorKeys.length > 0) {
+      const firstKey = errorKeys[0];
+      const firstMsg = errors[firstKey];
+      setErrorMessage(firstMsg);
+      showToast(firstMsg, 'error');
+      scrollToFirstError(errorKeys);
+      return false;
+    }
+
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateInputs()) {
-      setErrorMessage('Please fix the errors highlighted below.');
-      showToast('Please fix the validation errors before submitting.', 'error');
       return;
     }
 
@@ -299,6 +329,10 @@ const AddTenant: React.FC = () => {
       const backendFieldErrors = extractFieldErrors(err);
       if (Object.keys(backendFieldErrors).length > 0) {
         setFieldErrors((prev) => ({ ...prev, ...backendFieldErrors }));
+        const backendErrorKeys = FIELD_ORDER.filter((key) => backendFieldErrors[key]);
+        if (backendErrorKeys.length > 0) {
+          scrollToFirstError(backendErrorKeys);
+        }
       }
     } finally {
       setSubmitting(false);
@@ -323,7 +357,7 @@ const AddTenant: React.FC = () => {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 sm:p-10 space-y-8">
+          <form onSubmit={handleSubmit} noValidate className="p-6 sm:p-10 space-y-8">
             {errorMessage && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start gap-3">
                 <svg className="w-5 h-5 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -340,49 +374,58 @@ const AddTenant: React.FC = () => {
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                 <div>
-                  <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                  <label htmlFor="fleetName" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                     Fleet Display Name *
                   </label>
                   <input
                     type="text"
+                    id="fleetName"
                     name="fleetName"
                     required
                     placeholder="e.g. Apex Express"
                     value={formData.fleetName}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.fleetName ? 'border-red-500' : 'border-[#E5E7EB]'} text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                      fieldErrors.fleetName ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                    } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                   />
                   {fieldErrors.fleetName && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.fleetName}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                  <label htmlFor="legalName" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                     Legal Registered Entity Name
                   </label>
                   <input
                     type="text"
+                    id="legalName"
                     name="legalName"
                     placeholder="e.g. Apex Mobility Solutions Pvt. Ltd."
                     value={formData.legalName}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
+                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                      fieldErrors.legalName ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                    } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                  <label htmlFor="businessCode" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                     Short Business Code (2–8 Chars) *
                   </label>
                   <div className="relative">
                     <input
                       type="text"
+                      id="businessCode"
                       name="businessCode"
                       required
                       maxLength={8}
                       placeholder="e.g. APX, BLU"
                       value={formData.businessCode}
                       onChange={handleChange}
-                      className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.businessCode ? 'border-red-500' : 'border-[#E5E7EB]'} font-mono font-bold text-sm tracking-wider uppercase focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                      className={`w-full px-4 py-2.5 rounded-lg border ${
+                        fieldErrors.businessCode ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                      } font-mono font-bold text-sm tracking-wider uppercase focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                     />
                     <span className="absolute right-3 top-2.5 text-xs text-[#7A7570] font-mono">
                       {formData.businessCode.length}/8
@@ -400,66 +443,79 @@ const AddTenant: React.FC = () => {
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                 <div>
-                  <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                  <label htmlFor="gstin" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                     Fleet GSTIN (15 Chars)
                   </label>
                   <input
                     type="text"
+                    id="gstin"
                     name="gstin"
                     maxLength={15}
                     placeholder="e.g. 33AAACA1111A1Z1"
                     value={formData.gstin}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.gstin ? 'border-red-500' : 'border-[#E5E7EB]'} font-mono uppercase text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                      fieldErrors.gstin ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                    } font-mono uppercase text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                   />
                   {fieldErrors.gstin && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.gstin}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                  <label htmlFor="panNumber" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                     Fleet PAN Number (10 Chars)
                   </label>
                   <input
                     type="text"
+                    id="panNumber"
                     name="panNumber"
                     maxLength={10}
                     placeholder="e.g. AAACA1111A"
                     value={formData.panNumber}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.panNumber ? 'border-red-500' : 'border-[#E5E7EB]'} font-mono uppercase text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                      fieldErrors.panNumber ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                    } font-mono uppercase text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                   />
                   {fieldErrors.panNumber && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.panNumber}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                  <label htmlFor="sacCode" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                     SAC Code (Passenger Transport)
                   </label>
                   <input
                     type="text"
+                    id="sacCode"
                     name="sacCode"
                     maxLength={6}
                     placeholder="996609"
                     value={formData.sacCode}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.sacCode ? 'border-red-500' : 'border-[#E5E7EB]'} font-mono text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                      fieldErrors.sacCode ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                    } font-mono text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                   />
                   {fieldErrors.sacCode && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.sacCode}</p>}
                 </div>
               </div>
 
               <div className="mt-4">
-                <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                <label htmlFor="registeredAddress" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                   Registered Office Address (Invoice Footer)
                 </label>
                 <textarea
+                  id="registeredAddress"
                   name="registeredAddress"
                   rows={2}
                   placeholder="e.g. 101 Corporate Towers, Anna Salai, Guindy, Chennai - 600032"
                   value={formData.registeredAddress}
                   onChange={handleChange}
-                  className="w-full px-4 py-2.5 rounded-lg border border-[#E5E7EB] text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white"
+                  className={`w-full px-4 py-2.5 rounded-lg border ${
+                    fieldErrors.registeredAddress ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                  } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                 />
+                {fieldErrors.registeredAddress && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.registeredAddress}</p>}
               </div>
 
               {/* Fleet Logo Upload */}
@@ -498,49 +554,58 @@ const AddTenant: React.FC = () => {
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                 <div>
-                  <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                  <label htmlFor="ownerName" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                     Owner / Admin Full Name *
                   </label>
                   <input
                     type="text"
+                    id="ownerName"
                     name="ownerName"
                     required
                     placeholder="e.g. Rajesh Kumar"
                     value={formData.ownerName}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.ownerName ? 'border-red-500' : 'border-[#E5E7EB]'} text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                      fieldErrors.ownerName ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                    } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                   />
                   {fieldErrors.ownerName && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.ownerName}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                  <label htmlFor="contactEmail" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                     Official Contact Email *
                   </label>
                   <input
                     type="email"
+                    id="contactEmail"
                     name="contactEmail"
                     required
                     placeholder="admin@yourcompany.com"
                     value={formData.contactEmail}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.contactEmail ? 'border-red-500' : 'border-[#E5E7EB]'} text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                      fieldErrors.contactEmail ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                    } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                   />
                   {fieldErrors.contactEmail && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.contactEmail}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                  <label htmlFor="contactPhone" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                     Official Contact Phone *
                   </label>
                   <input
                     type="tel"
+                    id="contactPhone"
                     name="contactPhone"
                     required
                     placeholder="+91 98765 43210"
                     value={formData.contactPhone}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.contactPhone ? 'border-red-500' : 'border-[#E5E7EB]'} text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                      fieldErrors.contactPhone ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                    } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                   />
                   {fieldErrors.contactPhone && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.contactPhone}</p>}
                 </div>
@@ -548,49 +613,58 @@ const AddTenant: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-4">
                 <div>
-                  <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                  <label htmlFor="city" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                     Primary Operating City *
                   </label>
                   <input
                     type="text"
+                    id="city"
                     name="city"
                     required
                     placeholder="e.g. Chennai"
                     value={formData.city}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.city ? 'border-red-500' : 'border-[#E5E7EB]'} text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                      fieldErrors.city ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                    } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                   />
                   {fieldErrors.city && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.city}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                  <label htmlFor="state" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                     Operating State *
                   </label>
                   <input
                     type="text"
+                    id="state"
                     name="state"
                     required
                     placeholder="e.g. Tamil Nadu"
                     value={formData.state}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.state ? 'border-red-500' : 'border-[#E5E7EB]'} text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                      fieldErrors.state ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                    } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                   />
                   {fieldErrors.state && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.state}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase text-[#17171D] mb-1">
+                  <label htmlFor="pinCode" className="block text-xs font-bold uppercase text-[#17171D] mb-1">
                     PIN Code
                   </label>
                   <input
                     type="text"
+                    id="pinCode"
                     name="pinCode"
                     maxLength={6}
                     placeholder="600032"
                     value={formData.pinCode}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2.5 rounded-lg border ${fieldErrors.pinCode ? 'border-red-500' : 'border-[#E5E7EB]'} text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
+                    className={`w-full px-4 py-2.5 rounded-lg border ${
+                      fieldErrors.pinCode ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20' : 'border-[#E5E7EB]'
+                    } text-sm focus:ring-2 focus:ring-[#5B3DF5]/20 focus:border-[#5B3DF5] outline-none bg-white`}
                   />
                   {fieldErrors.pinCode && <p className="text-[11px] text-red-600 mt-0.5">{fieldErrors.pinCode}</p>}
                 </div>

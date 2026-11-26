@@ -19,6 +19,11 @@ import { showToast, AlertContainer } from '../../../components/AlertBox';
 import axiosInstance from '../../../utils/axiosInstance';
 import { useNavigate } from 'react-router-dom';
 import { Country, State, City, ICountry, IState, ICity } from 'country-state-city';
+import {
+  scrollToFirstError,
+  extractApiErrorMessage,
+  extractFieldErrors,
+} from '../../../utils/validation';
 
 // Define the data types
 type FormData = {
@@ -115,61 +120,60 @@ export default function AddOwnerForm() {
   };
 
   const validate = (): boolean => {
+    const newErrors: FormErrors = {};
+
     if (!formData.name.trim()) {
-      showToast("Owner name is required", "warn");
-      return false;
+      newErrors.name = "Owner name is required";
     }
 
     if (!formData.email.trim()) {
-      showToast("Email address is required", "warn");
-      return false;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      showToast("Invalid email format", "warn");
-      return false;
+      newErrors.email = "Email address is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = "Please enter a valid email address.";
     }
 
     if (!formData.phone.trim()) {
-      showToast("Phone number is required", "warn");
-      return false;
-    }
-    if (!/^\d{10}$/.test(formData.phone)) {
-      showToast("Phone number must be 10 digits", "warn");
-      return false;
+      newErrors.phone = "Phone number is required";
+    } else if (!/^\d{10}$/.test(formData.phone)) {
+      newErrors.phone = "Phone number must be exactly 10 digits.";
     }
 
     if (!formData.address1.trim()) {
-      showToast("Address Line 1 is required", "warn");
-      return false;
+      newErrors.address1 = "Address Line 1 is required";
     }
 
     if (!formData.address2.trim()) {
-      showToast("Address Line 2 is required", "warn");
-      return false;
+      newErrors.address2 = "Address Line 2 is required";
     }
 
     if (!formData.country) {
-      showToast("Please select a country", "warn");
-      return false;
+      newErrors.country = "Please select a country";
     }
 
     if (!formData.state) {
-      showToast("Please select a state", "warn");
-      return false;
+      newErrors.state = "Please select a state";
     }
 
     if (!formData.city) {
-      showToast("Please select a city", "warn");
-      return false;
+      newErrors.city = "Please select a city";
     }
+
     if (!formData.password.trim()) {
-      showToast("Password is required", "warn");
+      newErrors.password = "Password is required";
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      const errorKeys = Object.keys(newErrors);
+      const firstError = newErrors[errorKeys[0] as keyof FormData]!;
+      showToast(firstError, "warn");
+      scrollToFirstError(errorKeys);
       return false;
     }
-    if (formData.password.length < 6) {
-      showToast("Password must be at least 6 characters", "warn");
-      return false;
-    }
+
+    setErrors({});
     return true; // ✅ All checks passed
   };
 
@@ -202,15 +206,14 @@ export default function AddOwnerForm() {
     } catch (error: any) {
       console.error('❌ Error:', error.response?.data || error.message);
 
-      if (error.response?.status === 400 && error.response?.data?.message) {
-        if (error.response.data.message.toLowerCase().includes("already")) {
-          showToast('Owner with this name/email already exists. Try a different one.', 'error');
-        } else {
-          showToast(error.response.data.message, 'error');
-        }
-      } else {
-        showToast('Failed to add owner. Please try again.', 'error');
+      const fieldErrors = extractFieldErrors(error);
+      if (Object.keys(fieldErrors).length > 0) {
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
+        scrollToFirstError(Object.keys(fieldErrors));
       }
+
+      const msg = extractApiErrorMessage(error, 'Failed to add owner. Please try again.');
+      showToast(msg, 'error');
     } finally {
       isSubmittingRef.current = false;
       setSubmitting(false);
@@ -272,6 +275,7 @@ export default function AddOwnerForm() {
               value={formData.password}
               onChange={handleChange}
               placeholder="Enter Password"
+              error={errors.password}
             />
 
             <InputBox

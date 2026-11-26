@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Tenant } from '../models/tenant';
 import { TenantSmsConfig, TemplateMappingItem } from '../models/tenantSmsConfig';
 import { TenantSubscription } from '../models/tenantSubscription';
 import { ROOT_TENANT_ID } from '../context/tenantContext';
@@ -185,21 +186,27 @@ export async function getTenantSmsConfig(tenantId: string): Promise<{
   let record = await TenantSmsConfig.findOne({ where: { tenantId } });
 
   // If root tenant and not in DB yet, create or fallback
-  if (!record && tenantId === ROOT_TENANT_ID) {
-    const envKey = (process.env.TWO_FACTOR_API_KEY || process.env.TWOFACTOR_API_KEY || '').trim();
-    const envSender = (process.env.TWO_FACTOR_SENDER_ID || process.env.TWOFACTOR_SENDER_ID || 'GRCCAB').trim();
-    if (envKey) {
-      record = await TenantSmsConfig.create({
-        tenantId,
-        provider: '2FACTOR',
-        encryptedApiKey: encryptSmsApiKey(envKey),
-        apiKeyMasked: maskApiKey(envKey),
-        senderId: envSender,
-        otpRoute: 'OTP1',
-        status: 'ACTIVE',
-        isVerified: true,
-        isEnabled: true,
-      });
+  const envKey = (process.env.TWO_FACTOR_API_KEY || process.env.TWOFACTOR_API_KEY || '').trim();
+  const envSender = (process.env.TWO_FACTOR_SENDER_ID || process.env.TWOFACTOR_SENDER_ID || 'GRCCAB').trim();
+
+  if (!record && tenantId === ROOT_TENANT_ID && envKey) {
+    try {
+      const rootTenantExists = await Tenant.findByPk(ROOT_TENANT_ID);
+      if (rootTenantExists) {
+        record = await TenantSmsConfig.create({
+          tenantId,
+          provider: '2FACTOR',
+          encryptedApiKey: encryptSmsApiKey(envKey),
+          apiKeyMasked: maskApiKey(envKey),
+          senderId: envSender,
+          otpRoute: 'OTP1',
+          status: 'ACTIVE',
+          isVerified: true,
+          isEnabled: true,
+        });
+      }
+    } catch (e: any) {
+      console.warn('[Tenant SMS Config] Safe fallback for root tenant:', e.message);
     }
   }
 
@@ -220,19 +227,19 @@ export async function getTenantSmsConfig(tenantId: string): Promise<{
     ...(record?.templateMappings || {}),
   };
 
-  const hasApiKey = Boolean(record?.encryptedApiKey);
+  const hasApiKey = Boolean(record?.encryptedApiKey || (tenantId === ROOT_TENANT_ID && envKey));
 
   return {
     success: true,
     config: {
       tenantId,
       provider: record?.provider || '2FACTOR',
-      senderId: record?.senderId || (tenantId === ROOT_TENANT_ID ? 'GRCCAB' : ''),
-      apiKeyMasked: record?.apiKeyMasked || (hasApiKey ? '••••••••••••' : 'Not Configured'),
+      senderId: record?.senderId || (tenantId === ROOT_TENANT_ID ? envSender : ''),
+      apiKeyMasked: record?.apiKeyMasked || (hasApiKey ? maskApiKey(envKey) : 'Not Configured'),
       hasApiKey,
       otpRoute: record?.otpRoute || 'OTP1',
       status: record?.status || (hasApiKey ? 'ACTIVE' : 'UNCONFIGURED'),
-      isVerified: Boolean(record?.isVerified),
+      isVerified: Boolean(record?.isVerified ?? (tenantId === ROOT_TENANT_ID && hasApiKey)),
       isEnabled: record ? record.isEnabled : true,
       lastVerifiedAt: record?.lastVerifiedAt || null,
       lastVerificationResult: record?.lastVerificationResult || null,

@@ -47,6 +47,8 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
       billingCycle = 'MONTHLY',
       fleetSize = '1-15',
       termsConsent = true,
+      demoCallDate,
+      demoCallTime,
       legalName,
       displayName,
       registeredAddress,
@@ -61,10 +63,98 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
     } = req.body;
 
     // Strict validation of required fields
-    if (!fleetName || !businessCode || !ownerName || !contactEmail || !contactPhone || !city || !state) {
+    if (!fleetName || !String(fleetName).trim()) {
       return res.status(400).json({
         success: false,
-        message: 'All registration fields (Fleet Name, Code, Owner Name, Email, Phone, City, State) are required.',
+        message: 'Please enter the fleet name.',
+        errors: { fleetName: 'Please enter the fleet name.' },
+      });
+    }
+
+    // Preferred Demo Call Date & Time Validation
+    if (!demoCallDate || !String(demoCallDate).trim() || !demoCallTime || !String(demoCallTime).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select your preferred demo call date and time.',
+        errors: { demoCallDate: 'Please select your preferred demo call date and time.' },
+      });
+    }
+
+    const cleanDemoDate = String(demoCallDate).trim();
+    const cleanDemoTime = String(demoCallTime).trim();
+
+    // Check date against current date (cannot be in the past)
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const maxDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const maxDateStr = `${maxDate.getFullYear()}-${String(maxDate.getMonth() + 1).padStart(2, '0')}-${String(maxDate.getDate()).padStart(2, '0')}`;
+
+    if (cleanDemoDate < todayStr) {
+      return res.status(400).json({
+        success: false,
+        message: 'Demo call date cannot be in the past.',
+        errors: { demoCallDate: 'Demo call date cannot be in the past.' },
+      });
+    }
+
+    if (cleanDemoDate > maxDateStr) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select a demo call time within the next 7 days.',
+        errors: { demoCallDate: 'Please select a demo call time within the next 7 days.' },
+      });
+    }
+
+    const cleanCode = String(businessCode || '').toUpperCase().trim().replace(/[^A-Z0-9]/g, '');
+    if (!cleanCode || cleanCode.length < 2 || cleanCode.length > 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'Business code must be between 2 and 10 alphanumeric characters (e.g. APX, BLU, GC).',
+        errors: { businessCode: 'Business code must be between 2 and 10 alphanumeric characters (e.g. APX, BLU, GC).' },
+      });
+    }
+
+    if (!ownerName || !String(ownerName).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter the contact person name.',
+        errors: { ownerName: 'Please enter the contact person name.' },
+      });
+    }
+
+    // Email syntax validation
+    const cleanEmail = String(contactEmail || '').toLowerCase().trim();
+    if (!cleanEmail || !EMAIL_REGEX.test(cleanEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid email address.',
+        errors: { contactEmail: 'Please enter a valid email address.' },
+      });
+    }
+
+    // Phone format validation (must be exactly 10 digits)
+    const cleanPhone = String(contactPhone || '').trim().replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length !== 10 || !PHONE_REGEX.test(cleanPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number must be exactly 10 digits.',
+        errors: { contactPhone: 'Phone number must be exactly 10 digits.' },
+      });
+    }
+
+    if (!city || !String(city).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter the city.',
+        errors: { city: 'Please enter the city.' },
+      });
+    }
+
+    if (!state || !String(state).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter the state.',
+        errors: { state: 'Please enter the state.' },
       });
     }
 
@@ -72,34 +162,18 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         message: 'You must accept the terms and conditions to register.',
-      });
-    }
-
-    // Email syntax validation
-    const cleanEmail = String(contactEmail || '').toLowerCase().trim();
-    if (!EMAIL_REGEX.test(cleanEmail)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid contact email format. Please provide a valid email address (e.g. operator@fleet.com).',
-      });
-    }
-
-    // Phone format validation
-    const cleanPhone = String(contactPhone || '').trim().replace(/\D/g, '');
-    if (!PHONE_REGEX.test(cleanPhone)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid contact phone format. Expected a 10-digit Indian mobile number starting with 6-9.',
+        errors: { termsConsent: 'You must accept the terms and conditions to register.' },
       });
     }
 
     // PIN code validation when provided
-    if (pinCode) {
-      const cleanPin = String(pinCode).trim();
-      if (!PINCODE_REGEX.test(cleanPin)) {
+    if (pinCode && String(pinCode).trim()) {
+      const cleanPin = String(pinCode).trim().replace(/\D/g, '');
+      if (cleanPin.length !== 6 || !PINCODE_REGEX.test(cleanPin)) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid PIN code format. Expected a 6-digit Indian postal code.',
+          message: 'Please enter a valid 6-digit pincode.',
+          errors: { pinCode: 'Please enter a valid 6-digit pincode.' },
         });
       }
     }
@@ -110,9 +184,109 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         message: 'Fleet name must be at least 2 characters long.',
+        errors: { fleetName: 'Fleet name must be at least 2 characters long.' },
       });
     }
 
+    // Optional Legal Field Validation
+    const cleanGstin = gstin && String(gstin).trim() ? String(gstin).trim().toUpperCase() : null;
+    if (cleanGstin && (!GSTIN_REGEX.test(cleanGstin) || cleanGstin.length !== 15)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid 15-character GST number.',
+        errors: { gstin: 'Please enter a valid 15-character GST number.' },
+      });
+    }
+
+    const cleanPan = panNumber && String(panNumber).trim()
+      ? String(panNumber).trim().toUpperCase()
+      : (cleanGstin && cleanGstin.length >= 12 ? cleanGstin.substring(2, 12) : null);
+    if (cleanPan && (!PAN_REGEX.test(cleanPan) || cleanPan.length !== 10)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid 10-character PAN number.',
+        errors: { panNumber: 'Please enter a valid 10-character PAN number.' },
+      });
+    }
+
+    const cleanSac = sacCode ? String(sacCode).trim() : '996609';
+    if (cleanSac && !SAC_REGEX.test(cleanSac)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid SAC code format. Expected 6 digits (default: 996609).',
+        errors: { sacCode: 'Invalid SAC code format. Expected 6 digits (default: 996609).' },
+      });
+    }
+
+    // DUPLICATE CHECKS AGAINST LIVE DATABASE
+
+    // 1. Duplicate Email Check
+    const existingEmailPending = await TenantRegistrationRequest.findOne({
+      where: {
+        contactEmail: cleanEmail,
+        status: 'PENDING',
+      },
+    });
+    const existingEmailTenant = await Tenant.findOne({ where: { contactEmail: cleanEmail } });
+    const existingEmailEmp = await Employee.findOne({ where: { email: cleanEmail } });
+    const existingEmailUser = await User.findOne({ where: { email: cleanEmail } });
+    if (existingEmailPending || existingEmailTenant || existingEmailEmp || existingEmailUser) {
+      return res.status(409).json({
+        success: false,
+        message: 'This email address is already registered.',
+        errors: { contactEmail: 'This email address is already registered.' },
+      });
+    }
+
+    // 2. Duplicate Phone Check
+    const existingPhonePending = await TenantRegistrationRequest.findOne({
+      where: {
+        contactPhone: cleanPhone,
+        status: 'PENDING',
+      },
+    });
+    const existingPhoneTenant = await Tenant.findOne({ where: { contactPhone: cleanPhone } });
+    const existingPhoneEmp = await Employee.findOne({ where: { phno: cleanPhone } });
+    const existingPhoneUser = await User.findOne({ where: { mobile: cleanPhone } });
+    if (existingPhonePending || existingPhoneTenant || existingPhoneEmp || existingPhoneUser) {
+      return res.status(409).json({
+        success: false,
+        message: 'This phone number is already registered.',
+        errors: { contactPhone: 'This phone number is already registered.' },
+      });
+    }
+
+    // 3. Duplicate GSTIN Check (if entered)
+    if (cleanGstin) {
+      const existingGstinTenant = await Tenant.findOne({ where: { gstin: cleanGstin } });
+      const existingGstinPending = await TenantRegistrationRequest.findOne({
+        where: { gstin: cleanGstin, status: 'PENDING' },
+      });
+      if (existingGstinTenant || existingGstinPending) {
+        return res.status(409).json({
+          success: false,
+          message: 'This GST number is already registered.',
+          errors: { gstin: 'This GST number is already registered.' },
+        });
+      }
+    }
+
+    // 4. Duplicate PAN Check (if entered)
+    if (cleanPan) {
+      const existingPanTenant = await Tenant.findOne({ where: { panNumber: cleanPan } });
+      const existingPanPending = await TenantRegistrationRequest.findOne({
+        where: { panNumber: cleanPan, status: 'PENDING' },
+      });
+      if (existingPanTenant || existingPanPending) {
+        return res.status(409).json({
+          success: false,
+          message: 'This PAN number is already registered.',
+          errors: { panNumber: 'This PAN number is already registered.' },
+        });
+      }
+    }
+
+    // 5. Duplicate Fleet Name Check
     const existingFleetName = await Tenant.findOne({
       where: Sequelize.where(
         Sequelize.fn('LOWER', Sequelize.fn('TRIM', Sequelize.col('name'))),
@@ -123,6 +297,7 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
       return res.status(409).json({
         success: false,
         message: `A fleet with name '${cleanFleetName}' is already registered on CABZ. Fleet names must be unique.`,
+        errors: { fleetName: `A fleet with name '${cleanFleetName}' is already registered on CABZ. Fleet names must be unique.` },
       });
     }
 
@@ -141,52 +316,20 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
       return res.status(409).json({
         success: false,
         message: `An application with fleet name '${cleanFleetName}' is currently under review.`,
+        errors: { fleetName: `An application with fleet name '${cleanFleetName}' is currently under review.` },
       });
     }
 
-    const cleanCode = String(businessCode).toUpperCase().trim().replace(/[^A-Z0-9]/g, '');
-    if (cleanCode.length < 2 || cleanCode.length > 10) {
-      return res.status(400).json({
-        success: false,
-        message: 'Business code must be between 2 and 10 alphanumeric characters (e.g. APX, BLU, GC).',
-      });
-    }
-
-    // Optional Legal Field Validation
-    const cleanGstin = gstin ? String(gstin).trim().toUpperCase() : null;
-    if (cleanGstin && !GSTIN_REGEX.test(cleanGstin)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid GSTIN format. Expected 15-character Indian GSTIN (e.g., 33AAMCG2518C1Z0).',
-      });
-    }
-
-    const cleanPan = panNumber ? String(panNumber).trim().toUpperCase() : (cleanGstin && cleanGstin.length >= 12 ? cleanGstin.substring(2, 12) : null);
-    if (cleanPan && !PAN_REGEX.test(cleanPan)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid PAN format. Expected 10-character alphanumeric PAN (e.g., AAMCG2518C).',
-      });
-    }
-
-    const cleanSac = sacCode ? String(sacCode).trim() : '996609';
-    if (cleanSac && !SAC_REGEX.test(cleanSac)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid SAC code format. Expected 6-digit Service Accounting Code (e.g., 996609).',
-      });
-    }
-
-    // Check duplicate code against active tenants
+    // 6. Duplicate Business Code Check
     const existingTenant = await Tenant.findOne({ where: { code: cleanCode } });
     if (existingTenant) {
       return res.status(409).json({
         success: false,
         message: `Business code '${cleanCode}' is already registered by an active fleet operator. Please choose another.`,
+        errors: { businessCode: `Business code '${cleanCode}' is already registered.` },
       });
     }
 
-    // Check duplicate code against existing pending registrations
     const existingPending = await TenantRegistrationRequest.findOne({
       where: {
         businessCode: cleanCode,
@@ -197,6 +340,7 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
       return res.status(409).json({
         success: false,
         message: `An application with business code '${cleanCode}' is currently under review.`,
+        errors: { businessCode: `An application with business code '${cleanCode}' is currently under review.` },
       });
     }
 
@@ -236,6 +380,9 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
       requestedPlanTier: normalizedTier,
       billingCycle: normalizedCycle,
       fleetSize: String(fleetSize).trim(),
+      demoCallDate: cleanDemoDate,
+      demoCallTime: cleanDemoTime,
+      demoCallStatus: 'Requested',
       status: 'PENDING',
       termsConsent: Boolean(termsConsent),
     });
@@ -340,6 +487,9 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
         requestId,
         fleetName: registration.fleetName,
         businessCode: registration.businessCode,
+        demoCallDate: registration.demoCallDate,
+        demoCallTime: registration.demoCallTime,
+        demoCallStatus: registration.demoCallStatus,
         slug: registration.slug,
         loginUrl: getFleetLoginUrl(registration.slug || registration.businessCode.toLowerCase()),
         status: registration.status,
@@ -402,6 +552,9 @@ export const getRegistrationRequests = async (req: Request, res: Response) => {
         billingCycle: json.billingCycle,
         reviewerNotes: json.reviewNotes,
         reviewNotes: json.reviewNotes,
+        demoCallDate: json.demoCallDate,
+        demoCallTime: json.demoCallTime,
+        demoCallStatus: json.demoCallStatus || 'Requested',
       };
     });
 
@@ -450,10 +603,57 @@ export const getRegistrationRequestById = async (req: Request, res: Response) =>
         billingCycle: json.billingCycle,
         reviewerNotes: json.reviewNotes,
         reviewNotes: json.reviewNotes,
+        demoCallDate: json.demoCallDate,
+        demoCallTime: json.demoCallTime,
+        demoCallStatus: json.demoCallStatus || 'Requested',
       },
     });
   } catch (error: any) {
     console.error('Error fetching registration request:', error);
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+/**
+ * SuperAdmin: Update demo call appointment status and date/time.
+ */
+export const updateDemoCallStatus = async (req: Request, res: Response) => {
+  try {
+    const requestId = req.params.requestId || req.params.id;
+    const { demoCallStatus, demoCallDate, demoCallTime } = req.body;
+
+    const reg = await TenantRegistrationRequest.findByPk(requestId);
+    if (!reg) {
+      return res.status(404).json({ success: false, message: 'Registration request not found.' });
+    }
+
+    const validStatuses = ['Requested', 'Confirmed', 'Completed', 'Rescheduled', 'Cancelled'];
+    if (demoCallStatus && !validStatuses.includes(demoCallStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid demo call status. Allowed values: ${validStatuses.join(', ')}`,
+      });
+    }
+
+    const updates: any = {};
+    if (demoCallStatus) updates.demoCallStatus = demoCallStatus;
+    if (demoCallDate) updates.demoCallDate = demoCallDate;
+    if (demoCallTime) updates.demoCallTime = demoCallTime;
+
+    await reg.update(updates);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Demo call details updated successfully.',
+      data: {
+        requestId: reg.requestId,
+        demoCallDate: reg.demoCallDate,
+        demoCallTime: reg.demoCallTime,
+        demoCallStatus: reg.demoCallStatus,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error updating demo call status:', error);
     return res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };
@@ -490,8 +690,9 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
 
     const tenantSlug = reg.slug || await generateUniqueFleetSlug(reg.displayName || reg.fleetName);
 
-    const now = new Date();
-    const periodEnd = calculateSubscriptionPeriodEnd(now, billingCycle);
+    const approvalNow = new Date();
+    // 7-day free trial starts at approval timestamp and expires in exactly 7 days
+    const trialEndsAt = new Date(approvalNow.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     const rawToken = `act_${crypto.randomBytes(32).toString('hex')}`;
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
@@ -562,8 +763,12 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
         billingCycle,
         agreedPrice,
         currency: 'INR',
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
+        trialStartDate: approvalNow,
+        trialEndsAt: trialEndsAt,
+        trialDurationDays: 7,
+        trialExtensionHistory: [],
+        currentPeriodStart: approvalNow,
+        currentPeriodEnd: trialEndsAt,
       }, { transaction: t });
 
       activationTokenRecord = await TenantActivationToken.create({
@@ -579,9 +784,9 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
       await reg.update({
         status: 'APPROVED',
         reviewedBy: (req as any).user?.userId || 'SuperAdmin',
-        reviewedAt: new Date(),
+        reviewedAt: approvalNow,
         tenantId,
-        reviewNotes: reviewNotes || 'Application reviewed and approved.',
+        reviewNotes: reviewNotes || 'Application reviewed and approved with 7-day free trial.',
       }, { transaction: t });
     });
 
@@ -599,8 +804,8 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
         billingCycle,
         agreedPrice,
         currency: 'INR',
-        startDate: now,
-        renewalDate: periodEnd,
+        startDate: approvalNow,
+        renewalDate: trialEndsAt,
         quotas: {
           vehicles: limits.vehicles,
           drivers: limits.drivers,
@@ -631,6 +836,11 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
         templateCode: 'TENANT_ADMIN_ACTIVATION_LINK',
         subject: `🎉 Congratulations! Your CABZ Account is Approved: ${reg.fleetName}`,
         body: `Dear ${reg.ownerName},\n\nYour application for ${reg.fleetName} has been approved!\n\n` +
+          `FREE TRIAL DETAILS:\n` +
+          `• Approval Status: Approved\n` +
+          `• Trial Start Date: ${approvalNow.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}\n` +
+          `• Trial Expiry Date: ${trialEndsAt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}\n` +
+          `• Total Free Trial Duration: 7 Days (Full Operational Access)\n\n` +
           `PLAN SUMMARY:\n` +
           `• Plan: ${plan?.name || reg.requestedPlanTier}\n` +
           `• Agreed Price: ₹${agreedPrice} / ${billingCycle.toLowerCase()}\n` +
@@ -651,6 +861,10 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
           planTier: reg.requestedPlanTier,
           billingCycle,
           agreedPrice: String(agreedPrice),
+          trialStartDate: approvalNow.toISOString(),
+          trialEndsAt: trialEndsAt.toISOString(),
+          trialDurationDays: '7',
+          approvalStatus: 'Approved',
           activationUrl,
           loginUrl: fleetLoginUrl,
           fleetLoginUrl,

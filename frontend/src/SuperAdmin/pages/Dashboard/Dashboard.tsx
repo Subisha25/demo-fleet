@@ -39,8 +39,9 @@ import { useTenant } from '../../../context/TenantContext';
 
 interface MonthlyBooking {
   year: number;
-  month: number;
+  month?: number;
   totalBookings: number;
+  date?: string;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -120,6 +121,20 @@ interface FleetOverviewData {
     employees: { current: number; limit: number };
     companies: { current: number; limit: number };
   };
+  trialDetails?: {
+    trialStatus: string;
+    isTrialing: boolean;
+    isTrialExpired: boolean;
+    originalTrialDays: number;
+    extendedTrialDays: number;
+    totalTrialDays: number;
+    trialStartDate: string;
+    originalTrialExpiry: string;
+    currentTrialExpiry: string;
+    remainingDays: number;
+    remainingMs: number;
+    trialExtensionHistory?: Array<any>;
+  };
 }
 
 const Dashboard: React.FC = () => {
@@ -178,8 +193,18 @@ const Dashboard: React.FC = () => {
     },
   ];
 
+  const isDemo = localStorage.getItem('isDemoView') === 'true' || localStorage.getItem('isDemoMode') === 'true' || role === 'demo';
+
   useEffect(() => {
     const fetchCounts = async () => {
+      if (isDemo) {
+        setConfirmPendingCount(14);
+        setPaymentPendingCount(6);
+        setClosedOrdersCount(29);
+        setCompletedOrdersCount(158);
+        return;
+      }
+
       try {
         const confirmRes = await axiosInstance.get('/emp/confirmPendingOrderCountWeb');
         setConfirmPendingCount(confirmRes.data.count || 0);
@@ -198,10 +223,52 @@ const Dashboard: React.FC = () => {
     };
 
     fetchCounts();
-  }, [selectedFleet, fleetChangeVersion]);
+  }, [selectedFleet, fleetChangeVersion, isDemo]);
 
   useEffect(() => {
     const fetchData = async () => {
+      if (isDemo) {
+        setPendingPercentage(11.5);
+        setCompletedPercentage(88.5);
+        setBookingData([
+          { date: 'Jan', totalBookings: 85, year: 2026 },
+          { date: 'Feb', totalBookings: 110, year: 2026 },
+          { date: 'Mar', totalBookings: 135, year: 2026 },
+          { date: 'Apr', totalBookings: 160, year: 2026 },
+          { date: 'May', totalBookings: 195, year: 2026 },
+          { date: 'Jun', totalBookings: 220, year: 2026 },
+        ]);
+        setYearRange('2026');
+        setFleetOverview({
+          tenant: {
+            name: 'CABZ Smart Fleet Demo',
+            contactPerson: 'Fleet Operations Lead',
+            contactEmail: 'demo@cabzmobility.com',
+            contactPhone: '9876543210',
+            status: 'ACTIVE',
+          },
+          subscription: {
+            planTier: 'DEMO',
+            plan: 'CABZ Demo Preview',
+            billingCycle: 'evaluation',
+            status: 'DEMO_PREVIEW',
+            startDate: '2026-01-01',
+            endDate: '2026-12-31',
+            daysRemaining: 30,
+            isExpiringSoon: false,
+            inGracePeriod: false,
+            isSuspended: false,
+          },
+          quotas: {
+            vehicles: { current: 18, limit: 50 },
+            drivers: { current: 24, limit: 60 },
+            employees: { current: 115, limit: 300 },
+            companies: { current: 12, limit: 40 },
+          },
+        });
+        return;
+      }
+
       try {
         const statusRes = await axiosInstance.get('/invoiceRoutes/invoice/status-count');
         if (statusRes.data?.success) {
@@ -211,8 +278,8 @@ const Dashboard: React.FC = () => {
 
         const bookingsRes = await axiosInstance.get('/order/getmonthlybookings');
         if (bookingsRes.data?.success && Array.isArray(bookingsRes.data.data)) {
-          const formatted = bookingsRes.data.data.map((item: MonthlyBooking) => ({
-            date: `${MONTHS[item.month - 1]}`,
+          const formatted = bookingsRes.data.data.map((item: any) => ({
+            date: item.date || (item.month ? MONTHS[item.month - 1] : 'Jan'),
             totalBookings: item.totalBookings,
             year: item.year,
           }));
@@ -248,15 +315,54 @@ const Dashboard: React.FC = () => {
           }
         }
       } catch (err) {
-        showToast('Error fetching dashboard telemetry', 'error');
+        if (!isDemo) {
+          showToast('Error fetching dashboard telemetry', 'error');
+        }
       }
     };
 
     fetchData();
-  }, [selectedFleet, fleetChangeVersion]);
+  }, [selectedFleet, fleetChangeVersion, isDemo]);
 
   const sub = fleetOverview?.subscription;
   const quotas = fleetOverview?.quotas;
+  const trialData = fleetOverview?.trialDetails || (currentTenant?.subscription as any)?.trialDetails;
+
+  const isTrialActive = currentTenant?.status === 'TRIALING' || sub?.status === 'TRIALING' || trialData?.isTrialing || trialData?.trialStatus === 'ACTIVE';
+  const isTrialExpired = trialData?.trialStatus === 'EXPIRED';
+  const isTrialTenant = !isDemo && (isTrialActive || isTrialExpired);
+
+  const [trialCountdown, setTrialCountdown] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    isExpired: false,
+  });
+
+  useEffect(() => {
+    if (!isTrialTenant) return;
+
+    const targetExpiry = trialData?.currentTrialExpiry || sub?.endDate || (currentTenant?.subscription as any)?.trialEndsAt;
+    if (!targetExpiry) return;
+
+    const updateTimer = () => {
+      const diff = new Date(targetExpiry).getTime() - Date.now();
+      if (diff <= 0) {
+        setTrialCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true });
+      } else {
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        setTrialCountdown({ days, hours, minutes, seconds, isExpired: false });
+      }
+    };
+
+    updateTimer();
+    const intervalId = setInterval(updateTimer, 1000);
+    return () => clearInterval(intervalId);
+  }, [isTrialTenant, trialData, sub, currentTenant]);
 
   const activeTenantName = fleetOverview?.tenant?.name || currentTenant?.name || 'Active Fleet';
   const effectivePlan = fleetOverview?.subscription?.planTier || sub?.planTier || currentTenant?.planTier || 'PRO';
@@ -380,14 +486,176 @@ const Dashboard: React.FC = () => {
           </div>
         )}
 
+        {/* Dedicated Free Trial Operations Hub with Live Ticking Countdown */}
+        {isTrialTenant && (
+          <div
+            className={`rounded-2xl border p-6 shadow-sm transition-all ${
+              trialCountdown.isExpired
+                ? 'bg-rose-50/90 border-rose-300 text-rose-950'
+                : 'bg-gradient-to-r from-purple-50 via-indigo-50/50 to-white border-purple-200 text-slate-900'
+            }`}
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-purple-100">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`p-3 rounded-xl ${
+                    trialCountdown.isExpired
+                      ? 'bg-rose-100 text-rose-700'
+                      : 'bg-purple-100 text-purple-700'
+                  }`}
+                >
+                  <Clock size={24} className={trialCountdown.isExpired ? '' : 'animate-pulse'} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                        trialCountdown.isExpired
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-emerald-600 text-white'
+                      }`}
+                    >
+                      {trialCountdown.isExpired ? 'TRIAL EXPIRED' : 'FREE TRIAL ACTIVE'}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-500">
+                      CABZ 7-Day All-Access Evaluation
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-extrabold text-slate-900 mt-0.5">
+                    {trialCountdown.isExpired
+                      ? 'Your 7-Day Free Trial Has Ended'
+                      : 'Live Free Trial Operations Hub'}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <a
+                  href="/billing/checkout"
+                  className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5"
+                >
+                  <CreditCard size={14} />
+                  <span>Choose Paid Subscription Plan &rarr;</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Trial Details Grid: Separate Original 7 Days vs Extended Days */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4 text-xs">
+              <div className="bg-white p-3 rounded-xl border border-slate-200">
+                <span className="text-slate-500 block text-[11px] font-medium">Trial Started</span>
+                <span className="font-bold text-slate-800 text-xs">
+                  {new Date(
+                    trialData?.trialStartDate || sub?.startDate || (currentTenant as any)?.createdAt || ''
+                  ).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                </span>
+              </div>
+
+              <div className="bg-white p-3 rounded-xl border border-slate-200">
+                <span className="text-slate-500 block text-[11px] font-medium">Original Free Trial</span>
+                <span className="font-bold text-indigo-700 text-xs">7 Days</span>
+              </div>
+
+              <div className="bg-white p-3 rounded-xl border border-slate-200">
+                <span className="text-slate-500 block text-[11px] font-medium">Extended Days</span>
+                <span className="font-bold text-purple-700 text-xs">
+                  +{trialData?.extendedTrialDays || 0} Days
+                </span>
+              </div>
+
+              <div className="bg-white p-3 rounded-xl border border-slate-200">
+                <span className="text-slate-500 block text-[11px] font-medium">Total Trial Duration</span>
+                <span className="font-bold text-slate-900 text-xs">
+                  {(trialData?.totalTrialDays || 7)} Days
+                </span>
+              </div>
+
+              <div className="bg-white p-3 rounded-xl border border-slate-200 col-span-2 md:col-span-1">
+                <span className="text-slate-500 block text-[11px] font-medium">Trial Ends Date</span>
+                <span className="font-bold text-slate-800 text-xs">
+                  {new Date(
+                    trialData?.currentTrialExpiry || sub?.endDate || ''
+                  ).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                </span>
+              </div>
+            </div>
+
+            {/* Live Ticking Countdown Timer */}
+            {!trialCountdown.isExpired ? (
+              <div className="mt-4 bg-white/90 p-4 rounded-xl border border-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Live Real-Time Countdown:
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 font-mono">
+                  <div className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-center min-w-[58px]">
+                    <span className="text-base font-extrabold">{trialCountdown.days}</span>
+                    <span className="text-[9px] block text-slate-400 uppercase font-sans">Days</span>
+                  </div>
+                  <span className="text-slate-400 font-bold">:</span>
+                  <div className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-center min-w-[58px]">
+                    <span className="text-base font-extrabold">
+                      {String(trialCountdown.hours).padStart(2, '0')}
+                    </span>
+                    <span className="text-[9px] block text-slate-400 uppercase font-sans">Hours</span>
+                  </div>
+                  <span className="text-slate-400 font-bold">:</span>
+                  <div className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-center min-w-[58px]">
+                    <span className="text-base font-extrabold">
+                      {String(trialCountdown.minutes).padStart(2, '0')}
+                    </span>
+                    <span className="text-[9px] block text-slate-400 uppercase font-sans">Mins</span>
+                  </div>
+                  <span className="text-slate-400 font-bold">:</span>
+                  <div className="bg-purple-900 text-purple-200 px-3 py-1.5 rounded-lg text-center min-w-[58px] border border-purple-600">
+                    <span className="text-base font-extrabold text-white">
+                      {String(trialCountdown.seconds).padStart(2, '0')}
+                    </span>
+                    <span className="text-[9px] block text-purple-300 uppercase font-sans">Secs</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 bg-rose-100/90 border border-rose-300 p-4 rounded-xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 text-xs text-rose-900 font-semibold">
+                  <AlertCircle size={18} className="text-rose-600 shrink-0" />
+                  <span>
+                    Your 7-day free trial has expired. Vehicle dispatch and booking actions are locked. Please select a paid subscription plan to reactivate full operations.
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Top Header Banner in Black & Purple Accent */}
         <div className="bg-[#0B0B0F] border-b-4 border-purple-600 rounded-xl p-6 text-white shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="bg-purple-950/70 text-purple-300 border border-purple-700/50 text-[11px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                Enterprise Dispatch v3.0
+                {isDemo
+                  ? 'CABZ Demo Preview • Read-Only'
+                  : isTrialActive
+                  ? 'CABZ Free Trial • All-Access'
+                  : isTrialExpired
+                  ? 'CABZ Free Trial • Expired'
+                  : isAllFleets
+                  ? 'CABZ Platform-Wide'
+                  : `CABZ ${effectivePlan.toUpperCase()}`}
               </span>
-              <span className="text-slate-300 text-xs">Isolated Tenant Telemetry</span>
+              <span className="text-slate-300 text-xs">
+                {isDemo ? 'Interactive Sandbox Telemetry' : 'Isolated Fleet Operations'}
+              </span>
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight">
               {isAllFleets ? "Platform-Wide Fleet Operations" : `${activeTenantName} Operations`}
@@ -424,7 +692,11 @@ const Dashboard: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Sparkles size={16} className="text-purple-600" />
                 <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                  Plan Quota Utilization ({effectivePlan.toUpperCase()} Plan)
+                  {isDemo
+                    ? 'Plan Quota Utilization (Demo Preview)'
+                    : isTrialTenant
+                    ? 'Plan Quota Utilization (7-Day Free Trial - Full Access)'
+                    : `Plan Quota Utilization (${effectivePlan.toUpperCase()} Plan)`}
                 </h3>
               </div>
               <span className="text-xs text-slate-500">

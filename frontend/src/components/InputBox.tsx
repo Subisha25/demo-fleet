@@ -3,6 +3,7 @@ import Calendar from "./Calender";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCalendarAlt, faCircleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { Eye, EyeOff } from "lucide-react";
 
 interface Option {
   value: string;
@@ -53,6 +54,7 @@ const InputBox: FC<InputBoxProps> = ({
 }) => {
   const initial = value ?? defaultValue ?? (type === "checkbox" ? false : "");
   const [inputValue, setInputValue] = useState<string | boolean | File | null>(initial);
+  const [showPassword, setShowPassword] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const calendarRef = useRef<HTMLDivElement>(null!);
   const [fromDate, setFromDate] = useState<Date | null>(null);
@@ -281,22 +283,33 @@ useEffect(() => {
       ) : (
         <div className="relative">
           {renderIcon()}
-        <input
-  id={name}
-  name={name}
-  type={type}
-  value={inputValue as string}
-  onChange={handleChange}
-  placeholder={placeholder}
-  required={required}
-  disabled={disabled}
-  readOnly={readOnly} 
-  onWheel={(e) => e.currentTarget.blur()} 
-   onKeyDown={(e) => {
-    if (e.key === "Enter") onEnterPress?.(); // 🔥 Enter press triggers callback
-  }}
-  className={`w-full border rounded px-4 py-2 outline-none ${icon ? 'pl-10' : ''} ${error ? 'border-red-500 ring-1 ring-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-2 focus:ring-purple-600 focus:border-purple-600'} ${type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''}`}
-/>
+          <input
+            id={name}
+            name={name}
+            type={type === "password" ? (showPassword ? "text" : "password") : type}
+            value={inputValue as string}
+            onChange={handleChange}
+            placeholder={placeholder}
+            required={required}
+            disabled={disabled}
+            readOnly={readOnly} 
+            onWheel={(e) => e.currentTarget.blur()} 
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onEnterPress?.(); // 🔥 Enter press triggers callback
+            }}
+            className={`w-full border rounded px-4 py-2 outline-none ${icon ? 'pl-10' : ''} ${type === 'password' ? 'pr-10' : ''} ${error ? 'border-red-500 ring-1 ring-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-2 focus:ring-purple-600 focus:border-purple-600'} ${type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''}`}
+          />
+          {type === "password" && (
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none cursor-pointer"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          )}
         </div>
       )}
       {error && <p className="mt-1 text-sm text-red-500 flex items-center gap-1"><FontAwesomeIcon icon={faCircleExclamation} /> {error}</p>}

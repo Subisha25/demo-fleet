@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { showToast } from './AlertBox';
 
 export type ButtonVariant =
   | 'primary'
@@ -79,9 +80,42 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
 }) => {
   const isLockedRef = useRef(false);
 
-  const isActuallyDisabled = disabled || loading;
+  const isDemo = typeof window !== 'undefined' && (
+    localStorage.getItem('isDemoView') === 'true' ||
+    localStorage.getItem('isDemoMode') === 'true' ||
+    localStorage.getItem('role') === 'demo'
+  );
+
+  const rawButtonText = (typeof text === 'string' ? text : '') ||
+    (typeof children === 'string' ? children : '') ||
+    (props['aria-label'] as string) ||
+    '';
+
+  const pathname = typeof window !== 'undefined' ? (window.location.pathname || '').toLowerCase() : '';
+  const isAuthOrPublicRoute = /^\/(login|adminlogin|forgetpasword|activate|register-fleet|company)/.test(pathname) || pathname.includes('/login');
+
+  const isAuthAction = /^(sign in|login|log in|authenticate|reset password|forgot password|send otp|verify otp|update password|activate account|start free trial|start 7-day|exit demo|register)/i.test(rawButtonText.trim());
+  const isModalDismiss = /^(cancel|close|dismiss|back|exit|no)/i.test(rawButtonText.trim());
+  const isDemoControl = /^(exit demo|register|start free trial|start 7-day)/i.test(rawButtonText.trim());
+
+  // Demo operational mutate action is ONLY applied inside authenticated demo preview workspace,
+  // NEVER on public/auth routes (login, forgot password, register, etc.) and NEVER on auth actions (Sign In, Log In, etc.)
+  const isMutateAction = !isAuthOrPublicRoute && !isAuthAction && isDemo && !isModalDismiss && !isDemoControl && (
+    /^(add|create|new|edit|update|delete|remove|save|confirm order|assign driver|close order|close pending|record payment|generate invoice|upload|import|export|dispatch|terminate|suspend)/i.test(rawButtonText.trim()) ||
+    variant === 'danger' ||
+    variant === 'edit'
+  );
+
+  const isActuallyDisabled = disabled || loading || isMutateAction;
 
   const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (isMutateAction) {
+      e.preventDefault();
+      e.stopPropagation();
+      showToast("You're viewing the CABZ Demo Preview. Register your fleet and start your free trial to access operational features.", 'warn');
+      return;
+    }
+
     // Synchronous double-click guard
     if (isActuallyDisabled || isLockedRef.current) {
       e.preventDefault();
@@ -107,6 +141,7 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
       type={type}
       disabled={isActuallyDisabled}
       onClick={handleClick}
+      title={isMutateAction ? "You're viewing the CABZ Demo Preview. Register your fleet and start your free trial to access operational features." : props.title}
       aria-busy={loading}
       aria-disabled={isActuallyDisabled}
       className={`inline-flex items-center justify-center font-medium transition-all duration-150 select-none
@@ -114,7 +149,7 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
         ${variantStyles[variant] || variantStyles.primary}
         ${
           isActuallyDisabled
-            ? 'opacity-60 cursor-not-allowed transform-none shadow-none pointer-events-none'
+            ? 'opacity-50 cursor-not-allowed transform-none shadow-none pointer-events-auto'
             : 'active:scale-[0.98] hover:shadow-md'
         }
         ${className}

@@ -42,22 +42,34 @@ axiosInstance.interceptors.response.use(
         data?.code === 'RESTRICTED_FREE_ACCESS' ||
         data?.code === 'SUBSCRIPTION_LOCKED' ||
         data?.code === 'SUBSCRIPTION_EXPIRED' ||
-        data?.requiresUpgrade
+        data?.code === 'SUBSCRIPTION_PAYMENT_REQUIRED' ||
+        data?.subscriptionRequired ||
+        data?.requiresUpgrade ||
+        data?.requiresPayment
       ) {
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
             new CustomEvent('fleetflow:subscription_required', {
               detail: {
                 title:
-                  data.code === 'SUBSCRIPTION_EXPIRED' || data.code === 'SUBSCRIPTION_LOCKED'
+                  data.code === 'SUBSCRIPTION_EXPIRED'
                     ? 'Subscription Expired'
+                    : data.code === 'SUBSCRIPTION_PAYMENT_REQUIRED'
+                    ? 'Payment Required to Activate Fleet'
                     : 'Subscription Required',
                 message: data.message,
-                isExpired: data.code === 'SUBSCRIPTION_EXPIRED' || data.code === 'SUBSCRIPTION_LOCKED',
+                isExpired: data.code === 'SUBSCRIPTION_EXPIRED',
+                isLocked: data.isLocked ?? (data.code === 'SUBSCRIPTION_PAYMENT_REQUIRED' || data.code === 'SUBSCRIPTION_EXPIRED' || data.code === 'SUBSCRIPTION_LOCKED'),
+                lockReason: data.lockReason || (data.code === 'SUBSCRIPTION_EXPIRED' ? 'EXPIRED' : 'PAYMENT_PENDING'),
+                subscriptionStatus: data.subscriptionStatus || (data.code === 'SUBSCRIPTION_EXPIRED' ? 'EXPIRED' : 'PENDING_PAYMENT'),
+                planTier: data.planTier || 'PRO',
+                billingCycle: data.billingCycle || 'MONTHLY',
+                payableAmount: data.payableAmount,
+                baseAmount: data.baseAmount,
+                taxAmount: data.taxAmount,
                 resource: data.resource,
                 current: data.current,
                 limit: data.limit,
-                planTier: data.planTier,
               },
             })
           );

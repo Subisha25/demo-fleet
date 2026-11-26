@@ -49,7 +49,14 @@ router.get(
     try {
       const tenantId = resolveTenantId(req);
       const result = await getTenantSmsConfig(tenantId);
-      return res.status(200).json(result);
+      return res.status(200).json({
+        success: true,
+        data: {
+          config: result.config,
+          subscriptionStatus: result.config?.subscriptionEligibility,
+        },
+        config: result.config,
+      });
     } catch (err: any) {
       console.error('[SMS Config Routes] Error fetching SMS config:', err);
       return res.status(500).json({

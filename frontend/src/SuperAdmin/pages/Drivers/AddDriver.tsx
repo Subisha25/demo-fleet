@@ -589,6 +589,7 @@ import {
   validateName,
   validateRequired,
   validatePinCode,
+  scrollToFirstError,
   extractApiErrorMessage,
   extractFieldErrors,
 } from "../../../utils/validation";
@@ -826,8 +827,10 @@ const AddDriverForm: React.FC = () => {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      const firstError = Object.values(newErrors)[0];
-      showToast(firstError, "warn");
+      const errorKeys = Object.keys(newErrors);
+      const firstError = newErrors[errorKeys[0] as keyof FormErrors];
+      showToast(firstError || "Please check the form for errors.", "warn");
+      scrollToFirstError(errorKeys);
       return;
     }
 
@@ -883,6 +886,7 @@ const AddDriverForm: React.FC = () => {
         if (fieldErrors.name) mapped.name = fieldErrors.name;
         if (fieldErrors.licenseNo) mapped.licenseNo = fieldErrors.licenseNo;
         setErrors((prev) => ({ ...prev, ...mapped }));
+        scrollToFirstError(Object.keys(mapped));
       }
       const msg = extractApiErrorMessage(error, "Failed to create driver. Please try again.");
       showToast(msg, "error");

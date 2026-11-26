@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { Mail, Lock, Key, ArrowLeft, ShieldCheck } from "lucide-react";
+import { Mail, Lock, Key, ArrowLeft, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import axiosInstance from "../../../utils/axiosInstance";
 import SimpleHeader from "../../../components/Homepage/simpleheader";
 import Footer from "../../../components/Homepage/Footer";
@@ -12,6 +12,8 @@ const ForgotPassword = () => {
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [resetToken, setResetToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -281,13 +283,22 @@ const ForgotPassword = () => {
                         <Lock size={18} />
                       </div>
                       <input
-                        type="password"
+                        type={showNewPassword ? "text" : "password"}
                         placeholder="At least 6 characters"
-                        className="w-full pl-10 pr-4 py-3 border-2 border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+                        className="w-full pl-10 pr-11 py-3 border-2 border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         disabled={loading}
                       />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        aria-label={showNewPassword ? "Hide password" : "Show password"}
+                        onClick={() => setShowNewPassword((prev) => !prev)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                      >
+                        {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
                     </div>
                   </div>
 
@@ -300,14 +311,23 @@ const ForgotPassword = () => {
                         <Lock size={18} />
                       </div>
                       <input
-                        type="password"
+                        type={showConfirmPassword ? "text" : "password"}
                         placeholder="Re-enter new password"
-                        className="w-full pl-10 pr-4 py-3 border-2 border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
+                        className="w-full pl-10 pr-11 py-3 border-2 border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleResetPassword()}
                         disabled={loading}
                       />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                      >
+                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
                     </div>
                   </div>
 

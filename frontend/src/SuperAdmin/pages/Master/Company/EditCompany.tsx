@@ -16,6 +16,7 @@ import {
   validateName,
   validateRequired,
   validateGstin,
+  scrollToFirstError,
   extractApiErrorMessage,
   extractFieldErrors,
 } from "../../../../utils/validation";
@@ -188,14 +189,16 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (companyForm.gstNo && String(companyForm.gstNo).trim() !== "") {
       const gstCheck = validateGstin(companyForm.gstNo);
       if (!gstCheck.valid) {
-        newErrors.gstNo = "Please enter a valid GST number.";
+        newErrors.gstNo = gstCheck.error || "Please enter a valid 15-character GST number.";
       }
     }
 
     if (Object.keys(newErrors).length > 0) {
       setFormErrors(newErrors);
-      const firstError = Object.values(newErrors)[0];
+      const errorKeys = Object.keys(newErrors);
+      const firstError = newErrors[errorKeys[0]];
       showToast(firstError, "warn");
+      scrollToFirstError(errorKeys);
       return;
     }
 
@@ -234,6 +237,7 @@ const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const fieldErrors = extractFieldErrors(error);
       if (Object.keys(fieldErrors).length > 0) {
         setFormErrors((prev) => ({ ...prev, ...fieldErrors }));
+        scrollToFirstError(Object.keys(fieldErrors));
       }
       const msg = extractApiErrorMessage(error, "Failed to update company. Please try again.");
       showToast(msg, "error");

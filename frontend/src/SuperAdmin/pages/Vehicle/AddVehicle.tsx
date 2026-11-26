@@ -20,6 +20,8 @@ import axiosInstance from '../../../utils/axiosInstance';
 import {
   validateVehicleReg,
   extractApiErrorMessage,
+  extractFieldErrors,
+  scrollToFirstError,
 } from '../../../utils/validation';
 
 interface TypeOption {
@@ -190,34 +192,40 @@ export const AddVehicle: React.FC = () => {
 
     if (!vehicleType.trim()) {
       showToast('Please enter or select a Vehicle Type.', 'error');
+      scrollToFirstError(['vehicleType']);
       return;
     }
 
     const cap = parseInt(seatCapacity, 10);
     if (isNaN(cap) || cap < 1) {
       showToast('Seat Capacity must be at least 1.', 'error');
+      scrollToFirstError(['seatCapacity']);
       return;
     }
 
     if (!vehicleModelName.trim()) {
       showToast('Please enter or select a Vehicle Model.', 'error');
+      scrollToFirstError(['vehicleModelName']);
       return;
     }
 
     if (!manufacturing.trim()) {
       showToast('Manufacturer (Make) is required.', 'error');
+      scrollToFirstError(['manufacturing']);
       return;
     }
 
     const regCheck = validateVehicleReg(vehicleNumber);
     if (!regCheck.valid) {
       showToast(regCheck.error || 'Please enter a valid vehicle registration number.', 'warn');
+      scrollToFirstError(['vehicleNumber']);
       return;
     }
     const cleanNum = vehicleNumber.trim().toUpperCase().replace(/[\s\-]/g, '');
 
     if (!vendorId) {
       showToast('Please select a vehicle owner.', 'warn');
+      scrollToFirstError(['vendorId']);
       return;
     }
 
@@ -250,6 +258,10 @@ export const AddVehicle: React.FC = () => {
     } catch (err: any) {
       const msg = extractApiErrorMessage(err, 'Failed to register vehicle. Please try again.');
       showToast(msg, 'error');
+      const backendFieldErrors = extractFieldErrors(err);
+      if (Object.keys(backendFieldErrors).length > 0) {
+        scrollToFirstError(Object.keys(backendFieldErrors));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -301,6 +313,8 @@ export const AddVehicle: React.FC = () => {
                   </label>
                   <div className="relative">
                     <input
+                      id="vehicleType"
+                      name="vehicleType"
                       type="text"
                       value={vehicleType}
                       onChange={(e) => {
@@ -361,6 +375,8 @@ export const AddVehicle: React.FC = () => {
                   </label>
                   <div className="relative">
                     <input
+                      id="seatCapacity"
+                      name="seatCapacity"
                       type="number"
                       min="1"
                       max="60"
@@ -420,6 +436,8 @@ export const AddVehicle: React.FC = () => {
                   </label>
                   <div className="relative">
                     <input
+                      id="vehicleModelName"
+                      name="vehicleModelName"
                       type="text"
                       value={vehicleModelName}
                       onChange={(e) => {
@@ -478,6 +496,8 @@ export const AddVehicle: React.FC = () => {
                   </label>
                   <div className="relative">
                     <input
+                      id="manufacturing"
+                      name="manufacturing"
                       type="text"
                       value={manufacturing}
                       onChange={(e) => setManufacturing(e.target.value)}
@@ -509,6 +529,8 @@ export const AddVehicle: React.FC = () => {
                   </label>
                   <div className="relative">
                     <input
+                      id="vehicleNumber"
+                      name="vehicleNumber"
                       type="text"
                       value={vehicleNumber}
                       onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
@@ -530,6 +552,8 @@ export const AddVehicle: React.FC = () => {
                   </label>
                   <div className="relative">
                     <select
+                      id="vendorId"
+                      name="vendorId"
                       value={vendorId}
                       onChange={(e) => setVendorId(e.target.value)}
                       className="w-full px-3.5 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all bg-white"

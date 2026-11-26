@@ -43,6 +43,8 @@ interface TenantSmsConfigData {
   lastVerificationResult?: string | null;
   templateMappings?: Record<string, any>;
   hasCustomKey?: boolean;
+  hasApiKey?: boolean;
+  subscriptionEligibility?: any;
 }
 
 const DEFAULT_DLT_TEMPLATES: Record<string, TemplateMapping> = {
@@ -121,25 +123,56 @@ const SmsIntegrationSettings: React.FC = () => {
       setLoading(true);
       const res = await axiosInstance.get('/sms/config');
       if (res.data && res.data.success) {
-        const config: TenantSmsConfigData = res.data.data.config;
-        if (config) {
-          setProvider(config.provider || '2FACTOR');
-          setApiKeyMasked(config.apiKeyMasked || '');
-          setSenderId(config.senderId || 'GRCCAB');
-          setOtpRoute(config.otpRoute || 'OTP1');
-          setIsEnabled(config.isEnabled !== false);
-          setStatus(config.status || 'UNCONFIGURED');
-          setIsVerified(Boolean(config.isVerified));
-          setLastVerifiedAt(config.lastVerifiedAt || null);
-          setLastVerificationResult(config.lastVerificationResult || null);
+        // Harmonized support for both res.data.data.config and res.data.config
+        const configData: TenantSmsConfigData | undefined =
+          res.data?.data?.config || res.data?.config;
+
+        if (configData) {
+          setProvider(configData.provider || '2FACTOR');
+          setApiKeyMasked(
+            configData.apiKeyMasked && configData.apiKeyMasked !== 'Not Configured'
+              ? configData.apiKeyMasked
+              : ''
+          );
+          setSenderId(configData.senderId || 'GRCCAB');
+          setOtpRoute(configData.otpRoute || 'OTP1');
+          setIsEnabled(configData.isEnabled !== false);
+          setStatus(configData.status || (configData.hasApiKey ? 'ACTIVE' : 'UNCONFIGURED'));
+          setIsVerified(Boolean(configData.isVerified));
+          setLastVerifiedAt(configData.lastVerifiedAt || null);
+          setLastVerificationResult(configData.lastVerificationResult || null);
+        } else {
+          // Unconfigured tenant - graceful "Needs Setup" state without error toast
+          setStatus('UNCONFIGURED');
+          setIsVerified(false);
+          setSenderId('GRCCAB');
+          setOtpRoute('OTP1');
         }
-        if (res.data.data.subscriptionStatus) {
-          setSubscriptionStatus(res.data.data.subscriptionStatus);
+
+        const subStatus =
+          res.data?.data?.subscriptionStatus ||
+          configData?.subscriptionEligibility;
+        if (subStatus) {
+          setSubscriptionStatus(subStatus);
         }
       }
     } catch (err: any) {
       console.error('Failed to load SMS configuration:', err);
-      showToast(err?.response?.data?.message || 'Could not load SMS settings', 'error');
+      // Only display toast for actual HTTP API failure, not normal unconfigured state
+      if (err?.response) {
+        const httpStatus = err.response.status;
+        if (httpStatus === 401) {
+          showToast('Session expired. Please log in again.', 'error');
+        } else if (httpStatus === 403) {
+          showToast('Access denied: Administrator privileges required for SMS settings.', 'error');
+        } else if (httpStatus !== 404) {
+          showToast(err.response.data?.message || 'Could not load SMS settings from server.', 'error');
+        }
+      } else if (err?.request) {
+        showToast('Network error: Unable to reach SMS configuration server.', 'error');
+      } else {
+        console.warn('Unexpected error in fetchConfig:', err);
+      }
     } finally {
       setLoading(false);
     }

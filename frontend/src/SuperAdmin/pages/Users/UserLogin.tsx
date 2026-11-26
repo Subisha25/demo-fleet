@@ -63,11 +63,19 @@ const UserLogin: React.FC = () => {
   const [step, setStep] = useState(1);
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [forgetError, setForgetError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   /* ===== Load Company ===== */
   useEffect(() => {
+    localStorage.removeItem('isDemoMode');
+    localStorage.removeItem('isDemoView');
+    if (localStorage.getItem('role') === 'demo') {
+      localStorage.removeItem('role');
+      localStorage.removeItem('token');
+    }
+
     const fetchCompany = async () => {
       if (!activeCompanySlug) {
         setLoadingCompany(false);
@@ -536,12 +544,21 @@ const UserLogin: React.FC = () => {
               />
 
               <input
-                type="password"
+                type={showResetPassword ? "text" : "password"}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#275981] focus:ring-2 focus:ring-[#275981]/20"
+                className="w-full pl-10 pr-11 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#275981] focus:ring-2 focus:ring-[#275981]/20"
                 placeholder="Enter new password"
               />
+              <button
+                type="button"
+                tabIndex={-1}
+                aria-label={showResetPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowResetPassword((prev) => !prev)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+              >
+                {showResetPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
 
             <div className="flex gap-3">

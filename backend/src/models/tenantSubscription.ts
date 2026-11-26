@@ -136,6 +136,25 @@ export class TenantSubscription extends Model {
   trialEndsAt!: Date;
 
   @Column({
+    type: DataType.DATE,
+    allowNull: true,
+  })
+  trialStartDate!: Date | null;
+
+  @Column({
+    type: DataType.INTEGER,
+    defaultValue: 7,
+    allowNull: false,
+  })
+  trialDurationDays!: number;
+
+  @Column({
+    type: DataType.JSON,
+    allowNull: true,
+  })
+  trialExtensionHistory!: any[] | null;
+
+  @Column({
     type: DataType.ENUM('MONTHLY', 'ANNUAL'),
     defaultValue: 'MONTHLY',
     allowNull: false,

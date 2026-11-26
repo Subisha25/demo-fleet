@@ -34,6 +34,9 @@ interface RegistrationRequest {
   reviewerNotes?: string;
   rejectionReason?: string;
   associatedTenantId?: string;
+  demoCallDate?: string;
+  demoCallTime?: string;
+  demoCallStatus?: "Requested" | "Confirmed" | "Completed" | "Rescheduled" | "Cancelled";
   createdAt: string;
 }
 
@@ -258,7 +261,8 @@ const RegistrationsQueue: React.FC = () => {
                   <th className="py-3.5 px-4">Ref & Fleet Name</th>
                   <th className="py-3.5 px-4">Admin Contact</th>
                   <th className="py-3.5 px-4">Location</th>
-                  <th className="py-3.5 px-4">Requested Plan</th>
+                  <th className="py-3.5 px-4">Preferred Demo Call</th>
+                  <th className="py-3.5 px-4">Plan</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-4">Submitted</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
@@ -284,6 +288,29 @@ const RegistrationsQueue: React.FC = () => {
                     <td className="py-3.5 px-4">
                       <div className="text-[#1C1A18] font-medium">{req.city}</div>
                       <div className="text-[#7A7570] text-[10px]">{req.state}</div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      {req.demoCallDate ? (
+                        <div>
+                          <div className="font-semibold text-[#1C1A18]">{req.demoCallDate}</div>
+                          <div className="text-[10px] text-[#5C5752]">{req.demoCallTime}</div>
+                          <span
+                            className={`inline-block mt-0.5 px-1.5 py-0.2 text-[9px] font-bold rounded-full ${
+                              req.demoCallStatus === "Confirmed"
+                                ? "bg-blue-100 text-blue-800"
+                                : req.demoCallStatus === "Completed"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : req.demoCallStatus === "Cancelled"
+                                ? "bg-rose-100 text-rose-800"
+                                : "bg-amber-100 text-amber-800"
+                            }`}
+                          >
+                            {req.demoCallStatus || "Requested"}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 text-[10px]">None</span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4">
                       <div className="font-bold text-[#C04E24] uppercase">{req.requestedPlan}</div>
@@ -407,6 +434,20 @@ const RegistrationsQueue: React.FC = () => {
                   <span className="text-slate-400">Plan & Billing</span>
                   <div className="font-bold text-emerald-700 uppercase">{selectedReq.requestedPlan} ({selectedReq.requestedBilling})</div>
                 </div>
+                <div className="col-span-2 bg-indigo-50/70 p-3 rounded-xl border border-indigo-100">
+                  <span className="text-indigo-900 font-bold block mb-1">Preferred Demo Call Appointment</span>
+                  <div className="flex flex-wrap items-center justify-between text-xs text-indigo-950">
+                    <div>
+                      <strong>Date & Time:</strong> {selectedReq.demoCallDate || 'Not specified'} at {selectedReq.demoCallTime || 'N/A'}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <strong>Status:</strong>
+                      <span className="px-2 py-0.5 bg-indigo-200/60 text-indigo-900 font-bold rounded-full text-[10px]">
+                        {selectedReq.demoCallStatus || 'Requested'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {selectedReq.associatedTenantId && (
@@ -452,9 +493,9 @@ const RegistrationsQueue: React.FC = () => {
             </p>
             <ul className="text-xs text-slate-600 space-y-1.5 list-disc pl-5 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
               <li>Provision an isolated tenant environment for <strong>{selectedReq.fleetName}</strong>.</li>
-              <li>Assign quotas for <strong>{selectedReq.requestedPlan.toUpperCase()}</strong> plan.</li>
+              <li>Initialize an automatic <strong>7-Day Free Trial</strong> starting from the approval timestamp with full operational access.</li>
               <li>Generate a 24-hour cryptographic activation token.</li>
-              <li>Send an onboarding invitation link to <strong>{selectedReq.adminEmail}</strong>.</li>
+              <li>Send an onboarding invitation link with trial start and expiry dates to <strong>{selectedReq.adminEmail}</strong>.</li>
             </ul>
 
             <div className="mb-4">

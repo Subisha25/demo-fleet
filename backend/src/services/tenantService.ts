@@ -33,6 +33,7 @@ import { sendNotification } from './notificationService';
 import { generateUniqueFleetSlug, getFleetLoginUrl } from './slugService';
 import { Security } from '../utils/Security';
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import sequelize from '../config/dbConfig';
 import config from '../config/config';
 
@@ -70,6 +71,35 @@ export const getAllTenants = async (req: Request, res: Response) => {
         const plain = t.toJSON();
         const sub = plain.subscription || {};
 
+        const now = new Date();
+        const trialStartDate = sub.trialStartDate || sub.currentPeriodStart || plain.createdAt;
+        const trialEndsAt = sub.trialEndsAt || sub.currentPeriodEnd;
+        const originalTrialDays = 7;
+        const totalTrialDays = Number(sub.trialDurationDays) || 7;
+        const extendedTrialDays = Math.max(0, totalTrialDays - originalTrialDays);
+        const originalTrialExpiry = trialStartDate ? new Date(new Date(trialStartDate).getTime() + 7 * 24 * 60 * 60 * 1000) : null;
+        const remainingTrialMs = trialEndsAt
+          ? Math.max(0, new Date(trialEndsAt).getTime() - now.getTime())
+          : 0;
+        const remainingTrialDays = Math.ceil(remainingTrialMs / (24 * 60 * 60 * 1000));
+
+        let trialStatus = 'TRIAL_ACTIVE';
+        if (sub.status === 'TRIALING') {
+          if (trialEndsAt && new Date(trialEndsAt).getTime() < now.getTime()) {
+            trialStatus = 'TRIAL_EXPIRED';
+          } else {
+            trialStatus = 'TRIAL_ACTIVE';
+          }
+        } else if (sub.status === 'ACTIVE') {
+          trialStatus = 'ACTIVE_PAID';
+        } else {
+          trialStatus = sub.status || 'TRIAL_ACTIVE';
+        }
+
+        const isPaid = !!lastPaidInvoice && sub.status === 'ACTIVE';
+        const actualPlanDisplay = isPaid ? `${sub.planTier || 'PRO'} (${sub.billingCycle || 'MONTHLY'})` : 'None (Free Trial)';
+        const paymentStatusDisplay = isPaid ? 'PAID' : (sub.status === 'TRIALING' ? (remainingTrialDays > 0 ? 'TRIAL' : 'EXPIRED') : 'PENDING');
+
         return {
           ...plain,
           subscription: {
@@ -77,7 +107,45 @@ export const getAllTenants = async (req: Request, res: Response) => {
             billingCycle: sub.billingCycle || 'MONTHLY',
             agreedPrice: sub.agreedPrice || (sub.planTier === 'ENTERPRISE' ? 549 : sub.planTier === 'PRO' ? 349 : 299),
             currency: sub.currency || 'INR',
+            trialStartDate,
+            trialEndsAt,
+            originalTrialDays,
+            extendedTrialDays,
+            totalTrialDays,
+            trialDurationDays: totalTrialDays,
+            originalTrialExpiry,
+            trialStatus,
+            remainingTrialDays,
+            remainingTrialMs,
+            trialExtensionHistory: sub.trialExtensionHistory || [],
+            actualPlanDisplay,
+            paymentStatusDisplay,
           },
+          trial: {
+            startDate: trialStartDate,
+            expiryDate: trialEndsAt,
+            originalDays: originalTrialDays,
+            extendedDays: extendedTrialDays,
+            totalDays: totalTrialDays,
+            originalExpiry: originalTrialExpiry,
+            remainingDays: remainingTrialDays,
+            remainingMs: remainingTrialMs,
+            status: trialStatus,
+            extensionHistory: sub.trialExtensionHistory || [],
+          },
+          trialStartDate,
+          trialEndsAt,
+          originalTrialDays,
+          extendedTrialDays,
+          totalTrialDays,
+          trialDurationDays: totalTrialDays,
+          originalTrialExpiry,
+          trialStatus,
+          remainingTrialDays,
+          remainingTrialMs,
+          actualPlanDisplay,
+          paymentStatusDisplay,
+          trialExtensionHistory: sub.trialExtensionHistory || [],
           usage: {
             vehicles: vehicleCount,
             drivers: driverCount,
@@ -104,6 +172,42 @@ export const getAllTenants = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error fetching tenants:', error);
     return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+/**
+ * Public: Get Demo View preview session & demo token.
+ * Read-only preview with safe demo fleet data.
+ */
+export const getPublicDemoSession = async (req: Request, res: Response) => {
+  try {
+    const demoPayload = {
+      userId: 'demo-user-001',
+      username: 'Demo Fleet Admin',
+      email: 'demo@cabz.com',
+      role: 'demo',
+      isDemo: true,
+      tenantId: 'demo-tenant',
+      tenantName: 'CABZ Smart Fleet Demo',
+      tenantSlug: 'cabz-demo',
+    };
+
+    const token = jwt.sign(demoPayload, config.security.jwtSecret || 'jk23DFEo', { expiresIn: '12h' });
+
+    return res.status(200).json({
+      success: true,
+      token,
+      user: demoPayload,
+      fleet: {
+        name: 'CABZ Smart Fleet Demo',
+        slug: 'cabz-demo',
+        isReadOnlyDemo: true,
+      },
+      message: 'Demo session initialized. Read-only preview active.',
+    });
+  } catch (error) {
+    console.error('Error generating demo session:', error);
+    return res.status(500).json({ success: false, message: 'Failed to initialize demo session.' });
   }
 };
 
@@ -598,6 +702,42 @@ export const getCurrentTenantProfile = async (req: Request, res: Response) => {
     const ctx = getTenantContext();
     const tenantId = ctx?.tenantId || (req as any).tenantId || ROOT_TENANT_ID;
 
+    // Demo View profile fallback
+    if (tenantId === 'demo-tenant' || (req as any).role === 'demo' || req.headers['x-demo-mode'] === 'true') {
+      return res.status(200).json({
+        success: true,
+        tenant: {
+          tenantId: 'demo-tenant',
+          name: 'CABZ Smart Fleet Demo',
+          displayName: 'CABZ Demo Preview',
+          code: 'DEMO',
+          subdomain: 'demo',
+          status: 'DEMO_PREVIEW',
+          planTier: 'PRO',
+          contactEmail: 'demo@cabz.com',
+          contactPhone: '9876543210',
+          brandingTokens: {
+            primaryColor: '#7C3AED',
+            secondaryColor: '#0B0B0F',
+            portalTitle: 'CABZ Demo Preview',
+          },
+          subscription: {
+            planTier: 'PRO',
+            status: 'DEMO_PREVIEW',
+            vehicleQuota: 75,
+            driverQuota: 75,
+            companyQuota: 20,
+            monthlyTripQuota: 2500,
+            allowOverage: false,
+          },
+        },
+        data: {
+          billingMonth: '2026-11',
+          usage: [],
+        },
+      });
+    }
+
     let tenant = await Tenant.findByPk(tenantId, {
       include: [{ model: TenantSubscription }],
     });
@@ -1023,6 +1163,68 @@ export const getFleetDashboardOverview = async (req: Request, res: Response) => 
     const isPlatformSuperAdmin = !!ctx?.isPlatformSuperAdmin;
     const isAllFleets = isPlatformSuperAdmin && (!ctx?.selectedTenantId || ctx?.selectedTenantId === 'all');
 
+    // Demo View overview data
+    const isDemo = (req as any).role === 'demo' || (req as any).user?.role === 'demo' || req.headers['x-demo-mode'] === 'true' || ctx?.tenantId === 'demo-tenant';
+    if (isDemo) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          isPlatformSuperAdmin: false,
+          isAllFleets: false,
+          isDemoView: true,
+          tenant: {
+            tenantId: 'demo-tenant',
+            name: 'CABZ Smart Fleet Demo',
+            code: 'DEMO',
+            contactEmail: 'demo@cabz.com',
+            contactPhone: '9876543210',
+            brandingTokens: {
+              primaryColor: '#7C3AED',
+              portalTitle: 'CABZ Demo Preview',
+            },
+          },
+          subscription: {
+            planTier: 'PRO',
+            status: 'DEMO_PREVIEW',
+            daysRemaining: 7,
+            billingCycle: 'MONTHLY',
+            isRenewalWarning: false,
+            isGracePeriod: false,
+            isSuspended: false,
+          },
+          trialDetails: {
+            trialStatus: 'DEMO_PREVIEW',
+            originalTrialDays: 7,
+            extendedTrialDays: 0,
+            totalTrialDays: 7,
+            remainingDays: 7,
+            remainingMs: 7 * 24 * 60 * 60 * 1000,
+            isDemo: true,
+          },
+          quotas: {
+            vehicles: { current: 18, limit: 75, percent: 24 },
+            drivers: { current: 16, limit: 75, percent: 21 },
+            companies: { current: 8, limit: 20, percent: 40 },
+            employees: { current: 6, limit: 25, percent: 24 },
+            trips: { current: 142, limit: 2500, percent: 6 },
+          },
+          pipeline: {
+            confirmPending: 12,
+            closePending: 28,
+            paymentPending: 5,
+            completed: 142,
+            totalBookings: 187,
+          },
+          invoices: {
+            singleTrip: 124,
+            monthly: 12,
+            onCall: 6,
+            recentSubscriptions: [],
+          },
+        },
+      });
+    }
+
     // Determine target tenant ID for individual fleet view
     const targetTenantId = isAllFleets
       ? ROOT_TENANT_ID
@@ -1088,6 +1290,32 @@ export const getFleetDashboardOverview = async (req: Request, res: Response) => 
       }),
     ]);
 
+    // Trial Lifecycle Breakdown
+    const originalTrialDays = 7;
+    const totalTrialDays = sub.trialDurationDays || 7;
+    const extendedTrialDays = Math.max(0, totalTrialDays - originalTrialDays);
+    const trialStart = sub.trialStartDate ? new Date(sub.trialStartDate) : null;
+    const trialEnd = sub.trialEndsAt ? new Date(sub.trialEndsAt) : (sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null);
+    const originalTrialExpiry = trialStart ? new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
+    const remainingTrialMs = trialEnd ? Math.max(0, trialEnd.getTime() - now.getTime()) : 0;
+    const remainingTrialDays = trialEnd ? Math.ceil(remainingTrialMs / (24 * 60 * 60 * 1000)) : 0;
+    const trialStatus = sub.status === 'TRIALING'
+      ? (remainingTrialMs > 0 ? 'TRIAL_ACTIVE' : 'TRIAL_EXPIRED')
+      : sub.status;
+
+    const trialDetails = {
+      trialStatus,
+      originalTrialDays,
+      extendedTrialDays,
+      totalTrialDays,
+      trialStartDate: trialStart,
+      originalTrialExpiry,
+      currentTrialExpiry: trialEnd,
+      remainingDays: remainingTrialDays,
+      remainingMs: remainingTrialMs,
+      trialExtensionHistory: sub.trialExtensionHistory || [],
+    };
+
     return res.status(200).json({
       success: true,
       data: {
@@ -1095,6 +1323,7 @@ export const getFleetDashboardOverview = async (req: Request, res: Response) => 
         isAllFleets,
         selectedTenantId: ctx?.selectedTenantId || (isPlatformSuperAdmin ? 'all' : ctx?.tenantId),
         activeFleetsCount: isPlatformSuperAdmin ? activeFleetsCount : undefined,
+        trialDetails,
         tenant: isAllFleets
           ? {
             tenantId: 'all',

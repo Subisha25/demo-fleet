@@ -22,6 +22,7 @@ import {
   validateMobile,
   validatePinCode,
   validateSelect,
+  scrollToFirstError,
   extractApiErrorMessage,
   extractFieldErrors,
 } from "../../../utils/validation";
@@ -203,7 +204,9 @@ export default function AddUser() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      showToast(Object.values(newErrors)[0], "warn");
+      const errorKeys = Object.keys(newErrors);
+      showToast(newErrors[errorKeys[0]], "warn");
+      scrollToFirstError(errorKeys);
       return;
     }
 
@@ -255,6 +258,7 @@ export default function AddUser() {
       const fieldErrors = extractFieldErrors(error);
       if (Object.keys(fieldErrors).length > 0) {
         setErrors((prev) => ({ ...prev, ...fieldErrors }));
+        scrollToFirstError(Object.keys(fieldErrors));
       }
       showToast(extractApiErrorMessage(error, "Failed to create user. Please try again."), "error");
     } finally {

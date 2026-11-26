@@ -6,9 +6,11 @@ import { TenantProvider } from './context/TenantContext';
 import PrivateRoute, { SuperAdminRoute } from './routes/PrivateRoutes';
 import Login from './SuperAdmin/pages/Login/Login';
 import Sidebar from './components/Sidebar';
-import { AlertContainer } from './components/AlertBox';
+import { showToast, AlertContainer } from './components/AlertBox';
 import FleetLogin from './SuperAdmin/pages/Login/FleetLogin';
 import SubscriptionRequiredModal from './components/SubscriptionRequiredModal';
+import axiosInstance from './utils/axiosInstance';
+import DemoViewPage from './components/Homepage/DemoViewPage';
 
 // SaaS Tenants
 import TenantList from './SuperAdmin/pages/Tenants/TenantList';
@@ -174,24 +176,113 @@ import PaymentForMonthlyInvoices from './SuperAdmin/pages/Invoice/PaymentForMont
 import UploadUsers from './SuperAdmin/pages/uploadfile/uploadfile';
 import Oncallinvoice from './SuperAdmin/pages/Users/Bookings/oncallbooking';
 import OnCallInvoiceView from './SuperAdmin/pages/Orders/view/Oncallinvoiceview';
+import SubscriptionLockModal from './components/SubscriptionLockModal';
 
 const Layout = () => {
   const role = localStorage.getItem("role");
+  const isDemoView = localStorage.getItem("isDemoMode") === "true" || localStorage.getItem("isDemoView") === "true" || role === "demo";
   const [subModalOpen, setSubModalOpen] = React.useState(false);
   const [subModalDetail, setSubModalDetail] = React.useState<any>({});
+  const [lockModalOpen, setLockModalOpen] = React.useState(false);
+  const [lockModalDetail, setLockModalDetail] = React.useState<any>({});
 
   React.useEffect(() => {
+    // If not superadmin or demo, proactively check subscription lock status on mounting/layout render
+    const checkLockStatus = async () => {
+      const token = localStorage.getItem("token");
+      if (!token || role === "superadmin" || isDemoView) return;
+
+      try {
+        const res = await axiosInstance.get('/tenants/current/subscription-lock-status');
+        if (res.data?.isLocked) {
+          setLockModalDetail(res.data);
+          setLockModalOpen(true);
+        }
+      } catch (err: any) {
+        // If 403 returned directly with SUBSCRIPTION_PAYMENT_REQUIRED
+        const data = err.response?.data;
+        if (data?.code === 'SUBSCRIPTION_PAYMENT_REQUIRED' || data?.isLocked) {
+          setLockModalDetail(data);
+          setLockModalOpen(true);
+        }
+      }
+    };
+
+    checkLockStatus();
+
     const handleSubRequired = (event: any) => {
       const detail = event?.detail || {};
-      setSubModalDetail(detail);
-      setSubModalOpen(true);
+      if (detail.isLocked) {
+        setLockModalDetail(detail);
+        setLockModalOpen(true);
+      } else {
+        setSubModalDetail(detail);
+        setSubModalOpen(true);
+      }
+    };
+
+    const handleDemoReadOnly = (event: any) => {
+      const msg = event?.detail?.message || "You're viewing the CABZ Demo Preview. Register your fleet and start your free trial to access operational features.";
+      showToast(msg, 'warn');
+    };
+
+    // Universal action guard for Demo View: block operational write/mutate actions
+    const handleDemoActionCapture = (e: MouseEvent) => {
+      if (!isDemoView) return;
+      const pathname = (window.location.pathname || '').toLowerCase();
+      // NEVER block anything on login, registration or public auth pages
+      if (/^\/(login|adminlogin|forgetpasword|activate|register-fleet|company)/.test(pathname) || pathname.includes('/login')) {
+        return;
+      }
+
+      const target = e.target as HTMLElement;
+      if (!target) return;
+      const buttonOrAction = target.closest('button, input[type="submit"], [role="button"], a');
+      if (!buttonOrAction) return;
+
+      const text = (buttonOrAction.textContent || '').trim().toLowerCase();
+      const href = buttonOrAction.getAttribute('href') || '';
+
+      // Allow navigation links across all preview menus and auth actions
+      const isAllowedAction = href.includes('register') || href.includes('login') || href.includes('home') ||
+        text.includes('sign in') || text.includes('log in') || text.includes('login') ||
+        text.includes('exit demo') || text.includes('start 7-day') || text.includes('free trial') || text.includes('documentation');
+      if (isAllowedAction) return;
+
+      // Allow menu navigation (Task 2: "allow navigation across all preview menus")
+      if (buttonOrAction.tagName.toLowerCase() === 'a' && !href.includes('javascript') && href.length > 0 && !text.includes('delete') && !text.includes('remove') && !text.includes('dispatch')) {
+        return;
+      }
+
+      // Allow modal dismiss / close actions
+      if (text === '×' || text === '✕' || text === 'close' || text === 'cancel' || buttonOrAction.getAttribute('data-action') === 'close') {
+        return;
+      }
+
+      // Check operational write/mutate action keywords inside demo session
+      const isMutateAction = /^(add|create|new|edit|update|delete|remove|save|confirm order|assign driver|close order|close pending|record payment|generate invoice|upload|import|export|dispatch|terminate|suspend|activate)/i.test(text)
+        || (buttonOrAction.getAttribute('title') || '').toLowerCase().includes('delete')
+        || (buttonOrAction.getAttribute('aria-label') || '').toLowerCase().includes('delete');
+
+      if (isMutateAction) {
+        e.preventDefault();
+        e.stopPropagation();
+        showToast("You're viewing the CABZ Demo Preview. Register your fleet and start your free trial to access operational features.", 'warn');
+      }
     };
 
     window.addEventListener('fleetflow:subscription_required', handleSubRequired);
+    window.addEventListener('cabz:demo_read_only', handleDemoReadOnly);
+    if (isDemoView) {
+      document.addEventListener('click', handleDemoActionCapture, true);
+    }
+
     return () => {
       window.removeEventListener('fleetflow:subscription_required', handleSubRequired);
+      window.removeEventListener('cabz:demo_read_only', handleDemoReadOnly);
+      document.removeEventListener('click', handleDemoActionCapture, true);
     };
-  }, []);
+  }, [role, isDemoView]);
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -199,6 +290,22 @@ const Layout = () => {
       {role !== "user" && role !== "manager" && <Sidebar />}
 
       <AlertContainer />
+      <SubscriptionLockModal
+        isOpen={lockModalOpen}
+        lockReason={lockModalDetail.lockReason}
+        subscriptionStatus={lockModalDetail.subscriptionStatus}
+        planTier={lockModalDetail.planTier}
+        billingCycle={lockModalDetail.billingCycle}
+        payableAmount={lockModalDetail.payableAmount}
+        baseAmount={lockModalDetail.baseAmount}
+        taxAmount={lockModalDetail.taxAmount}
+        periodEnd={lockModalDetail.periodEnd}
+        message={lockModalDetail.message}
+        onPaymentSuccess={() => {
+          setLockModalOpen(false);
+          window.location.reload();
+        }}
+      />
       <SubscriptionRequiredModal
         isOpen={subModalOpen}
         onClose={() => setSubModalOpen(false)}
@@ -213,9 +320,51 @@ const Layout = () => {
       <main
         className={`flex-1 bg-gray-100 p-2 overflow-auto ${
           role !== "manager" ? "ml-74" : ""
-        }`}
-      >
-        
+        }`}
+      >
+        {isDemoView && (
+          <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white px-4 py-2.5 text-xs font-semibold flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md sticky top-0 z-40 rounded-xl mb-3 border border-purple-400/30">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 bg-yellow-400 text-slate-950 font-black rounded text-[10px] uppercase tracking-wider shadow-sm">
+                Demo Preview Mode
+              </span>
+              <span>
+                CABZ Fleet Operations Demo Preview • Read-Only. Register your fleet and start your 7-day free trial to unlock full operations.
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => {
+                  localStorage.removeItem('isDemoMode');
+                  localStorage.removeItem('isDemoView');
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('user');
+                  localStorage.removeItem('role');
+                  localStorage.removeItem('tenantId');
+                  window.location.href = '/register-fleet';
+                }}
+                className="px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold rounded-lg shadow-sm transition text-xs"
+              >
+                Start 7-Day Free Trial
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('isDemoMode');
+                  localStorage.removeItem('isDemoView');
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('user');
+                  localStorage.removeItem('role');
+                  localStorage.removeItem('tenantId');
+                  window.location.href = '/';
+                }}
+                className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg transition text-xs"
+              >
+                Exit Demo
+              </button>
+            </div>
+          </div>
+        )}
+
         {role === "manager" ? <TravelHeader /> : <Header />}
 
         <Routes>
@@ -381,6 +530,8 @@ const App: React.FC = () => {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/activate-account" element={<ActivateAccount />} />
           <Route path="/activate" element={<ActivateAccount />} />
+          <Route path="/demo" element={<DemoViewPage />} />
+          <Route path="/demo-view" element={<DemoViewPage />} />
 
           {/* Public Cab Booking Routes */}
           <Route path="/book" element={<PublicBookingWizard />} />

@@ -24,9 +24,11 @@ import {
   getNotificationAuditLogs,
   getPublicFleetBySlug,
   fleetLoginBySlug,
+  getPublicDemoSession,
 } from '../services/tenantService';
 import { requireThemeCustomization } from '../middleware/entitlementMiddleware';
 import { uploadFleetLogo } from '../middleware/uploadConfig';
+import { getSubscriptionLockStatus } from '../middleware/subscriptionGuard';
 import {
   submitFleetRegistration,
   getRegistrationRequests,
@@ -39,6 +41,7 @@ import {
   diagnoseEmailEndpoint,
   sendTestEmailEndpoint,
   downloadPlanSummaryPDF,
+  updateDemoCallStatus,
 } from '../services/registrationService';
 import { getPublicContactInfo } from '../services/userServices';
 import {
@@ -47,6 +50,9 @@ import {
   getTenantSubscriptionInvoices,
   getSubscriptionRevenueSummary,
   getAllSubscriptionInvoices,
+  downloadSubscriptionReceiptPdf,
+  resendSubscriptionReceiptEmail,
+  extendTenantTrial,
 } from '../services/subscriptionBillingService';
 import {
   runLifecycleEvaluation,
@@ -80,6 +86,12 @@ router.post('/public/login/:slug', fleetLoginBySlug);
 router.get('/contact-info', getPublicContactInfo);
 router.get('/public/contact-info', getPublicContactInfo);
 
+// Public Demo View Session Endpoint
+router.get('/public/demo-session', getPublicDemoSession);
+router.post('/public/demo-session', getPublicDemoSession);
+router.get('/demo-session', getPublicDemoSession);
+router.post('/demo-session', getPublicDemoSession);
+
 // =============================================================================
 // SUPERADMIN REGISTRATION REVIEW & ONBOARDING QUEUE
 // =============================================================================
@@ -98,18 +110,28 @@ router.post('/registrations/:requestId/reject', authMiddleware, requireSuperAdmi
 router.post('/registrations/:requestId/resend-activation', authMiddleware, requireSuperAdmin, resendActivationLink);
 router.post('/registrations/:requestId/resend-token', authMiddleware, requireSuperAdmin, resendActivationLink);
 
+// Demo Call Appointment Management (SuperAdmin)
+router.patch('/admin/registrations/:requestId/demo-call', authMiddleware, requireSuperAdmin, updateDemoCallStatus);
+router.post('/admin/registrations/:requestId/demo-call', authMiddleware, requireSuperAdmin, updateDemoCallStatus);
+router.patch('/registrations/:requestId/demo-call', authMiddleware, requireSuperAdmin, updateDemoCallStatus);
+router.post('/registrations/:requestId/demo-call', authMiddleware, requireSuperAdmin, updateDemoCallStatus);
+
 // =============================================================================
 // SUBSCRIPTION CHECKOUT & INVOICING (Authenticated Tenant Operator)
 // =============================================================================
 router.post('/subscription/checkout', authMiddleware, createSubscriptionCheckout);
 router.post('/subscription/verify-payment', authMiddleware, verifySubscriptionPayment);
 router.get('/subscription/invoices', authMiddleware, getTenantSubscriptionInvoices);
+router.get('/subscription/invoices/:invoiceId/receipt', authMiddleware, downloadSubscriptionReceiptPdf);
+router.post('/subscription/invoices/:invoiceId/resend-receipt', authMiddleware, resendSubscriptionReceiptEmail);
 router.get('/subscription/history', authMiddleware, getTenantSubscriptionInvoices);
 
 // Billing desk aliases for /api/admin/billing and /api/tenants/billing
 router.post('/billing/checkout', authMiddleware, createSubscriptionCheckout);
 router.post('/billing/verify-payment', authMiddleware, verifySubscriptionPayment);
 router.get('/billing/invoices', authMiddleware, getTenantSubscriptionInvoices);
+router.get('/billing/invoices/:invoiceId/receipt', authMiddleware, downloadSubscriptionReceiptPdf);
+router.post('/billing/invoices/:invoiceId/resend-receipt', authMiddleware, resendSubscriptionReceiptEmail);
 router.get('/billing/history', authMiddleware, getTenantSubscriptionInvoices);
 router.post('/billing/run-lifecycle-check', authMiddleware, runLifecycleEvaluation);
 
@@ -130,6 +152,7 @@ router.get('/admin/subscription-lifecycle/status', authMiddleware, requireSuperA
 // TENANT PROFILE, DASHBOARD STATS & BRANDING (Authenticated Staff)
 // =============================================================================
 router.get('/current/profile', authMiddleware, getCurrentTenantProfile);
+router.get('/current/subscription-lock-status', authMiddleware, getSubscriptionLockStatus);
 router.get('/current/entitlements', authMiddleware, getCurrentTenantEntitlements);
 router.put('/current/branding', authMiddleware, requireThemeCustomization, updateCurrentTenantBranding);
 router.post('/current/logo', authMiddleware, uploadFleetLogo.single('logo'), uploadCurrentTenantLogo);
@@ -191,5 +214,8 @@ router.post('/', authMiddleware, requireSuperAdmin, createTenant);
 router.get('/:tenantId', authMiddleware, getTenantById);
 router.put('/:tenantId/subscription', authMiddleware, requireSuperAdmin, updateTenantSubscription);
 router.post('/:tenantId/subscription/renew', authMiddleware, requireSuperAdmin, renewTenantSubscription);
+router.post('/:tenantId/extend-trial', authMiddleware, requireSuperAdmin, extendTenantTrial);
+router.post('/admin/tenants/:tenantId/extend-trial', authMiddleware, requireSuperAdmin, extendTenantTrial);
+router.post('/admin/:tenantId/extend-trial', authMiddleware, requireSuperAdmin, extendTenantTrial);
 
 export default router;

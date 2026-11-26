@@ -170,6 +170,25 @@ export class TenantRegistrationRequest extends Model {
   fleetSize!: string;
 
   @Column({
+    type: DataType.STRING(20),
+    allowNull: true,
+  })
+  demoCallDate!: string | null;
+
+  @Column({
+    type: DataType.STRING(30),
+    allowNull: true,
+  })
+  demoCallTime!: string | null;
+
+  @Column({
+    type: DataType.ENUM('Requested', 'Confirmed', 'Completed', 'Rescheduled', 'Cancelled'),
+    defaultValue: 'Requested',
+    allowNull: false,
+  })
+  demoCallStatus!: 'Requested' | 'Confirmed' | 'Completed' | 'Rescheduled' | 'Cancelled';
+
+  @Column({
     type: DataType.ENUM('PENDING', 'APPROVED', 'REJECTED'),
     defaultValue: 'PENDING',
     allowNull: false,

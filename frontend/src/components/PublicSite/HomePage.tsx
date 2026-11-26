@@ -157,6 +157,19 @@ export default function HomePage() {
                   </svg>
                 </button>
 
+                {/* Demo View CTA (Prompt Section 9) */}
+                <button
+                  id="hero-demo-view-btn"
+                  onClick={() => navigate("/demo-view")}
+                  className="px-6 py-3.5 text-base font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 hover:border-indigo-300 rounded-xl shadow-sm transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  <span>Demo View</span>
+                </button>
+
                 {/* Secondary CTA */}
                 <button
                   id="hero-book-cab-btn"

@@ -25,6 +25,7 @@ import {
   validateName,
   validateRequired,
   validateGstin,
+  scrollToFirstError,
   extractApiErrorMessage,
   extractFieldErrors,
 } from "../../../../utils/validation";
@@ -172,14 +173,16 @@ useEffect(() => {
     if (form.gstNo && String(form.gstNo).trim() !== "") {
       const gstCheck = validateGstin(form.gstNo);
       if (!gstCheck.valid) {
-        newErrors.gstNo = "Please enter a valid GST number.";
+        newErrors.gstNo = gstCheck.error || "Please enter a valid 15-character GST number.";
       }
     }
 
     if (Object.keys(newErrors).length > 0) {
       setFormErrors(newErrors);
-      const firstError = Object.values(newErrors)[0];
+      const errorKeys = Object.keys(newErrors);
+      const firstError = newErrors[errorKeys[0]];
       showToast(firstError, "warn");
+      scrollToFirstError(errorKeys);
       return;
     }
 

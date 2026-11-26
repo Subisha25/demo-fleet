@@ -94,7 +94,7 @@ export function validateMobileRecipient(phone?: string | null): {
     return {
       valid: false,
       normalizedPhone: digitsOnly,
-      error: `Mobile number must be exactly 10 digits (${digitsOnly.length} digits entered).`,
+      error: 'Phone number must be exactly 10 digits.',
     };
   }
 
@@ -103,7 +103,7 @@ export function validateMobileRecipient(phone?: string | null): {
     return {
       valid: false,
       normalizedPhone: digitsOnly,
-      error: 'Please enter a valid Indian mobile number starting with 6, 7, 8, or 9.',
+      error: 'Phone number must start with 6, 7, 8, or 9.',
     };
   }
 
@@ -221,27 +221,39 @@ export const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z
 export const PINCODE_REGEX = /^[1-9][0-9]{5}$/;
 export const VEHICLE_REG_REGEX = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$/;
 
-export function validatePan(pan?: string | null): { valid: boolean; normalized: string; error?: string } {
-  if (!pan || typeof pan !== 'string') return { valid: false, normalized: '', error: 'PAN is required.' };
+export function validatePan(pan?: string | null, isRequired = false): { valid: boolean; normalized: string; error?: string } {
+  if (!pan || typeof pan !== 'string' || !pan.trim()) {
+    if (isRequired) return { valid: false, normalized: '', error: 'Please enter the PAN number.' };
+    return { valid: true, normalized: '' };
+  }
   const normalized = pan.trim().toUpperCase();
-  if (normalized.length !== 10) return { valid: false, normalized, error: 'PAN must be exactly 10 characters.' };
-  if (!PAN_REGEX.test(normalized)) return { valid: false, normalized, error: 'Invalid PAN format. Expected format: ABCDE1234F' };
+  if (normalized.length !== 10 || !PAN_REGEX.test(normalized)) {
+    return { valid: false, normalized, error: 'Please enter a valid 10-character PAN number.' };
+  }
   return { valid: true, normalized };
 }
 
-export function validateGstin(gstin?: string | null): { valid: boolean; normalized: string; error?: string } {
-  if (!gstin || typeof gstin !== 'string') return { valid: false, normalized: '', error: 'GSTIN is required.' };
+export function validateGstin(gstin?: string | null, isRequired = false): { valid: boolean; normalized: string; error?: string } {
+  if (!gstin || typeof gstin !== 'string' || !gstin.trim()) {
+    if (isRequired) return { valid: false, normalized: '', error: 'Please enter the GST number.' };
+    return { valid: true, normalized: '' };
+  }
   const normalized = gstin.trim().toUpperCase();
-  if (normalized.length !== 15) return { valid: false, normalized, error: 'GSTIN must be exactly 15 characters.' };
-  if (!GSTIN_REGEX.test(normalized)) return { valid: false, normalized, error: 'Invalid GSTIN format. Expected format: 22AAAAA0000A1Z5' };
+  if (normalized.length !== 15 || !GSTIN_REGEX.test(normalized)) {
+    return { valid: false, normalized, error: 'Please enter a valid 15-character GST number.' };
+  }
   return { valid: true, normalized };
 }
 
-export function validatePinCode(pin?: string | null): { valid: boolean; normalized: string; error?: string } {
-  if (!pin || typeof pin !== 'string') return { valid: false, normalized: '', error: 'PIN Code is required.' };
+export function validatePinCode(pin?: string | null, isRequired = false): { valid: boolean; normalized: string; error?: string } {
+  if (!pin || typeof pin !== 'string' || !pin.trim()) {
+    if (isRequired) return { valid: false, normalized: '', error: 'Please enter a valid 6-digit pincode.' };
+    return { valid: true, normalized: '' };
+  }
   const normalized = pin.trim().replace(/\D/g, '');
-  if (normalized.length !== 6) return { valid: false, normalized, error: 'PIN Code must be exactly 6 digits.' };
-  if (!PINCODE_REGEX.test(normalized)) return { valid: false, normalized, error: 'Invalid PIN Code format.' };
+  if (normalized.length !== 6 || !PINCODE_REGEX.test(normalized)) {
+    return { valid: false, normalized, error: 'Please enter a valid 6-digit pincode.' };
+  }
   return { valid: true, normalized };
 }
 

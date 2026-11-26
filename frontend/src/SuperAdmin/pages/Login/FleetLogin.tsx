@@ -52,6 +52,14 @@ export default function FleetLogin() {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
   useEffect(() => {
+    // Clear any previous demo preview flags so fleet login operates on clean state
+    localStorage.removeItem('isDemoMode');
+    localStorage.removeItem('isDemoView');
+    if (localStorage.getItem('role') === 'demo') {
+      localStorage.removeItem('role');
+      localStorage.removeItem('token');
+    }
+
     if (!slug) {
       setNotFound(true);
       setLoading(false);
@@ -133,6 +141,21 @@ export default function FleetLogin() {
           token: accessToken,
         };
         localStorage.setItem('user', JSON.stringify(userObject));
+
+        // Clear any previous demo flags
+        localStorage.removeItem('isDemoMode');
+        localStorage.removeItem('isDemoView');
+
+        // Fetch latest tenant subscription / trial status from backend
+        if (role !== 'superadmin') {
+          try {
+            await axiosInstance.get('/tenants/current/subscription-lock-status', {
+              headers: { Authorization: `Bearer ${accessToken}`, 'X-Tenant-ID': tenantId },
+            });
+          } catch (e) {
+            // Handled silently
+          }
+        }
 
         login();
 

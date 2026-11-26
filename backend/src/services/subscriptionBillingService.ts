@@ -1,12 +1,14 @@
 import { Request, Response } from 'express';
 import { Op } from 'sequelize';
 import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
 import { SubscriptionInvoice } from '../models/subscriptionInvoice';
 import { Tenant } from '../models/tenant';
 import { TenantSubscription } from '../models/tenantSubscription';
 import { getTenantContext, ROOT_TENANT_ID } from '../context/tenantContext';
 import { PLAN_CATALOG, PLAN_LIMITS, getOrCreateSubscription } from './quotaService';
 import { sendNotification, getSuperAdminEmail } from './notificationService';
+import { generateSubscriptionReceiptPdf } from './subscriptionReceiptPdfService';
 import config from '../config/config';
 
 /**
@@ -250,18 +252,96 @@ export const verifySubscriptionPayment = async (req: Request, res: Response) => 
       });
     }
 
-    // Send payment confirmation notification only to the intended tenant contact email
+    // 1. Generate Authoritative, Multi-Section PDF Payment Receipt on disk
+    let receiptPdfPath: string | null = null;
+    let receiptFileName: string | null = null;
+    let receiptData: any = null;
+
+    try {
+      const receiptRes = await generateSubscriptionReceiptPdf(invoice.subscriptionInvoiceId);
+      receiptPdfPath = receiptRes.filePath;
+      receiptFileName = receiptRes.fileName;
+      receiptData = receiptRes.receiptData;
+    } catch (pdfErr) {
+      console.error('[verifySubscriptionPayment] PDF receipt generation failed:', pdfErr);
+    }
+
+    // 2. Send professional payment confirmation email with PDF receipt attached
+    // Strictly dispatched only to the tenant's verified contact email
     const recipientEmail = tenant?.contactEmail;
+    const fleetAdminName = receiptData?.adminName || tenant?.name || 'Valued Fleet Partner';
+
     if (recipientEmail) {
-      await sendNotification({
-        channel: 'EMAIL',
-        recipient: recipientEmail,
-        templateCode: 'SUBSCRIPTION_PAYMENT_SUCCESS',
-        subject: `Payment Receipt: ${invoice.invoiceNumber} (${invoice.planTier} Plan)`,
-        body: `Thank you for your payment!\n\nInvoice Number: ${invoice.invoiceNumber}\nPlan: ${invoice.planTier} (${invoice.billingCycle})\nTotal Amount: ₹${invoice.totalAmount} INR\nTransaction Reference: ${txnRef}\nValid Until: ${newEnd.toDateString()}\n\nYour fleet subscription has been activated with full enterprise access.`,
-        referenceEntity: 'SUBSCRIPTION_INVOICE',
-        referenceId: invoice.subscriptionInvoiceId,
-      });
+      try {
+        const emailSubject = 'CABZ – Subscription Payment Confirmation & Official Receipt';
+        const emailBody = `Dear ${fleetAdminName},
+
+Thank you for choosing CABZ – Smart Fleet Mobility.
+
+We are pleased to confirm that your subscription payment has been successfully received.
+
+Your subscription is now active. Please find your detailed payment receipt attached for your records.
+
+The receipt includes your fleet information, selected subscription plan, payment details and subscription validity period.
+
+Thank you for being a part of CABZ.
+
+Regards,
+CABZ – Smart Fleet Mobility
+Subscription & Billing Team`;
+
+        const attachments = receiptPdfPath && fs.existsSync(receiptPdfPath)
+          ? [
+              {
+                filename: receiptFileName || `CABZ_Subscription_Receipt_${invoice.invoiceNumber}.pdf`,
+                path: receiptPdfPath,
+                contentType: 'application/pdf',
+              },
+            ]
+          : [];
+
+        const notifResult = await sendNotification({
+          channel: 'EMAIL',
+          recipient: recipientEmail,
+          templateCode: 'SUBSCRIPTION_PAYMENT_SUCCESS',
+          subject: emailSubject,
+          body: emailBody,
+          tenantId: tenant.tenantId,
+          referenceEntity: 'SUBSCRIPTION_INVOICE',
+          referenceId: invoice.subscriptionInvoiceId,
+          idempotencyKey: `sub_receipt_${invoice.subscriptionInvoiceId}`,
+          metadata: {
+            fleetName: tenant.name,
+            adminName: fleetAdminName,
+            invoiceNumber: invoice.invoiceNumber,
+            planTier: invoice.planTier,
+            billingCycle: invoice.billingCycle,
+            totalAmount: invoice.totalAmount,
+            paidAt: invoice.paidAt,
+            transactionReference: txnRef,
+            receiptNumber: receiptData?.receiptNumber || `REC-${invoice.invoiceNumber}`,
+            receiptPdfPath,
+            receiptFileName,
+            attachments,
+          },
+        });
+
+        // Record receipt notification audit on invoice metadata
+        const updatedMeta = {
+          ...(invoice.metadata || {}),
+          receiptGenerated: Boolean(receiptPdfPath),
+          receiptFileName,
+          receiptPdfPath,
+          receiptSentTo: recipientEmail,
+          receiptSentAt: new Date().toISOString(),
+          receiptNotificationLogId: notifResult.logId,
+          receiptNotificationStatus: notifResult.providerStatus,
+        };
+        await invoice.update({ metadata: updatedMeta });
+      } catch (emailErr) {
+        // Resilience: If email delivery fails, do NOT reverse or mark the payment as failed
+        console.error('[verifySubscriptionPayment] Email receipt dispatch failed:', emailErr);
+      }
     }
 
     const jsonInv = invoice.toJSON ? invoice.toJSON() : invoice;
@@ -537,6 +617,235 @@ export const getAllSubscriptionInvoices = async (req: Request, res: Response) =>
     });
   } catch (error: any) {
     console.error('Error fetching all subscription invoices:', error);
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+/**
+ * Download authoritative subscription payment receipt PDF for a paid invoice.
+ */
+export const downloadSubscriptionReceiptPdf = async (req: Request, res: Response) => {
+  try {
+    const ctx = getTenantContext();
+    const callerTenantId = ctx?.tenantId || (req as any).tenantId;
+    const isSuperAdmin = (req as any).user?.role === 'superadmin' || callerTenantId === ROOT_TENANT_ID;
+    const invoiceId = req.params.invoiceId || req.params.id;
+
+    if (!invoiceId) {
+      return res.status(400).json({ success: false, message: 'invoiceId is required.' });
+    }
+
+    const whereClause: any = {
+      [Op.or]: [
+        { subscriptionInvoiceId: invoiceId },
+        { invoiceNumber: invoiceId },
+      ],
+    };
+    if (!isSuperAdmin && callerTenantId) {
+      whereClause.tenantId = callerTenantId;
+    }
+
+    const invoice = await SubscriptionInvoice.findOne({ where: whereClause });
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: 'Subscription invoice not found.' });
+    }
+
+    const { fileName, pdfBuffer } = await generateSubscriptionReceiptPdf(invoice.subscriptionInvoiceId);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    return res.status(200).send(pdfBuffer);
+  } catch (err: any) {
+    console.error('Error downloading subscription receipt PDF:', err);
+    return res.status(500).json({ success: false, message: 'Failed to generate receipt PDF.' });
+  }
+};
+
+/**
+ * Resend subscription payment receipt email with PDF attachment.
+ */
+export const resendSubscriptionReceiptEmail = async (req: Request, res: Response) => {
+  try {
+    const ctx = getTenantContext();
+    const callerTenantId = ctx?.tenantId || (req as any).tenantId;
+    const isSuperAdmin = (req as any).user?.role === 'superadmin' || callerTenantId === ROOT_TENANT_ID;
+    const invoiceId = req.params.invoiceId || req.params.id;
+
+    if (!invoiceId) {
+      return res.status(400).json({ success: false, message: 'invoiceId is required.' });
+    }
+
+    const whereClause: any = {
+      [Op.or]: [
+        { subscriptionInvoiceId: invoiceId },
+        { invoiceNumber: invoiceId },
+      ],
+    };
+    if (!isSuperAdmin && callerTenantId) {
+      whereClause.tenantId = callerTenantId;
+    }
+
+    const invoice = await SubscriptionInvoice.findOne({ where: whereClause });
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: 'Subscription invoice not found.' });
+    }
+
+    if (invoice.paymentStatus !== 'PAID') {
+      return res.status(400).json({ success: false, message: 'Cannot send payment receipt for unpaid invoice.' });
+    }
+
+    const tenant = await Tenant.findByPk(invoice.tenantId);
+    if (!tenant || !tenant.contactEmail) {
+      return res.status(400).json({ success: false, message: 'Tenant registered email not found.' });
+    }
+
+    const { filePath, fileName, receiptData } = await generateSubscriptionReceiptPdf(invoice.subscriptionInvoiceId);
+
+    const emailSubject = 'CABZ – Subscription Payment Confirmation & Official Receipt';
+    const emailBody = `Dear ${receiptData.adminName},
+
+Thank you for choosing CABZ – Smart Fleet Mobility.
+
+We are pleased to confirm that your subscription payment has been successfully received.
+
+Your subscription is now active. Please find your detailed payment receipt attached for your records.
+
+The receipt includes your fleet information, selected subscription plan, payment details and subscription validity period.
+
+Thank you for being a part of CABZ.
+
+Regards,
+CABZ – Smart Fleet Mobility
+Subscription & Billing Team`;
+
+    const notifResult = await sendNotification({
+      channel: 'EMAIL',
+      recipient: tenant.contactEmail,
+      templateCode: 'SUBSCRIPTION_PAYMENT_SUCCESS',
+      subject: emailSubject,
+      body: emailBody,
+      tenantId: tenant.tenantId,
+      referenceEntity: 'SUBSCRIPTION_INVOICE',
+      referenceId: invoice.subscriptionInvoiceId,
+      idempotencyKey: `sub_receipt_resend_${invoice.subscriptionInvoiceId}_${Date.now()}`,
+      metadata: {
+        fleetName: tenant.name,
+        adminName: receiptData.adminName,
+        invoiceNumber: invoice.invoiceNumber,
+        attachments: [
+          {
+            filename: fileName,
+            path: filePath,
+            contentType: 'application/pdf',
+          },
+        ],
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Subscription payment receipt resent to ${tenant.contactEmail}.`,
+      data: {
+        recipient: tenant.contactEmail,
+        logId: notifResult.logId,
+        providerStatus: notifResult.providerStatus,
+      },
+    });
+  } catch (err: any) {
+    console.error('Error resending subscription receipt email:', err);
+    return res.status(500).json({ success: false, message: 'Failed to resend subscription receipt email.' });
+  }
+};
+
+/**
+ * SuperAdmin: Extend a tenant's free trial by N days.
+ * Section 5:
+ * - Allow SuperAdmin to enter additional number of days.
+ * - Calculate new expiry date.
+ * - Record audit history: who extended, when, how many days, reason.
+ * - Update trialEndsAt and currentPeriodEnd on tenant_subscriptions.
+ * - Do not create paid transaction.
+ * - If trial was expired, reactivates status to TRIALING and extends from current date.
+ * - If trial was active, extends from existing trialEndsAt.
+ */
+export const extendTenantTrial = async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    const { additionalDays, reason } = req.body;
+
+    const days = parseInt(String(additionalDays), 10);
+    if (!days || isNaN(days) || days <= 0 || days > 365) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid number of trial extension days (between 1 and 365).',
+      });
+    }
+
+    const tenant = await Tenant.findByPk(tenantId);
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tenant not found.',
+      });
+    }
+
+    const sub = await TenantSubscription.findOne({ where: { tenantId } });
+    if (!sub) {
+      return res.status(404).json({
+        success: false,
+        message: 'Subscription record not found for tenant.',
+      });
+    }
+
+    const now = new Date();
+    const existingExpiry = sub.trialEndsAt
+      ? new Date(sub.trialEndsAt)
+      : (sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : now);
+
+    // Active trial: extend from existing expiry date
+    // Already expired trial: calculate new expiry from now
+    const baseTime = existingExpiry.getTime() < now.getTime() ? now.getTime() : existingExpiry.getTime();
+    const newExpiry = new Date(baseTime + days * 24 * 60 * 60 * 1000);
+
+    const historyEntry = {
+      extendedBy: (req as any).user?.username || (req as any).user?.userId || 'SuperAdmin',
+      extendedAt: now,
+      daysAdded: days,
+      previousExpiry: existingExpiry,
+      newExpiry,
+      reason: reason ? String(reason).trim() : 'Free trial extension granted by SuperAdmin',
+    };
+
+    const currentHistory = Array.isArray(sub.trialExtensionHistory) ? sub.trialExtensionHistory : [];
+    const newHistory = [...currentHistory, historyEntry];
+    const newDuration = (Number(sub.trialDurationDays) || 7) + days;
+
+    await sub.update({
+      trialEndsAt: newExpiry,
+      currentPeriodEnd: newExpiry,
+      trialDurationDays: newDuration,
+      trialExtensionHistory: newHistory,
+      status: 'TRIALING',
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully extended trial by ${days} days for ${tenant.name}. New trial expiry is ${newExpiry.toLocaleDateString('en-IN')}.`,
+      data: {
+        tenantId,
+        fleetName: tenant.name,
+        previousExpiry: existingExpiry,
+        newExpiry,
+        daysAdded: days,
+        originalTrialDays: 7,
+        extendedTrialDays: newDuration - 7,
+        totalTrialDays: newDuration,
+        trialStatus: 'TRIAL_ACTIVE',
+        history: newHistory,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error extending trial:', error);
     return res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };

@@ -43,6 +43,7 @@ const Header: React.FC = () => {
 
   const role = (localStorage.getItem('role') || 'User').toLowerCase();
   const isSuperAdmin = role === 'superadmin';
+  const isDemo = localStorage.getItem('isDemoView') === 'true' || localStorage.getItem('isDemoMode') === 'true' || role === 'demo';
 
   const fleetName = currentTenant?.displayName || currentTenant?.name || 'Fleet Mobility Portal';
   const fleetLogo = currentTenant?.brandingTokens?.logoUrl || currentTenant?.logoUrl;
@@ -174,56 +175,56 @@ const Header: React.FC = () => {
           <span className="px-2.5 py-0.5 text-[11px] font-extrabold rounded-full uppercase tracking-wider shadow-sm border bg-purple-50 text-purple-700 border-purple-200">
             SuperAdmin
           </span>
+        ) : isDemo ? (
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-full uppercase tracking-wider shadow-sm border bg-amber-100 text-amber-900 border-amber-300">
+              Demo Preview
+            </span>
+            <span className="px-2 py-0.5 text-[10px] font-black rounded-full uppercase tracking-wider border bg-purple-50 text-purple-700 border-purple-300">
+              Read-Only
+            </span>
+          </div>
+        ) : currentTenant?.subscription?.status === 'TRIALING' ? (
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 text-[11px] font-black rounded-full uppercase tracking-wider shadow-sm border bg-blue-100 text-blue-800 border-blue-300">
+              FREE TRIAL
+            </span>
+            <span className="px-2 py-0.5 text-[10px] font-black rounded-full uppercase tracking-wider border bg-emerald-100 text-emerald-800 border-emerald-300">
+              TRIAL ACTIVE
+            </span>
+          </div>
+        ) : currentTenant?.subscription?.status === 'ACTIVE' ? (
+          <div className="flex items-center gap-2">
+            <span
+              className={`px-2.5 py-0.5 text-[11px] font-extrabold rounded-full uppercase tracking-wider shadow-sm border ${
+                currentTenant.planTier === 'ENTERPRISE'
+                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                  : currentTenant.planTier === 'PRO'
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  : 'bg-gray-100 text-gray-700 border-gray-200'
+              }`}
+            >
+              {currentTenant.planTier} ({currentTenant.subscription?.billingCycle || 'MONTHLY'})
+            </span>
+            <span className="px-2 py-0.5 text-[10px] font-black rounded-full uppercase tracking-wider border bg-emerald-50 text-emerald-700 border-emerald-300">
+              Active
+            </span>
+          </div>
         ) : (
           <div className="flex items-center gap-2">
-            {currentTenant?.planTier && (
-              <span
-                className={`px-2.5 py-0.5 text-[11px] font-extrabold rounded-full uppercase tracking-wider shadow-sm border ${
-                  currentTenant.planTier === 'ENTERPRISE'
-                    ? 'bg-purple-50 text-purple-700 border-purple-200'
-                    : currentTenant.planTier === 'PRO'
-                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                    : 'bg-gray-100 text-gray-700 border-gray-200'
-                }`}
-              >
-                {currentTenant.planTier} ({currentTenant.subscription?.billingCycle || 'MONTHLY'})
-              </span>
-            )}
-
-            {/* Subscription Status Indicator */}
-            {currentTenant?.subscription?.status && (
-              <span
-                className={`px-2 py-0.5 text-[10px] font-black rounded-full uppercase tracking-wider border ${
-                  currentTenant.subscription.status === 'ACTIVE'
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                    : currentTenant.subscription.status === 'TRIALING'
-                    ? 'bg-indigo-50 text-indigo-700 border-indigo-300'
-                    : currentTenant.subscription.status === 'PAST_DUE'
-                    ? 'bg-amber-50 text-amber-700 border-amber-300'
-                    : 'bg-rose-50 text-rose-700 border-rose-300 animate-pulse'
-                }`}
-              >
-                {currentTenant.subscription.status === 'ACTIVE'
-                  ? 'Active'
-                  : currentTenant.subscription.status === 'TRIALING'
-                  ? 'Trial Setup'
-                  : currentTenant.subscription.status === 'PAST_DUE'
-                  ? 'Grace Period'
-                  : 'Suspended'}
-              </span>
-            )}
-
-            {/* Renewal / Upgrade CTA if not active */}
-            {currentTenant?.subscription?.status && currentTenant.subscription.status !== 'ACTIVE' && (
-              <a
-                href="/subscription/current"
-                className="px-2.5 py-0.5 text-[10px] font-black rounded bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white transition shadow-sm"
-              >
-                Renew &rarr;
-              </a>
-            )}
+            <span className="px-2.5 py-0.5 text-[11px] font-extrabold rounded-full uppercase tracking-wider shadow-sm border bg-rose-50 text-rose-700 border-rose-300">
+              {currentTenant?.subscription?.status === 'PAST_DUE' ? 'Grace Period' : 'TRIAL EXPIRED'}
+            </span>
+            <a
+              href="/admin/billing"
+              className="px-2.5 py-0.5 text-[10px] font-black rounded bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white transition shadow-sm"
+            >
+              Choose Plan &rarr;
+            </a>
           </div>
         )}
+        
+
 
         {/* Persistent Global Fleet Selector — STRICTLY SuperAdmin Only */}
         {isSuperAdmin && (

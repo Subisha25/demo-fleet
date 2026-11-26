@@ -47,6 +47,8 @@ import onCallRoutes from './routes/onCallRoutes';
 
 import downloadPdf from './routes/downloadPdf';
 import publicBookingRoutes from './routes/publicBookingRoutes';
+import { requireSubscriptionAccess } from './middleware/subscriptionGuard';
+import { demoGuard } from './middleware/demoGuard';
 
 import config from "../src/config/config"; 
 
@@ -88,13 +90,19 @@ app.use(cors({
     "X-Selected-Tenant-ID",
     "x-selected-tenant-id",
     "X-Inspection-Mode",
-    "x-inspection-mode"
+    "x-inspection-mode",
+    "X-Demo-Mode",
+    "x-demo-mode",
+    "X-Demo-View",
+    "x-demo-view"
   ],
   exposedHeaders: ["X-Tenant-ID", "X-Inspection-Mode"]
 }));
 
 // Multi-tenant context resolution
 app.use(tenantMiddleware);
+// Demo View read-only guard: prevents all create/update/delete operations in demo mode
+app.use(demoGuard);
 
 app.use('/uploads/vehicleImg', express.static(path.join(process.cwd(), 'uploads', 'vehicleImg')));
 // Protected: Signatures require authentication (Bearer token or ?token=)
@@ -108,29 +116,29 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tenants', tenantRoutes);
 app.use('/api/public', tenantRoutes);
 app.use('/api/admin', tenantRoutes);
-app.use('/api/emp', empRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/vendor', vendorRoutes);
-app.use('/api/driver',driverRoutes);
-app.use('/api/location',locationRoutes)
+app.use('/api/emp', requireSubscriptionAccess, empRoutes);
+app.use('/api/user', requireSubscriptionAccess, userRoutes);
+app.use('/api/vendor', requireSubscriptionAccess, vendorRoutes);
+app.use('/api/driver', requireSubscriptionAccess, driverRoutes);
+app.use('/api/location', requireSubscriptionAccess, locationRoutes);
 
-app.use('/api/vehicle',vehicleRoutes);
-app.use('/api/vehicleType',vehicleTypeRoutes);
-app.use('/api/owner',ownerRoutes);
-app.use('/api/order',orderRoutes);
+app.use('/api/vehicle', requireSubscriptionAccess, vehicleRoutes);
+app.use('/api/vehicleType', requireSubscriptionAccess, vehicleTypeRoutes);
+app.use('/api/owner', requireSubscriptionAccess, ownerRoutes);
+app.use('/api/order', requireSubscriptionAccess, orderRoutes);
 
 
-app.use('/api/city',pickupCityRoutes);
-app.use('/api/area',pickupAreaRoutes);
+app.use('/api/city', requireSubscriptionAccess, pickupCityRoutes);
+app.use('/api/area', requireSubscriptionAccess, pickupAreaRoutes);
 
-app.use('/api/company',companyRoutes);
+app.use('/api/company', requireSubscriptionAccess, companyRoutes);
 
 
 // app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/api/vehicleMaster',vehicleMasterRoute);
+app.use('/api/vehicleMaster', requireSubscriptionAccess, vehicleMasterRoute);
 
-app.use('/app/appCreateBookingRoutes',appCreateBookingRoutes);
-app.use('/app/appRoutes',appRoutes);
+app.use('/app/appCreateBookingRoutes', requireSubscriptionAccess, appCreateBookingRoutes);
+app.use('/app/appRoutes', requireSubscriptionAccess, appRoutes);
 
 app.use(
   '/oncallinvoice',
@@ -181,14 +189,14 @@ app.use(
 
 app.use('/app/appInvoiceRoutes',appInvoiceRoutes);
 
-app.use('/api/paymentmode',paymentModeRoutes)
+app.use('/api/paymentmode', requireSubscriptionAccess, paymentModeRoutes);
 app.use('/api', globalSearchRoutes);
-app.use('/api/package',packageRoutes);
-app.use('/api/packageData',packageDataRoutes);
-app.use('/api/config',configurationRoutes)
-app.use('/api/filter', userFilterRoutes );
-app.use('/api/closePendingOrder',closePendingRoutes );
-app.use('/api/invoiceRoutes',invoiceRoutes );
+app.use('/api/package', requireSubscriptionAccess, packageRoutes);
+app.use('/api/packageData', requireSubscriptionAccess, packageDataRoutes);
+app.use('/api/config', configurationRoutes);
+app.use('/api/filter', userFilterRoutes);
+app.use('/api/closePendingOrder', requireSubscriptionAccess, closePendingRoutes);
+app.use('/api/invoiceRoutes', requireSubscriptionAccess, invoiceRoutes);
 
 app.use('/api/downloadPdf',downloadPdf );
 
