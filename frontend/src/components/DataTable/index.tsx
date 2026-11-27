@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { showToast } from '../AlertBox';
 import {
   faEye,
   faPen,
@@ -75,6 +76,12 @@ export const DataTable = <T extends object>({
 
   const totalPages = Math.ceil(data.length / rowsPerPage);
 
+  const isDemo = typeof window !== 'undefined' && (
+    localStorage.getItem('isDemoView') === 'true' ||
+    localStorage.getItem('isDemoMode') === 'true' ||
+    localStorage.getItem('role') === 'demo'
+  );
+
   const currentData = data.slice(
     (currentPage - 1) * rowsPerPage,
     currentPage * rowsPerPage
@@ -90,6 +97,10 @@ export const DataTable = <T extends object>({
 
   const handleAction = async (row: T, index: number, actionName: string, actionFn?: (r: T) => void | Promise<void>) => {
     if (!actionFn) return;
+    if (isDemo && actionName !== 'view' && actionName !== 'copy') {
+      showToast('Demo Preview is read-only. This action is unavailable.', 'warn');
+      return;
+    }
     const key = `${getRowKey(row, index)}-${actionName}`;
     if (activeLockRef.current[key]) return; // Synchronous double-click guard
 
@@ -191,10 +202,10 @@ export const DataTable = <T extends object>({
                         {onEdit && (
                           <button
                             type="button"
-                            disabled={busyRowKey === `${rowKey}-edit`}
+                            disabled={isDemo || busyRowKey === `${rowKey}-edit`}
                             onClick={() => handleAction(row, rowIndex, 'edit', onEdit)}
-                            className="text-sky-600 hover:text-sky-800 p-1.5 rounded hover:bg-sky-50 transition disabled:opacity-50"
-                            title="Edit"
+                            className={`text-sky-600 hover:text-sky-800 p-1.5 rounded hover:bg-sky-50 transition disabled:opacity-50 ${isDemo ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            title={isDemo ? 'Demo Preview is read-only. Editing is disabled.' : 'Edit'}
                           >
                             <FontAwesomeIcon icon={faPen} className="text-xs" />
                           </button>
@@ -202,10 +213,10 @@ export const DataTable = <T extends object>({
                         {onDelete && (
                           <button
                             type="button"
-                            disabled={busyRowKey === `${rowKey}-delete`}
+                            disabled={isDemo || busyRowKey === `${rowKey}-delete`}
                             onClick={() => handleAction(row, rowIndex, 'delete', onDelete)}
-                            className="text-rose-600 hover:text-rose-800 p-1.5 rounded hover:bg-rose-50 transition disabled:opacity-50"
-                            title="Delete"
+                            className={`text-rose-600 hover:text-rose-800 p-1.5 rounded hover:bg-rose-50 transition disabled:opacity-50 ${isDemo ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            title={isDemo ? 'Demo Preview is read-only. Deleting is disabled.' : 'Delete'}
                           >
                             {busyRowKey === `${rowKey}-delete` ? (
                               <FontAwesomeIcon icon={faSpinner} spin className="text-xs" />
@@ -217,10 +228,10 @@ export const DataTable = <T extends object>({
                         {onCancel && (
                           <button
                             type="button"
-                            disabled={busyRowKey === `${rowKey}-cancel`}
+                            disabled={isDemo || busyRowKey === `${rowKey}-cancel`}
                             onClick={() => handleAction(row, rowIndex, 'cancel', onCancel)}
-                            className="text-amber-600 hover:text-amber-800 p-1.5 rounded hover:bg-amber-50 transition disabled:opacity-50"
-                            title="Cancel"
+                            className={`text-amber-600 hover:text-amber-800 p-1.5 rounded hover:bg-amber-50 transition disabled:opacity-50 ${isDemo ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            title={isDemo ? 'Demo Preview is read-only. Cancelling is disabled.' : 'Cancel'}
                           >
                             <FontAwesomeIcon icon={faBan} className="text-xs" />
                           </button>
@@ -228,10 +239,10 @@ export const DataTable = <T extends object>({
                         {onClose && (
                           <button
                             type="button"
-                            disabled={busyRowKey === `${rowKey}-close`}
+                            disabled={isDemo || busyRowKey === `${rowKey}-close`}
                             onClick={() => handleAction(row, rowIndex, 'close', onClose)}
-                            className="text-slate-500 hover:text-slate-700 p-1.5 rounded hover:bg-slate-100 transition disabled:opacity-50"
-                            title="Close"
+                            className={`text-slate-500 hover:text-slate-700 p-1.5 rounded hover:bg-slate-100 transition disabled:opacity-50 ${isDemo ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            title={isDemo ? 'Demo Preview is read-only. Closing is disabled.' : 'Close'}
                           >
                             <FontAwesomeIcon icon={faTimes} className="text-xs" />
                           </button>
@@ -250,10 +261,10 @@ export const DataTable = <T extends object>({
                         {onSave && (
                           <button
                             type="button"
-                            disabled={busyRowKey === `${rowKey}-save`}
+                            disabled={isDemo || busyRowKey === `${rowKey}-save`}
                             onClick={() => handleAction(row, rowIndex, 'save', (r) => onSave(r, {} as Partial<T>))}
-                            className="text-teal-600 hover:text-teal-800 p-1.5 rounded hover:bg-teal-50 transition disabled:opacity-50"
-                            title="Save"
+                            className={`text-teal-600 hover:text-teal-800 p-1.5 rounded hover:bg-teal-50 transition disabled:opacity-50 ${isDemo ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            title={isDemo ? 'Demo Preview is read-only. Saving is disabled.' : 'Save'}
                           >
                             <FontAwesomeIcon icon={faSave} className="text-xs" />
                           </button>
@@ -261,10 +272,10 @@ export const DataTable = <T extends object>({
                         {onRestore && (
                           <button
                             type="button"
-                            disabled={busyRowKey === `${rowKey}-restore`}
+                            disabled={isDemo || busyRowKey === `${rowKey}-restore`}
                             onClick={() => handleAction(row, rowIndex, 'restore', onRestore)}
-                            className="text-emerald-600 hover:text-emerald-800 p-1.5 rounded hover:bg-emerald-50 transition disabled:opacity-50"
-                            title="Restore"
+                            className={`text-emerald-600 hover:text-emerald-800 p-1.5 rounded hover:bg-emerald-50 transition disabled:opacity-50 ${isDemo ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            title={isDemo ? 'Demo Preview is read-only. Restoring is disabled.' : 'Restore'}
                           >
                             {busyRowKey === `${rowKey}-restore` ? (
                               <FontAwesomeIcon icon={faSpinner} spin className="text-xs" />
@@ -276,10 +287,10 @@ export const DataTable = <T extends object>({
                         {onPermanentDelete && (
                           <button
                             type="button"
-                            disabled={busyRowKey === `${rowKey}-perm-delete`}
+                            disabled={isDemo || busyRowKey === `${rowKey}-perm-delete`}
                             onClick={() => handleAction(row, rowIndex, 'perm-delete', onPermanentDelete)}
-                            className="text-rose-700 hover:text-rose-900 p-1.5 rounded hover:bg-rose-50 transition disabled:opacity-50"
-                            title="Permanent Delete"
+                            className={`text-rose-700 hover:text-rose-900 p-1.5 rounded hover:bg-rose-50 transition disabled:opacity-50 ${isDemo ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            title={isDemo ? 'Demo Preview is read-only. Deleting is disabled.' : 'Permanent Delete'}
                           >
                             <FontAwesomeIcon icon={faRecycle} className="text-xs" />
                           </button>
@@ -288,9 +299,10 @@ export const DataTable = <T extends object>({
                         {onInvoice && (invoiceVisible ? invoiceVisible(row) : true) && (
                           <button
                             type="button"
-                            disabled={busyRowKey === `${rowKey}-invoice`}
+                            disabled={isDemo || busyRowKey === `${rowKey}-invoice`}
                             onClick={() => handleAction(row, rowIndex, 'invoice', onInvoice)}
-                            className="inline-flex items-center text-[#5B3DF5] hover:text-[#4326C6] bg-[#5B3DF5]/10 hover:bg-[#5B3DF5]/20 font-semibold px-2 py-1 rounded border border-[#5B3DF5]/30 transition text-xs disabled:opacity-50"
+                            className={`inline-flex items-center text-[#5B3DF5] hover:text-[#4326C6] bg-[#5B3DF5]/10 hover:bg-[#5B3DF5]/20 font-semibold px-2 py-1 rounded border border-[#5B3DF5]/30 transition text-xs disabled:opacity-50 ${isDemo ? 'opacity-40 cursor-not-allowed' : ''}`}
+                            title={isDemo ? 'Demo Preview is read-only. Invoice generation is disabled.' : undefined}
                           >
                             {busyRowKey === `${rowKey}-invoice` ? (
                               <FontAwesomeIcon icon={faSpinner} spin className="mr-1 text-xs" />

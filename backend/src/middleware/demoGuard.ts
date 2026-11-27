@@ -1,39 +1,66 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import config from '../config/config';
+import { getTenantContext } from '../context/tenantContext';
 
 /**
  * Middleware: demoGuard
- * Strictly enforces that demo sessions / demo mode callers CANNOT perform write/mutate operations.
- * Allows all GET / OPTIONS queries for browsing and exploring pages.
- * Rejects POST / PUT / PATCH / DELETE with 403 DEMO_MODE_READ_ONLY.
+ * Strictly enforces that Demo View / demo preview callers CANNOT perform write or mutate operations.
+ * Allows all GET / OPTIONS / HEAD queries for browsing and exploring pages.
+ * Blocks all POST / PUT / PATCH / DELETE mutation attempts with HTTP 403 DEMO_MODE_READ_ONLY.
  */
 export const demoGuard = (req: Request, res: Response, next: NextFunction) => {
-  // Check if request is tagged as demo
-  const isDemoHeader = req.headers['x-demo-mode'] === 'true' || req.headers['x-demo-view'] === 'true';
+  // Check if request is tagged as demo via headers
+  const isDemoHeader =
+    req.headers['x-demo-mode'] === 'true' ||
+    req.headers['x-demo-view'] === 'true' ||
+    req.headers['x-tenant-id'] === 'demo-tenant';
+
+  // Check demo query parameter
+  const isDemoQuery = req.query?.demo === 'true';
+
   let isDemoToken = false;
 
+  // Extract from Authorization header or query token
+  let rawToken: string | undefined;
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
+    rawToken = authHeader.split(' ')[1];
+  } else if (req.query && req.query.token) {
+    rawToken = String(req.query.token);
+  }
+
+  if (rawToken) {
     try {
-      const token = authHeader.split(' ')[1];
-      const decoded: any = jwt.verify(token, config.security.jwtSecret || process.env.JWT_SECRET || 'jk23DFEo');
+      const secret = config.security.jwtSecret || process.env.JWT_SECRET || 'jk23DFEo';
+      const decoded: any = jwt.verify(rawToken, secret);
       if (decoded && (decoded.isDemo || decoded.role === 'demo' || decoded.tenantId === 'demo-tenant')) {
         isDemoToken = true;
       }
     } catch (e) {
-      const unverified: any = jwt.decode(authHeader.split(' ')[1]);
+      const unverified: any = jwt.decode(rawToken);
       if (unverified && (unverified.isDemo || unverified.role === 'demo' || unverified.tenantId === 'demo-tenant')) {
         isDemoToken = true;
       }
     }
   }
 
-  const isDemoUser = (req as any).user?.isDemo || (req as any).user?.role === 'demo' || (req as any).role === 'demo';
+  // Check user or tenant context attached to the request
+  const isDemoUser =
+    (req as any).user?.isDemo ||
+    (req as any).user?.role === 'demo' ||
+    (req as any).role === 'demo' ||
+    (req as any).tenantId === 'demo-tenant';
 
-  if (isDemoHeader || isDemoToken || isDemoUser) {
-    // Permit public demo session creation
-    if (req.path.includes('/demo-session') || req.path.includes('/public/demo')) {
+  const ctx = getTenantContext();
+  const isDemoContext = ctx?.tenantId === 'demo-tenant';
+
+  if (isDemoHeader || isDemoQuery || isDemoToken || isDemoUser || isDemoContext) {
+    // Permit public demo session creation & initialization endpoints
+    if (
+      req.path.includes('/demo-session') ||
+      req.path.includes('/public/demo')
+    ) {
       return next();
     }
 
@@ -43,7 +70,7 @@ export const demoGuard = (req: Request, res: Response, next: NextFunction) => {
         success: false,
         code: 'DEMO_MODE_READ_ONLY',
         isDemoReadOnly: true,
-        message: "You're viewing the CABZ Demo Preview. Register your fleet and start your free trial to access operational features.",
+        message: 'Demo Preview is read-only. This action is unavailable.',
       });
     }
   }

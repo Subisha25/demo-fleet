@@ -61,6 +61,25 @@ const InputBox: FC<InputBoxProps> = ({
   const [toDate, setToDate] = useState<Date | null>(null);
   const [selectingDateType, setSelectingDateType] = useState<"from" | "to">("from");
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  const isDemo = typeof window !== 'undefined' && (
+    localStorage.getItem('isDemoView') === 'true' ||
+    localStorage.getItem('isDemoMode') === 'true' ||
+    localStorage.getItem('role') === 'demo'
+  );
+
+  const pathname = typeof window !== 'undefined' ? (window.location.pathname || '').toLowerCase() : '';
+  const isAuthOrPublicRoute = /^\/(login|adminlogin|forgetpasword|activate|register-fleet|company)/.test(pathname) || pathname.includes('/login');
+
+  const isFilterOrSearch =
+    /search|filter|keyword|query/i.test(name) ||
+    /search|filter|keyword|query/i.test(placeholder || '') ||
+    (typeof label === 'string' && /search|filter/i.test(label));
+
+  const isDemoDisabled = isDemo && !isAuthOrPublicRoute && !isFilterOrSearch;
+  const effectiveDisabled = disabled || isDemoDisabled;
+  const effectiveReadOnly = readOnly || isDemoDisabled;
+
 useEffect(() => {
   if (value !== undefined) {
     setInputValue(value);
@@ -92,6 +111,7 @@ useEffect(() => {
     date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
 
   const handleDateSelect = (date: Date) => {
+    if (isDemoDisabled) return;
     if (selectingDateType === "from") {
       setFromDate(date);
       setToDate(null);
@@ -114,6 +134,7 @@ useEffect(() => {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
+    if (isDemoDisabled) return;
     let rawValue: string | boolean | File | null;
 
     if (type === "checkbox") {
@@ -160,32 +181,45 @@ useEffect(() => {
       
       {type === "date-range" ? (
   <>
-    <div className="relative flex gap-2 items-center border border-gray-300 rounded px-4 py-2 bg-white cursor-pointer w-[290px]">
+    <div
+      className={`relative flex gap-2 items-center border border-gray-300 rounded px-4 py-2 w-[290px] ${
+        isDemoDisabled ? 'bg-slate-100 cursor-not-allowed opacity-75' : 'bg-white cursor-pointer'
+      }`}
+      title={isDemoDisabled ? 'Demo Preview is read-only. Date selection is disabled.' : undefined}
+    >
       <span
         onClick={() => {
-          setShowCalendar(true);
-          setSelectingDateType("from");
+          if (!isDemoDisabled) {
+            setShowCalendar(true);
+            setSelectingDateType("from");
+          }
         }}
-        className="hover:text-purple-600 text-sm font-medium"
+        className={isDemoDisabled ? 'text-gray-500 text-sm font-medium' : 'hover:text-purple-600 text-sm font-medium'}
       >
         From: {fromDate ? formatDate(fromDate) : "Select"}
       </span>
       <span className="text-gray-400">|</span>
       <span
         onClick={() => {
-          setShowCalendar(true);
-          setSelectingDateType("to");
+          if (!isDemoDisabled) {
+            setShowCalendar(true);
+            setSelectingDateType("to");
+          }
         }}
-        className="hover:text-purple-600 text-sm font-medium"
+        className={isDemoDisabled ? 'text-gray-500 text-sm font-medium' : 'hover:text-purple-600 text-sm font-medium'}
       >
         To: {toDate ? formatDate(toDate) : "Select"}
       </span>
       <FontAwesomeIcon
         icon={faCalendarAlt}
-        className="absolute right-3 top-2.5 text-gray-500 hover:text-purple-600"
+        className={`absolute right-3 top-2.5 ${
+          isDemoDisabled ? 'text-gray-400' : 'text-gray-500 hover:text-purple-600'
+        }`}
         onClick={() => {
-          setShowCalendar(true);
-          setSelectingDateType("from");
+          if (!isDemoDisabled) {
+            setShowCalendar(true);
+            setSelectingDateType("from");
+          }
         }}
       />
     </div>
@@ -238,8 +272,9 @@ useEffect(() => {
     if (e.key === "Enter") onEnterPress?.(); // 🔥 Enter press triggers callback
   }}
             required={required}
-            disabled={disabled}
-            className={`w-full border rounded px-4 py-2 outline-none ${icon ? 'pl-10' : ''} ${error ? 'border-red-500 ring-1 ring-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-2 focus:ring-purple-600 focus:border-purple-600'}`}
+            disabled={effectiveDisabled}
+            title={isDemoDisabled ? 'Demo Preview is read-only. Selection is disabled.' : undefined}
+            className={`w-full border rounded px-4 py-2 outline-none ${icon ? 'pl-10' : ''} ${isDemoDisabled ? 'bg-slate-100 cursor-not-allowed opacity-75' : ''} ${error ? 'border-red-500 ring-1 ring-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-2 focus:ring-purple-600 focus:border-purple-600'}`}
           >
             <option value="">-- Select --</option>
             {renderOptions()}
@@ -255,8 +290,10 @@ useEffect(() => {
             onChange={handleChange}
             placeholder={placeholder}
             required={required}
-            disabled={disabled}
-            className={`w-full border rounded px-4 py-2 h-20 outline-none ${icon ? 'pl-10' : ''} ${error ? 'border-red-500 ring-1 ring-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-2 focus:ring-purple-600 focus:border-purple-600'}`}
+            disabled={effectiveDisabled}
+            readOnly={effectiveReadOnly}
+            title={isDemoDisabled ? 'Demo Preview is read-only. Text editing is disabled.' : undefined}
+            className={`w-full border rounded px-4 py-2 h-20 outline-none ${icon ? 'pl-10' : ''} ${isDemoDisabled ? 'bg-slate-100 cursor-not-allowed opacity-75' : ''} ${error ? 'border-red-500 ring-1 ring-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-2 focus:ring-purple-600 focus:border-purple-600'}`}
           />
         </div>
       ) : type === "checkbox" ? (
@@ -267,7 +304,9 @@ useEffect(() => {
             type="checkbox"
             checked={Boolean(inputValue)}
             onChange={handleChange}
-            className="w-5 h-5"
+            disabled={effectiveDisabled}
+            title={isDemoDisabled ? 'Demo Preview is read-only. Checkbox is disabled.' : undefined}
+            className={`w-5 h-5 ${isDemoDisabled ? 'cursor-not-allowed opacity-60' : ''}`}
           />
           <label htmlFor={name} className="font-medium">{label}</label>
         </div>
@@ -277,8 +316,9 @@ useEffect(() => {
           name={name}
           type="file"
           onChange={handleChange}
-          disabled={disabled}
-          className={`w-full px-4 py-2 ${error ? 'border border-red-500 rounded ring-1 ring-red-500' : ''}`}
+          disabled={effectiveDisabled}
+          title={isDemoDisabled ? 'Demo Preview is read-only. File upload is disabled.' : undefined}
+          className={`w-full px-4 py-2 ${isDemoDisabled ? 'cursor-not-allowed opacity-60 bg-slate-100' : ''} ${error ? 'border border-red-500 rounded ring-1 ring-red-500' : ''}`}
         />
       ) : (
         <div className="relative">
@@ -291,13 +331,14 @@ useEffect(() => {
             onChange={handleChange}
             placeholder={placeholder}
             required={required}
-            disabled={disabled}
-            readOnly={readOnly} 
+            disabled={effectiveDisabled}
+            readOnly={effectiveReadOnly}
+            title={isDemoDisabled ? 'Demo Preview is read-only. Input is disabled.' : undefined}
             onWheel={(e) => e.currentTarget.blur()} 
             onKeyDown={(e) => {
               if (e.key === "Enter") onEnterPress?.(); // 🔥 Enter press triggers callback
             }}
-            className={`w-full border rounded px-4 py-2 outline-none ${icon ? 'pl-10' : ''} ${type === 'password' ? 'pr-10' : ''} ${error ? 'border-red-500 ring-1 ring-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-2 focus:ring-purple-600 focus:border-purple-600'} ${type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''}`}
+            className={`w-full border rounded px-4 py-2 outline-none ${icon ? 'pl-10' : ''} ${type === 'password' ? 'pr-10' : ''} ${isDemoDisabled ? 'bg-slate-100 cursor-not-allowed opacity-75' : ''} ${error ? 'border-red-500 ring-1 ring-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-2 focus:ring-purple-600 focus:border-purple-600'} ${type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''}`}
           />
           {type === "password" && (
             <button

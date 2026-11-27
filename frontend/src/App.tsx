@@ -223,7 +223,7 @@ const Layout = () => {
     };
 
     const handleDemoReadOnly = (event: any) => {
-      const msg = event?.detail?.message || "You're viewing the CABZ Demo Preview. Register your fleet and start your free trial to access operational features.";
+      const msg = event?.detail?.message || "Demo Preview is read-only. This action is unavailable.";
       showToast(msg, 'warn');
     };
 
@@ -238,11 +238,12 @@ const Layout = () => {
 
       const target = e.target as HTMLElement;
       if (!target) return;
-      const buttonOrAction = target.closest('button, input[type="submit"], [role="button"], a');
+      const buttonOrAction = target.closest('button, input[type="submit"], input[type="button"], [role="button"], a');
       if (!buttonOrAction) return;
 
       const text = (buttonOrAction.textContent || '').trim().toLowerCase();
       const href = buttonOrAction.getAttribute('href') || '';
+      const type = buttonOrAction.getAttribute('type') || '';
 
       // Allow navigation links across all preview menus and auth actions
       const isAllowedAction = href.includes('register') || href.includes('login') || href.includes('home') ||
@@ -255,33 +256,126 @@ const Layout = () => {
         return;
       }
 
-      // Allow modal dismiss / close actions
-      if (text === '×' || text === '✕' || text === 'close' || text === 'cancel' || buttonOrAction.getAttribute('data-action') === 'close') {
+      // Allow modal dismiss / close actions, search buttons, view buttons, pagination
+      if (text === '×' || text === '✕' || text === 'close' || text === 'cancel' || text === 'search' || text === 'view' || text === 'inspect' || buttonOrAction.getAttribute('data-action') === 'close') {
         return;
       }
 
       // Check operational write/mutate action keywords inside demo session
-      const isMutateAction = /^(add|create|new|edit|update|delete|remove|save|confirm order|assign driver|close order|close pending|record payment|generate invoice|upload|import|export|dispatch|terminate|suspend|activate)/i.test(text)
+      // Matches: Add, Create, Save, Submit, Update, Edit, Delete, Cancel Booking, Assign Driver, Change Status, Approve, Reject, Confirm, Close Trip, Generate Invoice, Process Payment, Upload, Import, Export
+      const isMutateAction =
+        type === 'submit' ||
+        /^(add|create|new|save|submit|update|edit|delete|remove|cancel booking|cancel order|assign|change status|approve|reject|confirm|close trip|close order|close pending|generate invoice|invoice|process payment|record payment|make payment|upload|import|export|dispatch|terminate|suspend|activate)/i.test(text)
         || (buttonOrAction.getAttribute('title') || '').toLowerCase().includes('delete')
-        || (buttonOrAction.getAttribute('aria-label') || '').toLowerCase().includes('delete');
+        || (buttonOrAction.getAttribute('title') || '').toLowerCase().includes('edit')
+        || (buttonOrAction.getAttribute('aria-label') || '').toLowerCase().includes('delete')
+        || (buttonOrAction.getAttribute('aria-label') || '').toLowerCase().includes('edit');
 
       if (isMutateAction) {
         e.preventDefault();
         e.stopPropagation();
-        showToast("You're viewing the CABZ Demo Preview. Register your fleet and start your free trial to access operational features.", 'warn');
+        showToast("Demo Preview is read-only. This action is unavailable.", 'warn');
       }
+    };
+
+    // Global form submission guard for Demo View
+    const handleFormSubmit = (e: Event) => {
+      if (!isDemoView) return;
+      const pathname = (window.location.pathname || '').toLowerCase();
+      if (/^\/(login|adminlogin|forgetpasword|activate|register-fleet|company)/.test(pathname) || pathname.includes('/login')) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      showToast("Demo Preview is read-only. This action is unavailable.", 'warn');
+    };
+
+    // Periodic & mutation sweep to disable inputs and mutate buttons in Demo View
+    const sweepDemoDOM = () => {
+      if (!isDemoView) return;
+      const pathname = (window.location.pathname || '').toLowerCase();
+      if (/^\/(login|adminlogin|forgetpasword|activate|register-fleet|company)/.test(pathname) || pathname.includes('/login')) {
+        return;
+      }
+
+      // 1. Disable form inputs (except search/filter inputs)
+      const inputs = document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+        'input:not([type="hidden"]), textarea, select'
+      );
+      inputs.forEach((el) => {
+        const name = (el.name || '').toLowerCase();
+        const placeholder = (el.getAttribute('placeholder') || '').toLowerCase();
+        const id = (el.id || '').toLowerCase();
+        const isFilterOrSearch =
+          name.includes('search') || name.includes('filter') || name.includes('keyword') || name.includes('query') ||
+          placeholder.includes('search') || placeholder.includes('filter') || placeholder.includes('keyword') ||
+          id.includes('search') || id.includes('filter') || el.closest('.search-bar');
+
+        if (!isFilterOrSearch && !el.disabled) {
+          el.disabled = true;
+          (el as any).readOnly = true;
+          el.classList.add('cursor-not-allowed', 'opacity-75', 'bg-slate-100');
+          el.setAttribute('title', 'Demo Preview is read-only. Editing is disabled.');
+        }
+      });
+
+      // 2. Visibly disable action buttons that mutate data
+      const buttons = document.querySelectorAll<HTMLButtonElement | HTMLElement>(
+        'button, input[type="submit"], [role="button"], a.btn'
+      );
+      buttons.forEach((btn) => {
+        const text = (btn.textContent || '').trim().toLowerCase();
+        const title = (btn.getAttribute('title') || '').toLowerCase();
+        const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+        const type = btn.getAttribute('type') || '';
+
+        const isDemoControl = /^(exit demo|register|start free trial|start 7-day)/i.test(text);
+        const isModalDismiss = /^(cancel|close|dismiss|back|exit|no|view|view details|inspect|filter|search)/i.test(text);
+        const isNavA = btn.tagName.toLowerCase() === 'a' && btn.getAttribute('href') && !btn.getAttribute('href')?.startsWith('#') && !btn.getAttribute('href')?.startsWith('javascript');
+
+        if (isDemoControl || isModalDismiss || isNavA) return;
+
+        const isMutate =
+          type === 'submit' ||
+          /^(add|create|new|save|submit|update|edit|delete|remove|cancel booking|cancel order|assign|change status|approve|reject|confirm|close trip|close order|close pending|generate invoice|invoice|process payment|record payment|make payment|upload|import|export|dispatch|terminate|suspend|activate)/i.test(text) ||
+          title.includes('delete') || title.includes('edit') || title.includes('remove') ||
+          aria.includes('delete') || aria.includes('edit');
+
+        if (isMutate) {
+          if ('disabled' in btn) {
+            (btn as HTMLButtonElement).disabled = true;
+          }
+          btn.setAttribute('aria-disabled', 'true');
+          btn.classList.add('opacity-50', 'cursor-not-allowed');
+          btn.setAttribute('title', 'Demo Preview is read-only. This action is unavailable.');
+        }
+      });
     };
 
     window.addEventListener('fleetflow:subscription_required', handleSubRequired);
     window.addEventListener('cabz:demo_read_only', handleDemoReadOnly);
+    let observer: MutationObserver | null = null;
+    let sweepInterval: NodeJS.Timeout | null = null;
+
     if (isDemoView) {
       document.addEventListener('click', handleDemoActionCapture, true);
+      window.addEventListener('submit', handleFormSubmit, true);
+      sweepDemoDOM();
+      sweepInterval = setInterval(sweepDemoDOM, 500);
+
+      observer = new MutationObserver(() => {
+        sweepDemoDOM();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
     }
 
     return () => {
       window.removeEventListener('fleetflow:subscription_required', handleSubRequired);
       window.removeEventListener('cabz:demo_read_only', handleDemoReadOnly);
       document.removeEventListener('click', handleDemoActionCapture, true);
+      window.removeEventListener('submit', handleFormSubmit, true);
+      if (sweepInterval) clearInterval(sweepInterval);
+      if (observer) observer.disconnect();
     };
   }, [role, isDemoView]);
 
@@ -326,12 +420,13 @@ const Layout = () => {
       >
         {isDemoView && (
           <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white px-4 py-2.5 text-xs font-semibold flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md sticky top-0 z-40 rounded-xl mb-3 border border-purple-400/30">
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 bg-yellow-400 text-slate-950 font-black rounded text-[10px] uppercase tracking-wider shadow-sm">
-                Demo Preview Mode
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="px-2.5 py-0.5 bg-yellow-400 text-slate-950 font-black rounded text-[10px] uppercase tracking-wider shadow-sm flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-950"></span>
+                DEMO PREVIEW MODE – READ ONLY
               </span>
-              <span>
-                CABZ Fleet Operations Demo Preview • Read-Only. Register your fleet and start your 7-day free trial to unlock full operations.
+              <span className="text-purple-100 font-medium">
+                Explore all available features. Editing, saving and data changes are disabled in this demo.
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -359,7 +454,7 @@ const Layout = () => {
                   localStorage.removeItem('tenantId');
                   window.location.href = '/';
                 }}
-                className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg transition text-xs"
+                className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg transition text-xs border border-white/20"
               >
                 Exit Demo
               </button>

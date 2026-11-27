@@ -27,6 +27,19 @@ axiosInstance.interceptors.request.use(
     if (tenantId && req.headers) {
       req.headers['X-Tenant-ID'] = tenantId;
     }
+
+    const isDemo = localStorage.getItem('isDemoMode') === 'true' ||
+      localStorage.getItem('isDemoView') === 'true' ||
+      localStorage.getItem('role') === 'demo';
+
+    if (isDemo && req.headers) {
+      req.headers['X-Demo-Mode'] = 'true';
+      req.headers['X-Demo-View'] = 'true';
+      if (!req.headers['X-Tenant-ID']) {
+        req.headers['X-Tenant-ID'] = 'demo-tenant';
+      }
+    }
+
     return req;
   },
 );
@@ -37,6 +50,20 @@ axiosInstance.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 403) {
       const data = error.response.data;
+
+      // Handle Demo View read-only response
+      if (data?.code === 'DEMO_MODE_READ_ONLY' || data?.isDemoReadOnly) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('cabz:demo_read_only', {
+              detail: {
+                message: data?.message || 'Demo Preview is read-only. This action is unavailable.',
+              },
+            })
+          );
+        }
+        return Promise.reject(error);
+      }
       if (
         data?.code === 'QUOTA_EXCEEDED' ||
         data?.code === 'RESTRICTED_FREE_ACCESS' ||

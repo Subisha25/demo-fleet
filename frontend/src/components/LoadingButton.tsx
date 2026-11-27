@@ -63,6 +63,17 @@ const sizeStyles: Record<ButtonSize, string> = {
   lg: 'px-6 py-3.5 text-base font-bold rounded-xl gap-2.5',
 };
 
+// Helper to extract plain text recursively from React nodes
+function extractButtonText(node: any): string {
+  if (!node) return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(extractButtonText).join(' ');
+  if (React.isValidElement(node) && (node.props as any)?.children) {
+    return extractButtonText((node.props as any).children);
+  }
+  return '';
+}
+
 export const LoadingButton: React.FC<LoadingButtonProps> = ({
   loading = false,
   loadingText,
@@ -87,21 +98,24 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
   );
 
   const rawButtonText = (typeof text === 'string' ? text : '') ||
-    (typeof children === 'string' ? children : '') ||
+    extractButtonText(children) ||
     (props['aria-label'] as string) ||
+    (props.title as string) ||
     '';
 
   const pathname = typeof window !== 'undefined' ? (window.location.pathname || '').toLowerCase() : '';
   const isAuthOrPublicRoute = /^\/(login|adminlogin|forgetpasword|activate|register-fleet|company)/.test(pathname) || pathname.includes('/login');
 
   const isAuthAction = /^(sign in|login|log in|authenticate|reset password|forgot password|send otp|verify otp|update password|activate account|start free trial|start 7-day|exit demo|register)/i.test(rawButtonText.trim());
-  const isModalDismiss = /^(cancel|close|dismiss|back|exit|no)/i.test(rawButtonText.trim());
+  const isModalDismiss = /^(cancel|close|dismiss|back|exit|no|view|view details|inspect|filter|search)/i.test(rawButtonText.trim());
   const isDemoControl = /^(exit demo|register|start free trial|start 7-day)/i.test(rawButtonText.trim());
 
   // Demo operational mutate action is ONLY applied inside authenticated demo preview workspace,
   // NEVER on public/auth routes (login, forgot password, register, etc.) and NEVER on auth actions (Sign In, Log In, etc.)
+  // Complete list of mutate keywords as mandated: Add, Create, Save, Submit, Update, Edit, Delete, Cancel Booking, Assign Driver, Change Status, Approve, Reject, Confirm, Close Trip, Generate Invoice, Process Payment, Upload, Import, Export, and form submit.
   const isMutateAction = !isAuthOrPublicRoute && !isAuthAction && isDemo && !isModalDismiss && !isDemoControl && (
-    /^(add|create|new|edit|update|delete|remove|save|confirm order|assign driver|close order|close pending|record payment|generate invoice|upload|import|export|dispatch|terminate|suspend)/i.test(rawButtonText.trim()) ||
+    /^(add|create|new|save|submit|update|edit|delete|remove|cancel booking|cancel order|assign|change status|approve|reject|confirm|close trip|close order|close pending|generate invoice|invoice|process payment|record payment|make payment|upload|import|export|dispatch|terminate|suspend|activate)/i.test(rawButtonText.trim()) ||
+    type === 'submit' ||
     variant === 'danger' ||
     variant === 'edit'
   );
@@ -112,7 +126,7 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
     if (isMutateAction) {
       e.preventDefault();
       e.stopPropagation();
-      showToast("You're viewing the CABZ Demo Preview. Register your fleet and start your free trial to access operational features.", 'warn');
+      showToast('Demo Preview is read-only. This action is unavailable.', 'warn');
       return;
     }
 
@@ -141,7 +155,7 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
       type={type}
       disabled={isActuallyDisabled}
       onClick={handleClick}
-      title={isMutateAction ? "You're viewing the CABZ Demo Preview. Register your fleet and start your free trial to access operational features." : props.title}
+      title={isMutateAction ? 'Demo Preview is read-only. This action is unavailable.' : props.title}
       aria-busy={loading}
       aria-disabled={isActuallyDisabled}
       className={`inline-flex items-center justify-center font-medium transition-all duration-150 select-none
