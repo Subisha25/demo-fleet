@@ -378,6 +378,7 @@ async function runTest() {
     // Cleanup test tenant and associated records
     if (testTenantId) {
       try {
+        await TrialExtensionRequest.destroy({ where: { tenantId: testTenantId } });
         await SubscriptionInvoice.destroy({ where: { tenantId: testTenantId } });
         await TenantSubscription.destroy({ where: { tenantId: testTenantId } });
         await TenantActivationToken.destroy({ where: { tenantId: testTenantId } });
