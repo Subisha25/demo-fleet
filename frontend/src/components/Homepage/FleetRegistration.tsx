@@ -129,6 +129,32 @@ export default function FleetRegistration() {
   } | null>(null);
 
   useEffect(() => {
+    // Proactively clear any stale demo session artifacts from localStorage on mounting,
+    // ensuring self-service public fleet registration is treated completely cleanly.
+    const isDemo =
+      localStorage.getItem('isDemoMode') === 'true' ||
+      localStorage.getItem('isDemoView') === 'true' ||
+      localStorage.getItem('role') === 'demo';
+
+    if (isDemo) {
+      localStorage.removeItem('isDemoMode');
+      localStorage.removeItem('isDemoView');
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          if (payload?.isDemo || payload?.role === 'demo' || payload?.tenantId === 'demo-tenant') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('role');
+            localStorage.removeItem('tenantId');
+          }
+        } catch {}
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     // Read plan and billing from query params if available (?plan=BASIC&billing=annual)
     const params = new URLSearchParams(location.search);
     const planParam = params.get('plan')?.toUpperCase();

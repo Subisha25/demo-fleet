@@ -4,12 +4,90 @@ import config from '../config/config';
 import { getTenantContext } from '../context/tenantContext';
 
 /**
+ * Check if the request is destined for an unauthenticated public route,
+ * such as self-service fleet registration, account activation, public booking, or authentication.
+ * These endpoints must NEVER be blocked by Demo View read-only guards.
+ */
+export const isPublicExemptRoute = (req: Request): boolean => {
+  const p = (req.originalUrl || req.path || '').toLowerCase();
+
+  // Self-service fleet registration endpoints
+  if (
+    p.includes('/register-fleet') ||
+    p.includes('/public/register') ||
+    p.includes('/tenants/register')
+  ) {
+    return true;
+  }
+
+  // Account activation endpoints
+  if (
+    p.includes('/activation/') ||
+    p.includes('/verify-activation-token') ||
+    p.includes('/activate-account')
+  ) {
+    return true;
+  }
+
+  // Public booking customer flows
+  if (p.includes('/public/booking')) {
+    return true;
+  }
+
+  // Authentication & credential recovery endpoints
+  if (
+    p.includes('/auth/login') ||
+    p.includes('/auth/emplogin') ||
+    p.includes('/auth/fleet-login') ||
+    p.includes('/auth/userlogin') ||
+    p.includes('/auth/vendorlogin') ||
+    p.includes('/auth/companylogin') ||
+    p.includes('/auth/send-otp') ||
+    p.includes('/auth/verify-otp') ||
+    p.includes('/auth/resend-otp') ||
+    p.includes('/auth/forgetpassword') ||
+    p.includes('/auth/forgot-password') ||
+    p.includes('/public/login')
+  ) {
+    return true;
+  }
+
+  // Demo session initialization & teardown
+  if (
+    p.includes('/demo-session') ||
+    p.includes('/public/demo')
+  ) {
+    return true;
+  }
+
+  // Public metadata, contact info & subscription plan viewing
+  if (
+    p.includes('/subscription/plans') ||
+    p.includes('/contact-info') ||
+    p.includes('/public/slug') ||
+    p.includes('/public/fleet-by-slug') ||
+    p.includes('/plan-summary')
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
  * Middleware: demoGuard
  * Strictly enforces that Demo View / demo preview callers CANNOT perform write or mutate operations.
  * Allows all GET / OPTIONS / HEAD queries for browsing and exploring pages.
- * Blocks all POST / PUT / PATCH / DELETE mutation attempts with HTTP 403 DEMO_MODE_READ_ONLY.
+ * Blocks all POST / PUT / PATCH / DELETE mutation attempts with HTTP 403 DEMO_MODE_READ_ONLY on tenant operations.
+ * Explicitly bypasses public unauthenticated onboarding, auth, and activation routes.
  */
 export const demoGuard = (req: Request, res: Response, next: NextFunction) => {
+  // CRITICAL: Public exempt routes (e.g. self-service fleet registration, public booking, login)
+  // must NEVER be blocked by Demo View read-only restrictions.
+  if (isPublicExemptRoute(req)) {
+    return next();
+  }
+
   // Check if request is tagged as demo via headers
   const isDemoHeader =
     req.headers['x-demo-mode'] === 'true' ||
@@ -56,14 +134,6 @@ export const demoGuard = (req: Request, res: Response, next: NextFunction) => {
   const isDemoContext = ctx?.tenantId === 'demo-tenant';
 
   if (isDemoHeader || isDemoQuery || isDemoToken || isDemoUser || isDemoContext) {
-    // Permit public demo session creation & initialization endpoints
-    if (
-      req.path.includes('/demo-session') ||
-      req.path.includes('/public/demo')
-    ) {
-      return next();
-    }
-
     const mutatingMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
     if (mutatingMethods.includes(req.method.toUpperCase())) {
       return res.status(403).json({

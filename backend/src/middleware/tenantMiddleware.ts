@@ -17,7 +17,51 @@ import jwt from 'jsonwebtoken';
  */
 export const tenantMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const rawHeaderTenantId = (req.headers['x-tenant-id'] || req.headers['X-Tenant-ID'] || req.headers['x-selected-tenant-id'] || req.headers['X-Selected-Tenant-ID']) as string | undefined;
-  const headerTenantId = rawHeaderTenantId?.trim();
+  let headerTenantId = rawHeaderTenantId?.trim();
+
+  // Detect public unauthenticated routes (registration, activation, public booking, auth)
+  const isPublicRoute = (
+    req.path.includes('/register-fleet') ||
+    req.path.includes('/public/register') ||
+    req.path.includes('/tenants/register') ||
+    req.path.includes('/activation/') ||
+    req.path.includes('/verify-activation-token') ||
+    req.path.includes('/activate-account') ||
+    req.path.includes('/public/booking') ||
+    req.path.includes('/auth/login') ||
+    req.path.includes('/auth/emplogin') ||
+    req.path.includes('/auth/fleet-login') ||
+    req.path.includes('/auth/userlogin') ||
+    req.path.includes('/auth/vendorlogin') ||
+    req.path.includes('/auth/companylogin') ||
+    req.path.includes('/auth/send-otp') ||
+    req.path.includes('/auth/verify-otp') ||
+    req.path.includes('/auth/resend-otp') ||
+    req.path.includes('/auth/forgetpassword') ||
+    req.path.includes('/auth/forgot-password') ||
+    req.path.includes('/public/login') ||
+    req.path.includes('/demo-session') ||
+    req.path.includes('/public/demo') ||
+    req.path.includes('/subscription/plans') ||
+    req.path.includes('/contact-info') ||
+    req.path.includes('/public/slug') ||
+    req.path.includes('/public/fleet-by-slug')
+  );
+
+  // If public route, strip any stale demo-tenant header so public request is treated cleanly as unauthenticated
+  if (isPublicRoute) {
+    if (headerTenantId === 'demo-tenant') {
+      headerTenantId = undefined;
+      delete req.headers['x-tenant-id'];
+      delete req.headers['X-Tenant-ID'];
+      delete req.headers['x-selected-tenant-id'];
+      delete req.headers['X-Selected-Tenant-ID'];
+    }
+    delete req.headers['x-demo-mode'];
+    delete req.headers['X-Demo-Mode'];
+    delete req.headers['x-demo-view'];
+    delete req.headers['X-Demo-View'];
+  }
 
   let tokenTenantId: string | undefined;
   let tokenRole: string | undefined;
@@ -38,24 +82,31 @@ export const tenantMiddleware = (req: Request, res: Response, next: NextFunction
   if (rawToken) {
     try {
       const decoded = jwt.verify(rawToken, process.env.JWT_SECRET!) as any;
-      isAuthenticated = true;
-      tokenRole = decoded.role || decoded.roles;
-      tokenUserId = decoded.userId ? String(decoded.userId) : undefined;
-      tokenCompanyId = decoded.companyId;
-      tokenEmail = decoded.email;
 
-      if (decoded.tenantId) {
-        tokenTenantId = String(decoded.tenantId);
+      // On public endpoints, ignore stale demo tokens so request remains unauthenticated public
+      if (isPublicRoute && (decoded.role === 'demo' || decoded.isDemo || decoded.tenantId === 'demo-tenant')) {
+        isAuthenticated = false;
+        rawToken = undefined;
       } else {
-        // Authenticated legacy Grace Cabs user without explicit tenantId claim
-        tokenTenantId = ROOT_TENANT_ID;
-      }
+        isAuthenticated = true;
+        tokenRole = decoded.role || decoded.roles;
+        tokenUserId = decoded.userId ? String(decoded.userId) : undefined;
+        tokenCompanyId = decoded.companyId;
+        tokenEmail = decoded.email;
 
-      // Strict Platform SuperAdmin validation:
-      // Must have role superadmin AND belong to root tenant / root admin identity
-      const configuredSuperAdminEmail = (process.env.SUPERADMIN_EMAIL || 'subisha2002.m@gmail.com').toLowerCase();
-      isPlatformSuperAdmin = (tokenRole === 'superadmin' || tokenRole === 'SUPERADMIN') &&
-        (tokenTenantId === ROOT_TENANT_ID || !decoded.tenantId || tokenEmail?.toLowerCase() === configuredSuperAdminEmail);
+        if (decoded.tenantId) {
+          tokenTenantId = String(decoded.tenantId);
+        } else {
+          // Authenticated legacy Grace Cabs user without explicit tenantId claim
+          tokenTenantId = ROOT_TENANT_ID;
+        }
+
+        // Strict Platform SuperAdmin validation:
+        // Must have role superadmin AND belong to root tenant / root admin identity
+        const configuredSuperAdminEmail = (process.env.SUPERADMIN_EMAIL || 'subisha2002.m@gmail.com').toLowerCase();
+        isPlatformSuperAdmin = (tokenRole === 'superadmin' || tokenRole === 'SUPERADMIN') &&
+          (tokenTenantId === ROOT_TENANT_ID || !decoded.tenantId || tokenEmail?.toLowerCase() === configuredSuperAdminEmail);
+      }
     } catch {
       // Invalid/expired token - authMiddleware will formally reject where required
     }

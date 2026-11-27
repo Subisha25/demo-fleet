@@ -69,7 +69,10 @@ const InputBox: FC<InputBoxProps> = ({
   );
 
   const pathname = typeof window !== 'undefined' ? (window.location.pathname || '').toLowerCase() : '';
-  const isAuthOrPublicRoute = /^\/(login|adminlogin|forgetpasword|activate|register-fleet|company)/.test(pathname) || pathname.includes('/login');
+  const isAuthOrPublicRoute =
+    /^\/(login|adminlogin|forgetpasword|activate|register|pricing|book|contact|about|services|portfolio|company)/.test(pathname) ||
+    pathname.includes('/login') ||
+    pathname === '/';
 
   const isFilterOrSearch =
     /search|filter|keyword|query/i.test(name) ||

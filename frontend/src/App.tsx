@@ -179,6 +179,29 @@ import Oncallinvoice from './SuperAdmin/pages/Users/Bookings/oncallbooking';
 import OnCallInvoiceView from './SuperAdmin/pages/Orders/view/Oncallinvoiceview';
 import SubscriptionLockModal from './components/SubscriptionLockModal';
 
+export const isPublicOrAuthPage = (pathname?: string): boolean => {
+  const p = (pathname || (typeof window !== 'undefined' ? window.location.pathname : '') || '').toLowerCase();
+  return (
+    p === '' ||
+    p === '/' ||
+    p.startsWith('/register') ||
+    p.startsWith('/pricing') ||
+    p.startsWith('/about') ||
+    p.startsWith('/services') ||
+    p.startsWith('/contact') ||
+    p.startsWith('/portfolio') ||
+    p.startsWith('/book') ||
+    p.startsWith('/login') ||
+    p.startsWith('/adminlogin') ||
+    p.startsWith('/forgetpasword') ||
+    p.startsWith('/forgot-password') ||
+    p.startsWith('/activate') ||
+    p.startsWith('/fleet-login') ||
+    p.startsWith('/company') ||
+    p.includes('/login')
+  );
+};
+
 const Layout = () => {
   const role = localStorage.getItem("role");
   const isDemoView = localStorage.getItem("isDemoMode") === "true" || localStorage.getItem("isDemoView") === "true" || role === "demo";
@@ -232,7 +255,7 @@ const Layout = () => {
       if (!isDemoView) return;
       const pathname = (window.location.pathname || '').toLowerCase();
       // NEVER block anything on login, registration or public auth pages
-      if (/^\/(login|adminlogin|forgetpasword|activate|register-fleet|company)/.test(pathname) || pathname.includes('/login')) {
+      if (isPublicOrAuthPage(pathname)) {
         return;
       }
 
@@ -282,7 +305,7 @@ const Layout = () => {
     const handleFormSubmit = (e: Event) => {
       if (!isDemoView) return;
       const pathname = (window.location.pathname || '').toLowerCase();
-      if (/^\/(login|adminlogin|forgetpasword|activate|register-fleet|company)/.test(pathname) || pathname.includes('/login')) {
+      if (isPublicOrAuthPage(pathname)) {
         return;
       }
       e.preventDefault();
@@ -294,7 +317,7 @@ const Layout = () => {
     const sweepDemoDOM = () => {
       if (!isDemoView) return;
       const pathname = (window.location.pathname || '').toLowerCase();
-      if (/^\/(login|adminlogin|forgetpasword|activate|register-fleet|company)/.test(pathname) || pathname.includes('/login')) {
+      if (isPublicOrAuthPage(pathname)) {
         return;
       }
 
@@ -418,7 +441,7 @@ const Layout = () => {
           role !== "manager" ? "ml-74" : ""
         }`}
       >
-        {isDemoView && (
+        {isDemoView && !isPublicOrAuthPage(window.location.pathname) && (
           <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white px-4 py-2.5 text-xs font-semibold flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md sticky top-0 z-40 rounded-xl mb-3 border border-purple-400/30">
             <div className="flex items-center gap-2.5 flex-wrap">
               <span className="px-2.5 py-0.5 bg-yellow-400 text-slate-950 font-black rounded text-[10px] uppercase tracking-wider shadow-sm flex items-center gap-1">

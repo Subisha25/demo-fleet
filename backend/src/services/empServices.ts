@@ -314,6 +314,7 @@ for (const email of managerEmails) {
     const bookingWithDetails = (await Booking.findByPk(booking.bookingId, {
       include: includeArray,
     })) || booking;
+    
 //console.log("copamnyyy ",bookingWithDetails?.user?.company?.needEmail);
 
  let needEmail = true;

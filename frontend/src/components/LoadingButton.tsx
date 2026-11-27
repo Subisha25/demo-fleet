@@ -104,7 +104,10 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
     '';
 
   const pathname = typeof window !== 'undefined' ? (window.location.pathname || '').toLowerCase() : '';
-  const isAuthOrPublicRoute = /^\/(login|adminlogin|forgetpasword|activate|register-fleet|company)/.test(pathname) || pathname.includes('/login');
+  const isAuthOrPublicRoute =
+    /^\/(login|adminlogin|forgetpasword|activate|register|pricing|book|contact|about|services|portfolio|company)/.test(pathname) ||
+    pathname.includes('/login') ||
+    pathname === '/';
 
   const isAuthAction = /^(sign in|login|log in|authenticate|reset password|forgot password|send otp|verify otp|update password|activate account|start free trial|start 7-day|exit demo|register)/i.test(rawButtonText.trim());
   const isModalDismiss = /^(cancel|close|dismiss|back|exit|no|view|view details|inspect|filter|search)/i.test(rawButtonText.trim());
