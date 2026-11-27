@@ -19,6 +19,9 @@ export interface TenantSubscriptionInfo {
   allowOverage: boolean;
   currentPeriodStart?: string;
   currentPeriodEnd?: string;
+  trialStartDate?: string;
+  trialEndsAt?: string;
+  trialDurationDays?: number;
   billingCycle?: string;
   agreedPrice?: number;
   currency?: string;

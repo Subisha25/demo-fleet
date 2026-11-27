@@ -60,6 +60,32 @@ const Header: React.FC = () => {
   };
   const fleetInitials = getFleetInitials(fleetName, currentTenant?.code);
 
+  // Free Trial Breakdown Calculation for Badge
+  const sub = currentTenant?.subscription;
+  const isTrial = sub?.status === 'TRIALING';
+  let trialRemainingDays = 7;
+  let trialExtendedDays = 0;
+  let trialEffectiveEndStr = '';
+  let trialStartStr = '';
+  let isTrialActuallyExpired = false;
+
+  if (isTrial) {
+    const trialEnd = sub?.trialEndsAt ? new Date(sub.trialEndsAt) : (sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null);
+    const trialStart = sub?.trialStartDate ? new Date(sub.trialStartDate) : null;
+    const now = new Date();
+    if (trialEnd) {
+      const diffMs = trialEnd.getTime() - now.getTime();
+      isTrialActuallyExpired = diffMs <= 0;
+      trialRemainingDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+      trialEffectiveEndStr = `${String(trialEnd.getDate()).padStart(2, '0')}-${String(trialEnd.getMonth() + 1).padStart(2, '0')}-${trialEnd.getFullYear()}`;
+    }
+    if (trialStart) {
+      trialStartStr = `${String(trialStart.getDate()).padStart(2, '0')}-${String(trialStart.getMonth() + 1).padStart(2, '0')}-${trialStart.getFullYear()}`;
+    }
+    const totalDays = sub?.trialDurationDays || 7;
+    trialExtendedDays = Math.max(0, totalDays - 7);
+  }
+
   // Fetch registration notifications for SuperAdmin
   const fetchNotifications = async () => {
     if (!isSuperAdmin) return;
@@ -184,15 +210,40 @@ const Header: React.FC = () => {
               Read-Only
             </span>
           </div>
-        ) : currentTenant?.subscription?.status === 'TRIALING' ? (
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 text-[11px] font-black rounded-full uppercase tracking-wider shadow-sm border bg-blue-100 text-blue-800 border-blue-300">
-              FREE TRIAL
-            </span>
-            <span className="px-2 py-0.5 text-[10px] font-black rounded-full uppercase tracking-wider border bg-emerald-100 text-emerald-800 border-emerald-300">
-              TRIAL ACTIVE
-            </span>
-          </div>
+        ) : isTrial ? (
+          isTrialActuallyExpired ? (
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 text-[11px] font-extrabold rounded-full uppercase tracking-wider shadow-sm border bg-rose-50 text-rose-700 border-rose-300">
+                TRIAL EXPIRED
+              </span>
+              <a
+                href="/admin/billing"
+                className="px-2.5 py-0.5 text-[10px] font-black rounded bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white transition shadow-sm"
+              >
+                Choose Plan &rarr;
+              </a>
+            </div>
+          ) : (
+            <div
+              className="flex items-center gap-1.5 flex-wrap"
+              title={`Free Trial Active | Start: ${trialStartStr || 'On Approval'} | Duration: ${sub?.trialDurationDays || 7} Days | Ends: ${trialEffectiveEndStr || '7 Days'}`}
+            >
+              <span className="px-2.5 py-0.5 text-[11px] font-black rounded-full uppercase tracking-wider shadow-sm border bg-blue-100 text-blue-800 border-blue-300">
+                FREE TRIAL
+              </span>
+              <span className="px-2 py-0.5 text-[10px] font-black rounded-full uppercase tracking-wider border bg-emerald-100 text-emerald-800 border-emerald-300">
+                TRIAL ACTIVE
+              </span>
+              <span className="px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider border bg-amber-50 text-amber-800 border-amber-300">
+                {trialRemainingDays} {trialRemainingDays === 1 ? 'Day Left' : 'Days Left'}
+              </span>
+              {trialExtendedDays > 0 && (
+                <span className="px-1.5 py-0.5 text-[9px] font-extrabold rounded-full uppercase border bg-purple-100 text-purple-800 border-purple-300">
+                  +{trialExtendedDays}D EXTENDED
+                </span>
+              )}
+            </div>
+          )
         ) : currentTenant?.subscription?.status === 'ACTIVE' ? (
           <div className="flex items-center gap-2">
             <span

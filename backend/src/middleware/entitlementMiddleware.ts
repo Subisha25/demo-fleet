@@ -14,6 +14,7 @@ import {
   checkFeatureEntitlement,
   checkThemeEntitlement,
   isSubscriptionExpired,
+  isTenantInActiveFreeTrial,
   getOrCreateSubscription,
   checkAndConsumeAllowance,
   rollbackAllowance,
@@ -74,24 +75,6 @@ export const requireVehicleQuota = async (req: Request, res: Response, next: Nex
       });
     }
 
-    const sub = await getOrCreateSubscription(tenantId);
-    if (sub.status === 'TRIALING') {
-      const consumption = await checkAndConsumeAllowance(tenantId, 'VEHICLES');
-      if (!consumption.allowed) {
-        return buildQuotaExceededResponse(res, {
-          errorCode: 'QUOTA_EXCEEDED',
-          resource: 'VEHICLES',
-          current: 1,
-          limit: 1,
-          planTier: sub.planTier,
-          message: consumption.message || 'Free setup allowance reached (1/1 vehicle). Upgrade to an active paid plan to add more vehicles.',
-        });
-      }
-      res.on('finish', () => {
-        if (res.statusCode >= 400) rollbackAllowance(tenantId, 'VEHICLES').catch(() => {});
-      });
-    }
-
     next();
   } catch (error: any) {
     console.error('Error verifying vehicle quota:', error);
@@ -121,24 +104,6 @@ export const requireBookingQuota = async (req: Request, res: Response, next: Nex
         recommendedPlan: result.recommendedPlan,
         billingPeriod: result.billingPeriod,
         message: result.message || 'Booking allowance reached for the current billing period.',
-      });
-    }
-
-    const sub = await getOrCreateSubscription(tenantId);
-    if (sub.status === 'TRIALING') {
-      const consumption = await checkAndConsumeAllowance(tenantId, 'BOOKINGS');
-      if (!consumption.allowed) {
-        return buildQuotaExceededResponse(res, {
-          errorCode: 'QUOTA_EXCEEDED',
-          resource: 'BOOKINGS',
-          current: 1,
-          limit: 1,
-          planTier: sub.planTier,
-          message: consumption.message || 'Free trial booking allowance reached (1/1 booking). Upgrade to an active paid plan to dispatch more trips.',
-        });
-      }
-      res.on('finish', () => {
-        if (res.statusCode >= 400) rollbackAllowance(tenantId, 'BOOKINGS').catch(() => {});
       });
     }
 
@@ -176,24 +141,6 @@ export const requireTaxQuota = async (req: Request, res: Response, next: NextFun
       });
     }
 
-    const sub = await getOrCreateSubscription(tenantId);
-    if (sub.status === 'TRIALING') {
-      const consumption = await checkAndConsumeAllowance(tenantId, 'TAXES');
-      if (!consumption.allowed) {
-        return buildQuotaExceededResponse(res, {
-          errorCode: 'QUOTA_EXCEEDED',
-          resource: 'TAXES',
-          current: 1,
-          limit: 1,
-          planTier: sub.planTier,
-          message: consumption.message || 'Free setup allowance reached (1/1 tax configuration). Upgrade to add more.',
-        });
-      }
-      res.on('finish', () => {
-        if (res.statusCode >= 400) rollbackAllowance(tenantId, 'TAXES').catch(() => {});
-      });
-    }
-
     next();
   } catch (error) {
     console.error('Error verifying tax quota:', error);
@@ -222,24 +169,6 @@ export const requireDriverQuota = async (req: Request, res: Response, next: Next
         planTier: result.planTier,
         recommendedPlan: result.recommendedPlan,
         message: result.message || 'Driver quota reached for your current subscription plan.',
-      });
-    }
-
-    const sub = await getOrCreateSubscription(tenantId);
-    if (sub.status === 'TRIALING') {
-      const consumption = await checkAndConsumeAllowance(tenantId, 'DRIVERS');
-      if (!consumption.allowed) {
-        return buildQuotaExceededResponse(res, {
-          errorCode: 'QUOTA_EXCEEDED',
-          resource: 'DRIVERS',
-          current: 1,
-          limit: 1,
-          planTier: sub.planTier,
-          message: consumption.message || 'Free setup allowance reached (1/1 driver). Upgrade to register more drivers.',
-        });
-      }
-      res.on('finish', () => {
-        if (res.statusCode >= 400) rollbackAllowance(tenantId, 'DRIVERS').catch(() => {});
       });
     }
 
@@ -274,24 +203,6 @@ export const requireCompanyQuota = async (req: Request, res: Response, next: Nex
       });
     }
 
-    const sub = await getOrCreateSubscription(tenantId);
-    if (sub.status === 'TRIALING') {
-      const consumption = await checkAndConsumeAllowance(tenantId, 'COMPANIES');
-      if (!consumption.allowed) {
-        return buildQuotaExceededResponse(res, {
-          errorCode: 'QUOTA_EXCEEDED',
-          resource: 'COMPANIES',
-          current: 1,
-          limit: 1,
-          planTier: sub.planTier,
-          message: consumption.message || 'Free setup allowance reached (1/1 corporate account). Upgrade to add more client accounts.',
-        });
-      }
-      res.on('finish', () => {
-        if (res.statusCode >= 400) rollbackAllowance(tenantId, 'COMPANIES').catch(() => {});
-      });
-    }
-
     next();
   } catch (error) {
     console.error('Error verifying company quota:', error);
@@ -320,24 +231,6 @@ export const requireUserQuota = async (req: Request, res: Response, next: NextFu
         planTier: result.planTier,
         recommendedPlan: result.recommendedPlan,
         message: result.message || 'User roster limit reached for your current subscription plan.',
-      });
-    }
-
-    const sub = await getOrCreateSubscription(tenantId);
-    if (sub.status === 'TRIALING') {
-      const consumption = await checkAndConsumeAllowance(tenantId, 'USERS');
-      if (!consumption.allowed) {
-        return buildQuotaExceededResponse(res, {
-          errorCode: 'QUOTA_EXCEEDED',
-          resource: 'USERS',
-          current: 1,
-          limit: 1,
-          planTier: sub.planTier,
-          message: consumption.message || 'Free setup allowance reached (1/1 user). Upgrade to register more users.',
-        });
-      }
-      res.on('finish', () => {
-        if (res.statusCode >= 400) rollbackAllowance(tenantId, 'USERS').catch(() => {});
       });
     }
 
@@ -555,7 +448,7 @@ export const requireThemeCustomization = async (req: Request, res: Response, nex
 /**
  * 13. Paid Modification Guard:
  * Expired / suspended subscriptions strictly block all modifications, updates, and deletes.
- * Trialing fleets cannot modify/delete records until an active paid subscription is activated.
+ * Active 7-Day Free Trial fleets receive COMPLETE operational access (Add, Edit, Delete, Invoicing, Reports).
  */
 export const requirePaidForModification = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -567,6 +460,11 @@ export const requirePaidForModification = async (req: Request, res: Response, ne
 
     const sub = await getOrCreateSubscription(tenantId);
 
+    // Active Free Trial: Complete operational access to modify, edit, delete, restore, and cancel records!
+    if (isTenantInActiveFreeTrial(sub)) {
+      return next();
+    }
+
     if (isSubscriptionExpired(sub)) {
       return res.status(403).json({
         success: false,
@@ -576,22 +474,10 @@ export const requirePaidForModification = async (req: Request, res: Response, ne
         requiresUpgrade: true,
         status: sub.status,
         planTier: sub.planTier,
-        message: 'Your fleet subscription is expired or suspended. Operational data updates, deletions, and exports are locked. Please renew your subscription.',
+        message: sub.status === 'TRIALING'
+          ? 'Your 7-day free trial has expired. Modifying, deleting, or exporting records is locked. Please choose a subscription plan to continue.'
+          : 'Your fleet subscription is expired or suspended. Operational data updates, deletions, and exports are locked. Please renew your subscription.',
         renewalUrl: '/billing/current',
-        upgradeUrl: '/billing/current',
-      });
-    }
-
-    if (sub.status === 'TRIALING') {
-      return res.status(403).json({
-        success: false,
-        code: 'RESTRICTED_FREE_ACCESS',
-        errorCode: 'RESTRICTED_FREE_ACCESS',
-        subscriptionRequired: true,
-        requiresUpgrade: true,
-        status: sub.status,
-        planTier: sub.planTier,
-        message: 'Modifying, deleting, or exporting records is restricted on the initial free setup allowance. Please activate an eligible paid plan.',
         upgradeUrl: '/billing/current',
       });
     }

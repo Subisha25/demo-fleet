@@ -40,6 +40,18 @@ interface CurrentPlanData {
   daysElapsed: number;
   daysRemaining: number;
   progressPercent: number;
+  trialDetails?: {
+    trialStatus: string;
+    originalTrialDays: number;
+    extendedTrialDays: number;
+    totalTrialDays: number;
+    trialStartDate?: string;
+    originalTrialExpiry?: string;
+    currentTrialExpiry?: string;
+    remainingDays: number;
+    remainingMs: number;
+    trialExtensionHistory?: any[];
+  };
   quotas: {
     vehicles: QuotaMeter;
     drivers: QuotaMeter;
@@ -88,15 +100,21 @@ const CurrentPlan: React.FC = () => {
           trips: quotas.trips || { current: 0, limit: tierDefaultLimits[planTier]?.trips || 250 },
         };
 
+        const trialDetails = stats.trialDetails;
+        const isTrialing = (sub.status || '').toUpperCase() === 'TRIALING';
         const now = new Date();
-        const start = sub.currentPeriodStart || sub.startDate ? new Date(sub.currentPeriodStart || sub.startDate) : new Date(now.getTime() - 15 * 86400000);
-        const end = sub.currentPeriodEnd || sub.endDate ? new Date(sub.currentPeriodEnd || sub.endDate) : new Date(now.getTime() + 15 * 86400000);
+        const start = isTrialing && sub.trialStartDate
+          ? new Date(sub.trialStartDate)
+          : (sub.currentPeriodStart || sub.startDate ? new Date(sub.currentPeriodStart || sub.startDate) : new Date(now.getTime() - 7 * 86400000));
+        const end = isTrialing && (sub.trialEndsAt || trialDetails?.currentTrialExpiry)
+          ? new Date(sub.trialEndsAt || trialDetails.currentTrialExpiry)
+          : (sub.currentPeriodEnd || sub.endDate ? new Date(sub.currentPeriodEnd || sub.endDate) : new Date(now.getTime() + 7 * 86400000));
 
         const totalMs = Math.max(1, end.getTime() - start.getTime());
         const elapsedMs = Math.max(0, now.getTime() - start.getTime());
         const daysTotal = Math.max(1, Math.round(totalMs / 86400000));
         const daysElapsed = Math.min(daysTotal, Math.max(0, Math.round(elapsedMs / 86400000)));
-        const daysRemaining = Math.max(0, Math.round((end.getTime() - now.getTime()) / 86400000));
+        const daysRemaining = trialDetails?.remainingDays ?? Math.max(0, Math.round((end.getTime() - now.getTime()) / 86400000));
         const progressPercent = Math.min(100, Math.max(0, Math.round((daysElapsed / daysTotal) * 100)));
 
         const tierNames: Record<string, string> = {
@@ -155,6 +173,7 @@ const CurrentPlan: React.FC = () => {
           daysElapsed,
           daysRemaining,
           progressPercent,
+          trialDetails,
           quotas: resolvedQuotas,
           features: defaultFeatures[planTier] || [],
           allPlanCatalog: [
@@ -237,7 +256,7 @@ const CurrentPlan: React.FC = () => {
       case 'TRIALING':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-black rounded-full bg-blue-100 text-blue-800 border border-blue-200 uppercase tracking-wider">
-            <Sparkles size={13} /> Free Trial Setup (1-Record Allowance)
+            <Sparkles size={13} /> Free Trial • Full Access
           </span>
         );
       case 'PAST_DUE':
@@ -362,6 +381,80 @@ const CurrentPlan: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Free Trial Breakdown (Active Free Trial) */}
+        {data.status === 'TRIALING' && (
+          <div className="bg-gradient-to-br from-blue-50/70 via-white to-indigo-50/40 rounded-xl border-2 border-blue-200 p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-blue-100">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                  <Sparkles size={16} />
+                </span>
+                <div>
+                  <h3 className="text-sm font-extrabold text-[#1C1A18] uppercase tracking-wider">
+                    7-Day Free Trial Entitlements & Lifecycle
+                  </h3>
+                  <p className="text-xs text-[#5C5752]">
+                    Full operational privileges enabled across all platform modules.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 bg-blue-100 text-blue-800 border border-blue-300 text-xs font-black rounded-full uppercase tracking-wider">
+                  FREE TRIAL
+                </span>
+                <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-black rounded-full uppercase tracking-wider">
+                  TRIAL ACTIVE
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <div className="bg-white p-3.5 rounded-lg border border-blue-100 shadow-2xs">
+                <span className="text-[10px] font-bold uppercase text-[#7A7570] tracking-wider block">Trial Status</span>
+                <span className="text-xs font-black text-emerald-700 mt-1 block">ACTIVE</span>
+              </div>
+              <div className="bg-white p-3.5 rounded-lg border border-blue-100 shadow-2xs">
+                <span className="text-[10px] font-bold uppercase text-[#7A7570] tracking-wider block">Start Date</span>
+                <span className="text-xs font-bold text-[#1C1A18] mt-1 block">{data.currentPeriodStart}</span>
+              </div>
+              <div className="bg-white p-3.5 rounded-lg border border-blue-100 shadow-2xs">
+                <span className="text-[10px] font-bold uppercase text-[#7A7570] tracking-wider block">Original Duration</span>
+                <span className="text-xs font-bold text-[#1C1A18] mt-1 block">7 Days</span>
+              </div>
+              <div className="bg-white p-3.5 rounded-lg border border-blue-100 shadow-2xs">
+                <span className="text-[10px] font-bold uppercase text-[#7A7570] tracking-wider block">Approved Extensions</span>
+                <span className="text-xs font-bold text-purple-700 mt-1 block">
+                  {data.trialDetails?.extendedTrialDays ? `+${data.trialDetails.extendedTrialDays} Days` : '0 Days'}
+                </span>
+              </div>
+              <div className="bg-white p-3.5 rounded-lg border border-blue-100 shadow-2xs">
+                <span className="text-[10px] font-bold uppercase text-[#7A7570] tracking-wider block">Total Trial Duration</span>
+                <span className="text-xs font-black text-[#1C1A18] mt-1 block">
+                  {data.trialDetails?.totalTrialDays || 7} Days
+                </span>
+              </div>
+              <div className="bg-white p-3.5 rounded-lg border border-blue-100 shadow-2xs">
+                <span className="text-[10px] font-bold uppercase text-[#7A7570] tracking-wider block">Remaining Days</span>
+                <span className="text-xs font-black text-blue-700 mt-1 block">
+                  {data.daysRemaining} {data.daysRemaining === 1 ? 'Day Left' : 'Days Left'}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-white/90 rounded-lg border border-blue-200/60 text-xs text-blue-900 flex items-center justify-between flex-wrap gap-2">
+              <span>
+                Effective Expiry Date: <strong className="font-extrabold text-[#1C1A18]">{data.currentPeriodEnd}</strong>
+              </span>
+              <a
+                href="/admin/billing/extension"
+                className="text-blue-700 hover:text-blue-900 font-bold underline text-xs"
+              >
+                Request Trial Extension &rarr;
+              </a>
+            </div>
+          </div>
+        )}
 
         {/* Quota Telemetry Meters Grid */}
         <div className="space-y-3">

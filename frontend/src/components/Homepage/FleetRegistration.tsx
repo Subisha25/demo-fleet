@@ -772,12 +772,66 @@ export default function FleetRegistration() {
                 </div>
               </div>
 
-              {/* Section 4: Preferred Demo Call Date & Time */}
+              {/* Section 4: Dedicated Read-Only Free Trial Information */}
+              <div className="bg-gradient-to-br from-emerald-50/80 via-white to-emerald-50/40 p-6 rounded-2xl border-2 border-emerald-300 shadow-sm">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-4 pb-3 border-b border-emerald-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                      4
+                    </span>
+                    <h2 className="text-base font-extrabold uppercase tracking-wider text-[#17171D]">
+                      Free Trial – 7 Days
+                    </h2>
+                  </div>
+                  <span className="px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-black rounded-full uppercase tracking-wider shadow-sm">
+                    Full Operational Access
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-xs">
+                    <div className="text-[11px] font-bold uppercase text-[#7A7570] tracking-wider">Duration</div>
+                    <div className="text-base font-black text-[#17171D] mt-1">7 Calendar Days</div>
+                    <div className="text-[11px] text-[#5C5752] mt-0.5">Comprehensive evaluation period</div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-xs">
+                    <div className="text-[11px] font-bold uppercase text-[#7A7570] tracking-wider">Start Date</div>
+                    <div className="text-base font-black text-emerald-700 mt-1">Upon Approval</div>
+                    <div className="text-[11px] text-[#5C5752] mt-0.5">Activates when SuperAdmin approves</div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-xs">
+                    <div className="text-[11px] font-bold uppercase text-[#7A7570] tracking-wider">Projected End Date</div>
+                    <div className="text-base font-black text-emerald-700 mt-1">
+                      {`${String(maxDate.getDate()).padStart(2, '0')}-${String(maxDate.getMonth() + 1).padStart(2, '0')}-${maxDate.getFullYear()}`}
+                    </div>
+                    <div className="text-[11px] text-[#5C5752] mt-0.5">If approved today (informational preview)</div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-xs">
+                    <div className="text-[11px] font-bold uppercase text-[#7A7570] tracking-wider">Payment Required Now</div>
+                    <div className="text-base font-black text-emerald-700 mt-1">₹0 Upfront</div>
+                    <div className="text-[11px] text-[#5C5752] mt-0.5">No credit card required to start</div>
+                  </div>
+                </div>
+
+                <div className="mt-4 p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
+                    ✓
+                  </div>
+                  <div className="text-xs text-emerald-900 leading-relaxed">
+                    <span className="font-bold">Access Scope:</span> Full operational access across all core modules — Vehicles, Drivers, Corporate Accounts, Bookings, Invoices, Billing, and Tracking. Zero setup limits or record restrictions during your entire 7-day period.
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 5: Preferred Demo Call Date & Time */}
               <div className="bg-gradient-to-br from-[#F8F9FE] to-white p-6 rounded-2xl border border-[#E0E7FF] shadow-sm">
                 <div className="mb-4 pb-3 border-b border-[#E5E7EB]">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg bg-[#5B3DF5] text-white flex items-center justify-center font-bold text-sm shadow-sm">
-                      4
+                      5
                     </span>
                     <h2 className="text-base font-bold uppercase tracking-wider text-[#17171D]">
                       Preferred Demo Call Date & Time
