@@ -3881,7 +3881,9 @@ export const getOverallInvoiceReport = async (req: Request, res: Response) => {
     /* =========================================================
        DISPATCH BASED ON bookingType
     ========================================================= */
-    if (bookingType === "all") {
+    const normalizedBookingType = (bookingType || '').toLowerCase();
+
+    if (normalizedBookingType === "all") {
       // ✅ Run all 3 reports in parallel, return separately so
       // frontend can put each into its own sheet in one workbook
       const [normalRows, monthlyRows, oncallRows] = await Promise.all([
@@ -3901,17 +3903,17 @@ export const getOverallInvoiceReport = async (req: Request, res: Response) => {
       });
     }
 
-    if (bookingType === "oncall") {
+    if (normalizedBookingType === "oncall") {
       const rows = await buildOncallRows();
       return res.json({ from, to, companyId, bookingType, rows });
     }
 
-    if (bookingType === "monthly") {
+    if (normalizedBookingType === "monthly") {
       const rows = await buildMonthlyRows();
       return res.json({ from, to, companyId, bookingType, rows });
     }
 
-    if (bookingType === "normal") {
+    if (normalizedBookingType === "normal" || normalizedBookingType === "daily") {
       const rows = await buildNormalRows();
       return res.json({ from, to, companyId, bookingType, rows });
     }

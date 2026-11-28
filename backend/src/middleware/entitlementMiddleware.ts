@@ -28,7 +28,7 @@ function buildQuotaExceededResponse(res: Response, opts: {
   resource: string;
   current: number | string;
   limit: number | string;
-  planTier: string;
+  planTier: string | null;
   recommendedPlan?: string;
   message: string;
   billingPeriod?: any;

@@ -263,19 +263,29 @@ const TenantList: React.FC = () => {
       accessor: 'planTier',
       render: (tenant: EnrichedTenant) => (
         <div className="space-y-1">
-          <span
-            className={`inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-              tenant.planTier === 'ENTERPRISE'
-                ? 'bg-purple-100 text-purple-800 border border-purple-300'
-                : tenant.planTier === 'PRO'
-                ? 'bg-teal-100 text-teal-800 border border-teal-300'
-                : 'bg-blue-100 text-blue-800 border border-blue-300'
-            }`}
-          >
-            {tenant.planTier}
-          </span>
+          {tenant.status === 'TRIALING' ? (
+            <span className="inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-300">
+              FREE TRIAL
+            </span>
+          ) : (
+            <span
+              className={`inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                tenant.planTier === 'ENTERPRISE'
+                  ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                  : tenant.planTier === 'PRO'
+                  ? 'bg-teal-100 text-teal-800 border border-teal-300'
+                  : 'bg-slate-100 text-slate-800 border border-slate-300'
+              }`}
+            >
+              {tenant.planTier || 'NO PLAN'}
+            </span>
+          )}
           <div className="text-[11px] text-slate-500">
-            Cycle: <strong className="text-slate-700">{(tenant.subscription as any)?.billingCycle || 'MONTHLY'}</strong>
+            {tenant.status === 'TRIALING' ? (
+              <span className="text-emerald-700 font-semibold">₹0 Upfront</span>
+            ) : (
+              <>Cycle: <strong className="text-slate-700">{(tenant.subscription as any)?.billingCycle || 'MONTHLY'}</strong></>
+            )}
           </div>
         </div>
       ),

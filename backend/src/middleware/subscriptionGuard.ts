@@ -9,7 +9,7 @@ export interface SubscriptionLockEvaluation {
   isLocked: boolean;
   lockReason: 'NONE' | 'PAYMENT_PENDING' | 'EXPIRED' | 'SUSPENDED' | 'TRIAL_EXPIRED';
   subscriptionStatus: string;
-  planTier: 'BASIC' | 'PRO' | 'ENTERPRISE';
+  planTier: 'BASIC' | 'PRO' | 'ENTERPRISE' | 'FREE_TRIAL' | null;
   billingCycle: 'MONTHLY' | 'ANNUAL';
   payableAmount: number;
   baseAmount: number;
@@ -17,6 +17,13 @@ export interface SubscriptionLockEvaluation {
   currency: string;
   periodEnd?: Date | null;
   message: string;
+  availablePlans?: Array<{
+    planTier: string;
+    name: string;
+    priceMonthlyINR: number;
+    priceAnnualINR: number;
+    gstPercent: number;
+  }>;
   trialDetails?: {
     trialStatus: string;
     originalTrialDays: number;
@@ -125,6 +132,39 @@ export async function evaluateTenantSubscriptionLock(
 
   // Case B & C: Free Trial Lifecycle (status === 'TRIALING')
   if (sub.status === 'TRIALING') {
+    const isAwaitingActivation = (sub.trialStartDate === null || sub.trialEndsAt === null);
+
+    if (isAwaitingActivation) {
+      // Pending activation: Trial has NOT started yet. 0 days consumed.
+      return {
+        isLocked: false,
+        lockReason: 'NONE',
+        subscriptionStatus: 'PENDING_ACTIVATION',
+        planTier: 'FREE_TRIAL',
+        billingCycle,
+        payableAmount: 0,
+        baseAmount: 0,
+        taxAmount: 0,
+        currency: 'INR',
+        periodEnd: null,
+        message: 'Account is awaiting initial activation. The 7-day free trial will start upon setting your password.',
+        trialDetails: {
+          trialStatus: 'PENDING_ACTIVATION',
+          originalTrialDays: 7,
+          extendedTrialDays: 0,
+          totalTrialDays: 7,
+          trialStartDate: null,
+          originalTrialExpiry: null,
+          currentTrialExpiry: null,
+          remainingDays: 7,
+          remainingMs: 7 * 24 * 60 * 60 * 1000,
+          trialExtensionHistory: sub.trialExtensionHistory || [],
+          latestExtensionRequest: null,
+          pendingExtensionRequest: null,
+        },
+      };
+    }
+
     const trialEnd = sub.trialEndsAt
       ? new Date(sub.trialEndsAt)
       : (sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null);
@@ -183,11 +223,11 @@ export async function evaluateTenantSubscriptionLock(
         isLocked: false,
         lockReason: 'NONE',
         subscriptionStatus: 'TRIAL_ACTIVE',
-        planTier,
+        planTier: (sub.planTier || 'FREE_TRIAL') as any,
         billingCycle,
-        payableAmount,
-        baseAmount,
-        taxAmount,
+        payableAmount: 0,
+        baseAmount: 0,
+        taxAmount: 0,
         currency: 'INR',
         periodEnd: trialEnd,
         message: 'Your free trial is active. You have full operational access across CABZ.',
@@ -208,7 +248,7 @@ export async function evaluateTenantSubscriptionLock(
         isLocked: false,
         lockReason: 'NONE',
         subscriptionStatus: 'ACTIVE_PAID',
-        planTier,
+        planTier: (sub.planTier || 'PRO') as any,
         billingCycle,
         payableAmount,
         baseAmount,
@@ -220,18 +260,24 @@ export async function evaluateTenantSubscriptionLock(
     }
 
     // Free trial expired and no verified payment: Restricted access with subscription-required lock
+    // Rule: Do NOT show PRO or ₹411.82 before customer selects a plan!
     return {
       isLocked: true,
       lockReason: 'EXPIRED',
       subscriptionStatus: 'TRIAL_EXPIRED',
-      planTier,
+      planTier: (sub.planTier || 'FREE_TRIAL') as any,
       billingCycle,
-      payableAmount,
-      baseAmount,
-      taxAmount,
+      payableAmount: 0,
+      baseAmount: 0,
+      taxAmount: 0,
       currency: 'INR',
       periodEnd: trialEnd,
       message: 'Your free trial has ended. To continue managing your fleet, vehicles, drivers and bookings, please choose a subscription plan and complete the payment.',
+      availablePlans: [
+        { planTier: 'BASIC', name: 'Starter Mobility', priceMonthlyINR: 299, priceAnnualINR: 3050, gstPercent: 18 },
+        { planTier: 'PRO', name: 'Growth Fleet Pro', priceMonthlyINR: 349, priceAnnualINR: 3560, gstPercent: 18 },
+        { planTier: 'ENTERPRISE', name: 'Enterprise Mobility Suite', priceMonthlyINR: 549, priceAnnualINR: 5600, gstPercent: 18 },
+      ],
       trialDetails,
     };
   }

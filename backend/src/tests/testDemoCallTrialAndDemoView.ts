@@ -440,7 +440,7 @@ async function runTestSuite() {
   // Test 24: Fleet Admin can view available subscription plans
   try {
     const sub = await TenantSubscription.findOne({ where: { tenantId: createdTenantId } });
-    const passed = sub !== null && ['BASIC', 'PRO', 'ENTERPRISE'].includes(sub.planTier);
+    const passed = sub !== null && ['BASIC', 'PRO', 'ENTERPRISE'].includes(sub.planTier as any);
     recordTest(24, 'Trial Expiry', 'Fleet Admin can view subscription plans and pricing', passed, `Current Tier: ${sub?.planTier}`);
   } catch (err: any) {
     recordTest(24, 'Trial Expiry', 'Fleet Admin can view subscription plans', false, undefined, err.message);

@@ -12,7 +12,7 @@ import { Employee } from '../models/employee';
 import path from 'path';
 import fs from 'fs';
 import jwt from 'jsonwebtoken';
-import { PLAN_LIMITS, getPlanDefinition } from './quotaService';
+import { PLAN_LIMITS, TRIAL_BASELINE_LIMITS, getPlanDefinition } from './quotaService';
 import { generatePlanSummaryPDF } from './planSummaryPdfService';
 import { calculateSubscriptionPeriodEnd } from './subscriptionBillingService';
 import { sendNotification, getSuperAdminEmail, getSuperAdminPhone, diagnoseSmtpConfig } from './notificationService';
@@ -43,7 +43,7 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
       city,
       state,
       pinCode,
-      requestedPlanTier = 'PRO',
+      requestedPlanTier = 'FREE_TRIAL',
       billingCycle = 'MONTHLY',
       fleetSize = '1-15',
       termsConsent = true,
@@ -345,10 +345,7 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
     }
 
     const requestId = uuidv4();
-    const normalizedTier = ['BASIC', 'PRO', 'ENTERPRISE'].includes(String(requestedPlanTier).toUpperCase())
-      ? (String(requestedPlanTier).toUpperCase() as 'BASIC' | 'PRO' | 'ENTERPRISE')
-      : 'PRO';
-
+    const normalizedTier = 'FREE_TRIAL';
     const normalizedCycle = String(billingCycle).toUpperCase() === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY';
 
     const slug = await generateUniqueFleetSlug(
@@ -399,11 +396,7 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Invalid applicant contact email format.' });
     }
 
-    // Resolve plan details for template display
-    const plan = await getPlanDefinition(normalizedTier);
-    const agreedPrice = normalizedCycle === 'ANNUAL'
-      ? (plan?.priceAnnualINR || 3560)
-      : (plan?.priceMonthlyINR || 349);
+    const agreedPrice = 0; // Free trial application only; no paid plan price assigned
 
     const notificationTasks: Promise<any>[] = [
       // EVENT 1 (Email): Registration Received acknowledgment email strictly to applicant
@@ -412,7 +405,7 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
         recipient: applicantEmail,
         templateCode: 'REGISTRATION_RECEIVED',
         subject: `Application Received: Welcome to CABZ — ${registration.fleetName}`,
-        body: `Hello ${registration.ownerName},\n\nThank you for applying to join CABZ Mobility Platform. Your application for ${registration.fleetName} (Code: ${registration.businessCode}) has been received and is currently under review by our platform administration team.\n\nApplication Reference: ${requestId}\nPlan: ${normalizedTier} (${normalizedCycle} billing)\nAgreed Price: ₹${agreedPrice}\n\nYou will receive a secure activation link once your fleet application is approved.`,
+        body: `Hello ${registration.ownerName},\n\nThank you for applying to join CABZ Mobility Platform. Your application for ${registration.fleetName} (Code: ${registration.businessCode}) has been received and is currently under review by our platform administration team.\n\nApplication Reference: ${requestId}\nPlan: 7-Day Free Trial (₹0 Upfront, Full Operational Access)\nAgreed Price: ₹0 (No paid plan required during trial)\n\nYou will receive a secure activation link once your fleet application is approved.`,
         referenceEntity: 'REGISTRATION_REQUEST',
         referenceId: requestId,
         metadata: {
@@ -421,9 +414,9 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
           ownerName: registration.ownerName,
           contactEmail: applicantEmail,
           contactPhone: applicantPhone,
-          planTier: normalizedTier,
+          planTier: 'FREE_TRIAL',
           billingCycle: normalizedCycle,
-          agreedPrice: String(agreedPrice),
+          agreedPrice: '0',
           supportEmail: 'support@cabz.com',
         },
       }),
@@ -453,7 +446,7 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
         recipient: superAdminNotificationEmail,
         templateCode: 'SUPERADMIN_NEW_APPLICATION_ALERT',
         subject: `🚨 New Fleet Application Received: ${registration.fleetName} (${registration.businessCode})`,
-        body: `A new fleet transport operator has submitted a registration application for review:\n\nFleet Name: ${registration.fleetName}\nBusiness Code: ${registration.businessCode}\nApplicant: ${registration.ownerName}\nContact Email: ${applicantEmail}\nContact Phone: ${applicantPhone}\nLocation: ${registration.city}, ${registration.state}\nRequested Plan: ${normalizedTier} (${normalizedCycle})\nAgreed Price: ₹${agreedPrice}\n\nPlease review the application at: ${WEB_BASE_URL}/admin/registrations`,
+        body: `A new fleet transport operator has submitted a registration application for review:\n\nFleet Name: ${registration.fleetName}\nBusiness Code: ${registration.businessCode}\nApplicant: ${registration.ownerName}\nContact Email: ${applicantEmail}\nContact Phone: ${applicantPhone}\nLocation: ${registration.city}, ${registration.state}\nRequested Plan: Free Trial (7 Days)\nAgreed Price: ₹0\n\nPlease review the application at: ${WEB_BASE_URL}/admin/registrations`,
         referenceEntity: 'REGISTRATION_REQUEST',
         referenceId: requestId,
         metadata: {
@@ -464,9 +457,9 @@ export const submitFleetRegistration = async (req: Request, res: Response) => {
           contactPhone: applicantPhone,
           city: registration.city,
           state: registration.state,
-          planTier: normalizedTier,
+          planTier: 'FREE_TRIAL',
           billingCycle: normalizedCycle,
-          agreedPrice: String(agreedPrice),
+          agreedPrice: '0',
           reviewUrl: `${WEB_BASE_URL}/admin/registrations`,
           actionText: 'Review Inbound Applications',
         },
@@ -681,22 +674,15 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
     // 1. Provision Tenant, Subscription & Activation Token inside an ACID transaction
     // Strictly ensures approval email triggers only after database transaction commits
     const tenantId = uuidv4();
-    const limits = PLAN_LIMITS[reg.requestedPlanTier];
-    const plan = await getPlanDefinition(reg.requestedPlanTier);
     const billingCycle = reg.billingCycle === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY';
-    const agreedPrice = billingCycle === 'ANNUAL'
-      ? (plan?.priceAnnualINR || 3560)
-      : (plan?.priceMonthlyINR || 349);
-
     const tenantSlug = reg.slug || await generateUniqueFleetSlug(reg.displayName || reg.fleetName);
 
     const approvalNow = new Date();
-    // 7-day free trial starts at approval timestamp and expires in exactly 7 days
-    const trialEndsAt = new Date(approvalNow.getTime() + 7 * 24 * 60 * 60 * 1000);
-
+    // Critical: Free trial dates are NOT initialized at approval time.
+    // The 7-day Free Trial starts ONLY when the Fleet Admin sets password and activates their account!
     const rawToken = `act_${crypto.randomBytes(32).toString('hex')}`;
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours expiry
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours expiry for activation token
 
     let tenant: Tenant;
     let subscription: TenantSubscription;
@@ -712,7 +698,7 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
         subdomain: reg.businessCode.toLowerCase(),
         slug: tenantSlug,
         status: 'ACTIVE',
-        planTier: reg.requestedPlanTier,
+        planTier: null, // Free trial: No customer-selected paid plan
         contactEmail: reg.contactEmail,
         contactPhone: reg.contactPhone,
         registeredAddress: reg.registeredAddress || null,
@@ -752,23 +738,24 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
       subscription = await TenantSubscription.create({
         subscriptionId: uuidv4(),
         tenantId,
-        planTier: reg.requestedPlanTier,
+        planTier: null, // Free trial: Internal technical baseline profile applies, no customer-selected paid plan
         status: 'TRIALING',
-        vehicleQuota: limits.vehicles,
-        driverQuota: limits.drivers,
-        companyQuota: limits.companies,
-        monthlyTripQuota: limits.trips,
-        allowOverage: reg.requestedPlanTier !== 'BASIC',
-        monthlyOverageSpendCap: reg.requestedPlanTier === 'PRO' ? 5000 : 1000,
+        vehicleQuota: TRIAL_BASELINE_LIMITS.vehicles,
+        driverQuota: TRIAL_BASELINE_LIMITS.drivers,
+        companyQuota: TRIAL_BASELINE_LIMITS.companies,
+        monthlyTripQuota: TRIAL_BASELINE_LIMITS.trips,
+        taxQuota: TRIAL_BASELINE_LIMITS.taxes,
+        allowOverage: false,
+        monthlyOverageSpendCap: 0,
         billingCycle,
-        agreedPrice,
+        agreedPrice: 0, // ₹0 Free Trial; no paid subscription invoice generated
         currency: 'INR',
-        trialStartDate: approvalNow,
-        trialEndsAt: trialEndsAt,
+        trialStartDate: null, // Critical: 7-day Free Trial starts ONLY when Fleet Admin sets password and activates account!
+        trialEndsAt: null,   // Calculated upon account activation (trialStartDate + 7 days)
         trialDurationDays: 7,
         trialExtensionHistory: [],
-        currentPeriodStart: approvalNow,
-        currentPeriodEnd: trialEndsAt,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
       }, { transaction: t });
 
       activationTokenRecord = await TenantActivationToken.create({
@@ -786,33 +773,16 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
         reviewedBy: (req as any).user?.userId || 'SuperAdmin',
         reviewedAt: approvalNow,
         tenantId,
-        reviewNotes: reviewNotes || 'Application reviewed and approved with 7-day free trial.',
+        reviewNotes: reviewNotes || 'Application reviewed and approved. Free trial starts upon account activation.',
       }, { transaction: t });
     });
 
-    // 2. Strict Recipient Separation: Dispatch 7-Day Free Trial activation & approval email to applicant only
+    // 2. Strict Recipient Separation: Dispatch Free Trial activation link to applicant only
     // EVENT 3: SuperAdmin Approves Fleet — sent ONLY to registered applicant / Fleet Admin email
     // Free Trial details ONLY: No paid plans (BASIC, PRO, ENTERPRISE), No pricing/rates, No billing cycle, No plan summary PDF
     const applicantEmail = reg.contactEmail.trim().toLowerCase();
     const activationUrl = `${WEB_BASE_URL}/activate-account?token=${rawToken}`;
     const fleetLoginUrl = getFleetLoginUrl(tenantSlug);
-
-    const formattedStart = approvalNow.toLocaleString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
-    const formattedEnd = trialEndsAt.toLocaleString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
 
     if (!applicantEmail || !EMAIL_REGEX.test(applicantEmail)) {
       console.error('[Approval] Cannot dispatch activation email: missing or invalid contactEmail on request', reg.requestId);
@@ -821,19 +791,20 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
         channel: 'EMAIL',
         recipient: applicantEmail,
         templateCode: 'TENANT_ADMIN_ACTIVATION_LINK',
-        subject: `CABZ – Your Fleet Registration Is Approved | 7-Day Free Trial Activated`,
+        subject: `CABZ – Your Fleet Registration Is Approved | Set Password to Start 7-Day Free Trial`,
         body: `Dear ${reg.ownerName},\n\n` +
           `Congratulations! Your fleet registration application for ${reg.fleetName} has been approved by the platform administrator.\n\n` +
-          `Your 7-day Free Trial is now active with full operational access to all CABZ mobility features!\n\n` +
-          `7-DAY FREE TRIAL DETAILS:\n` +
-          `• Trial Status: FREE TRIAL ACTIVE\n` +
-          `• Start Date & Time: ${formattedStart}\n` +
-          `• Duration: 7 Days\n` +
-          `• End Date & Time: ${formattedEnd}\n` +
-          `• Validity: Full access to all fleet mobility features (vehicles, drivers, companies, bookings & dispatch)\n\n` +
+          `Your 7-Day Free Trial with full operational access to all CABZ mobility features will start as soon as you complete your password setup and activate your account.\n\n` +
+          `7-DAY FREE TRIAL ENTITLEMENTS:\n` +
+          `• Account Status: Pending Account Activation\n` +
+          `• Free Trial Duration: 7 Full Calendar Days (starts upon password setup)\n` +
+          `• Trial Start Date & Time: Awaiting Account Activation\n` +
+          `• Trial End Date & Time: To be calculated automatically from your exact activation timestamp\n` +
+          `• Validity: 100% full access to all fleet mobility features (vehicles, drivers, companies, bookings, dispatch & invoicing)\n` +
+          `• Selected Plan: None (₹0 upfront, choose your plan anytime before or at trial completion)\n\n` +
           `EXPLORE & OPERATE WITHOUT RESTRICTIONS:\n` +
-          `During your 7-day free trial, you can explore and operate all platform features without restriction. You can select and upgrade to a paid subscription plan anytime directly from your dashboard before or at trial expiry.\n\n` +
-          `STEP 1 — ACTIVATE YOUR ACCOUNT:\n` +
+          `During your 7-day free trial, you can explore and operate all platform features without restriction. No trial days are consumed while waiting for your account activation.\n\n` +
+          `STEP 1 — ACTIVATE YOUR ACCOUNT & START YOUR TRIAL:\n` +
           `Click the secure activation link below to set your administrator password:\n${activationUrl}\n` +
           `(Note: This link will expire in 24 hours. Never share this link with anyone.)\n\n` +
           `STEP 2 — DEDICATED FLEET LOGIN PORTAL:\n` +
@@ -845,23 +816,23 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
           tenantId,
           fleetName: reg.fleetName,
           ownerName: reg.ownerName,
-          trialStartDate: formattedStart,
-          trialEndDate: formattedEnd,
-          trialEndsAt: trialEndsAt.toISOString(),
+          trialStartDate: 'Awaiting Account Activation',
+          trialEndDate: 'To be calculated after activation',
+          trialEndsAt: null,
           trialDurationDays: '7',
-          trialStatus: 'FREE TRIAL ACTIVE',
+          trialStatus: 'AWAITING_ACTIVATION',
           approvalStatus: 'Approved',
           activationUrl,
           loginUrl: fleetLoginUrl,
           fleetLoginUrl,
-          actionText: 'Set Up Administrator Password',
+          actionText: 'Set Up Administrator Password & Start Trial',
         },
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Application approved successfully, 7-day free trial activated, and activation link dispatched.',
+      message: 'Application approved successfully. Activation link dispatched to Fleet Admin to set password and start 7-day free trial.',
       tenantId,
       data: {
         tenantId,
@@ -869,7 +840,9 @@ export const approveRegistrationRequest = async (req: Request, res: Response) =>
         tenantSlug,
         activationUrl,
         fleetLoginUrl,
-        trialEndsAt,
+        trialStatus: 'AWAITING_ACTIVATION',
+        trialStartDate: null,
+        trialEndsAt: null,
         status: 'APPROVED',
       },
     });
@@ -1171,29 +1144,87 @@ export const completeAccountActivation = async (req: Request, res: Response) => 
       });
     }
 
-    // Mark token as used
-    await record.update({ usedAt: new Date() });
+    // Critical: The 7-day Free Trial starts ONLY AT THIS EXACT MOMENT (successful password setup & account activation).
+    // Idempotency: If trial has already started, do not overwrite trialStartDate or trialEndsAt.
+    const activationNow = new Date();
+    const trialEndsAt = new Date(activationNow.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    // Send confirmation welcome notification
+    const sub = await TenantSubscription.findOne({ where: { tenantId: record.tenantId } });
+    if (sub && !sub.trialStartDate) {
+      await sub.update({
+        trialStartDate: activationNow,
+        trialEndsAt: trialEndsAt,
+        trialDurationDays: 7,
+        status: 'TRIALING',
+        planTier: null,
+        agreedPrice: 0,
+        currentPeriodStart: activationNow,
+        currentPeriodEnd: trialEndsAt,
+      });
+    }
+
+    // Mark token as used
+    await record.update({ usedAt: activationNow });
+
+    // Send confirmation welcome notification with exact trial validity
     const loginUrl = `${WEB_BASE_URL}/login`;
+    const formattedActivationStart = activationNow.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+    const formattedActivationEnd = trialEndsAt.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+
     await sendNotification({
       channel: 'EMAIL',
       recipient: record.adminEmail,
       templateCode: 'ACCOUNT_ACTIVATED',
-      subject: `✅ Welcome to CABZ: Your Operator Account is Ready`,
-      body: `Dear ${record.adminName || 'Fleet Operator'},\n\nYour administrator password has been set successfully. You can now log into your CABZ fleet management portal.\n\nSign In URL: ${loginUrl}\nLogin Email: ${record.adminEmail}\n\nFrom your dashboard, you can configure your fleet, assign vehicles, dispatch trips, and monitor operations.\n\nBest regards,\nCABZ SaaS Team`,
+      subject: `CABZ – Account Activated & 7-Day Free Trial Started`,
+      body: `Dear ${record.adminName || 'Fleet Operator'},\n\n` +
+        `Your administrator password has been set successfully and your account is now active!\n\n` +
+        `YOUR 7-DAY FREE TRIAL HAS NOW STARTED:\n` +
+        `• Status: FREE TRIAL ACTIVE\n` +
+        `• Trial Start: ${formattedActivationStart} (IST)\n` +
+        `• Trial Expiry: ${formattedActivationEnd} (IST)\n` +
+        `• Duration: 7 Full Calendar Days\n` +
+        `• Operational Access: Unrestricted access to add vehicles, onboard drivers, register client companies, dispatch bookings, and issue invoices.\n\n` +
+        `Sign In URL: ${loginUrl}\n` +
+        `Login Email: ${record.adminEmail}\n\n` +
+        `Best regards,\nCABZ SaaS Platform Team`,
       referenceEntity: 'TENANT',
       referenceId: record.tenantId,
-      metadata: { loginUrl, actionText: 'Sign In to Fleet Portal' },
+      metadata: {
+        loginUrl,
+        actionText: 'Sign In to Fleet Portal',
+        trialStartDate: formattedActivationStart,
+        trialEndDate: formattedActivationEnd,
+        trialEndsAt: trialEndsAt.toISOString(),
+      },
     });
 
     return res.status(200).json({
       success: true,
-      message: 'Password set successfully! Your account is now active. Please sign in.',
+      message: 'Password set successfully! Your account is active and your 7-day free trial has started. Please sign in.',
       data: {
         email: record.adminEmail,
         tenantId: record.tenantId,
         loginUrl,
+        trialStartDate: activationNow,
+        trialEndsAt,
+        trialDurationDays: 7,
+        subscriptionStatus: 'TRIALING',
       },
     });
   } catch (error: any) {

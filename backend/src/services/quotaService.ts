@@ -28,7 +28,7 @@ export interface QuotaCheckResult {
   current: number;
   max: number | 'Unlimited';
   isUnlimited?: boolean;
-  planTier: string;
+  planTier: string | null;
   resource?: string;
   recommendedPlan?: string;
   message?: string;
@@ -121,6 +121,29 @@ export const PLAN_LIMITS = {
     maps: 100000,
     storageGb: 100,
   },
+};
+
+/**
+ * Baseline internal technical quota profile for active 7-day Free Trial.
+ * Separates technical execution safeguards from customer-selected paid plans.
+ */
+export const TRIAL_BASELINE_LIMITS = {
+  vehicles: 75,
+  drivers: 75,
+  companies: 20,
+  employees: 25,
+  users: 25,
+  trips: 250, // 250 bookings during trial evaluation
+  taxes: 2,
+  pickupAreas: 50,
+  pickupCities: 25,
+  packages: 25,
+  paymentModes: 10,
+  themeLevel: 'PRESETS' as const,
+  themePresets: ['terracotta', 'emerald', 'slate', 'indigo'],
+  sms: 5000,
+  maps: 10000,
+  storageGb: 25,
 };
 
 export const PLAN_CATALOG: Record<'BASIC' | 'PRO' | 'ENTERPRISE', PlanDefinition> = {
@@ -486,11 +509,29 @@ export const checkVehicleQuota = async (tenantId: string): Promise<QuotaCheckRes
       allowed: false,
       current: currentCount,
       max: 0,
-      planTier: sub.planTier,
+      planTier: sub.status === 'TRIALING' ? 'FREE_TRIAL' : (sub.planTier || 'NONE'),
       resource: 'VEHICLES',
       message: sub.status === 'TRIALING'
         ? 'Your 7-day free trial has expired. Vehicle creation is locked. Please choose a subscription plan to continue.'
         : 'Subscription has expired or is suspended due to unpaid renewal. Please renew your plan to add vehicles.',
+    };
+  }
+
+  // Active Free Trial baseline evaluation profile
+  if (isTenantInActiveFreeTrial(sub)) {
+    const max = sub.vehicleQuota || TRIAL_BASELINE_LIMITS.vehicles;
+    const allowed = currentCount < max;
+    return {
+      allowed,
+      current: currentCount,
+      max,
+      isUnlimited: false,
+      planTier: 'FREE_TRIAL',
+      resource: 'VEHICLES',
+      recommendedPlan: 'PRO',
+      message: allowed
+        ? undefined
+        : `Free trial vehicle limit reached (${currentCount}/${max}). Choose a subscription plan to add more vehicles.`,
     };
   }
 
@@ -558,12 +599,31 @@ export const checkBookingQuota = async (tenantId: string): Promise<QuotaCheckRes
       allowed: false,
       current: currentCount,
       max: 0,
-      planTier: sub.planTier,
+      planTier: sub.status === 'TRIALING' ? 'FREE_TRIAL' : (sub.planTier || 'NONE'),
       resource: 'BOOKINGS',
       billingPeriod,
       message: sub.status === 'TRIALING'
         ? 'Your 7-day free trial has expired. Booking creation is locked. Please choose a subscription plan to continue.'
         : 'Subscription has expired or is suspended due to unpaid renewal. Please renew your plan to create bookings.',
+    };
+  }
+
+  // Active Free Trial baseline evaluation profile
+  if (isTenantInActiveFreeTrial(sub)) {
+    const max = sub.monthlyTripQuota || TRIAL_BASELINE_LIMITS.trips;
+    const allowed = currentCount < max;
+    return {
+      allowed,
+      current: currentCount,
+      max,
+      isUnlimited: false,
+      planTier: 'FREE_TRIAL',
+      resource: 'BOOKINGS',
+      recommendedPlan: 'PRO',
+      billingPeriod,
+      message: allowed
+        ? undefined
+        : `Free trial booking allowance reached (${currentCount}/${max}). Choose a subscription plan to continue booking trips.`,
     };
   }
 
@@ -629,11 +689,29 @@ export const checkTaxQuota = async (tenantId: string): Promise<QuotaCheckResult>
       allowed: false,
       current: currentCount,
       max: 0,
-      planTier: sub.planTier,
+      planTier: sub.status === 'TRIALING' ? 'FREE_TRIAL' : (sub.planTier || 'NONE'),
       resource: 'TAXES',
       message: sub.status === 'TRIALING'
         ? 'Your 7-day free trial has expired. Tax configuration is locked. Please choose a subscription plan to continue.'
         : 'Subscription has expired or is suspended due to unpaid renewal. Please renew your plan to configure taxes.',
+    };
+  }
+
+  // Active Free Trial baseline evaluation profile
+  if (isTenantInActiveFreeTrial(sub)) {
+    const max = sub.taxQuota || TRIAL_BASELINE_LIMITS.taxes;
+    const allowed = currentCount < max;
+    return {
+      allowed,
+      current: currentCount,
+      max,
+      isUnlimited: false,
+      planTier: 'FREE_TRIAL',
+      resource: 'TAXES',
+      recommendedPlan: 'PRO',
+      message: allowed
+        ? undefined
+        : `Free trial tax configuration limit reached (${currentCount}/${max}). Choose a subscription plan to add more.`,
     };
   }
 
@@ -682,11 +760,29 @@ export const checkDriverQuota = async (tenantId: string): Promise<QuotaCheckResu
       allowed: false,
       current: currentCount,
       max: 0,
-      planTier: sub.planTier,
+      planTier: sub.status === 'TRIALING' ? 'FREE_TRIAL' : (sub.planTier || 'NONE'),
       resource: 'DRIVERS',
       message: sub.status === 'TRIALING'
         ? 'Your 7-day free trial has expired. Driver registration is locked. Please choose a subscription plan to continue.'
         : 'Subscription has expired or is suspended due to unpaid renewal. Please renew your plan to register drivers.',
+    };
+  }
+
+  // Active Free Trial baseline evaluation profile
+  if (isTenantInActiveFreeTrial(sub)) {
+    const max = sub.driverQuota || TRIAL_BASELINE_LIMITS.drivers;
+    const allowed = currentCount < max;
+    return {
+      allowed,
+      current: currentCount,
+      max,
+      isUnlimited: false,
+      planTier: 'FREE_TRIAL',
+      resource: 'DRIVERS',
+      recommendedPlan: 'PRO',
+      message: allowed
+        ? undefined
+        : `Free trial driver limit reached (${currentCount}/${max}). Choose a subscription plan to register more drivers.`,
     };
   }
 
@@ -735,11 +831,29 @@ export const checkCompanyQuota = async (tenantId: string): Promise<QuotaCheckRes
       allowed: false,
       current: currentCount,
       max: 0,
-      planTier: sub.planTier,
+      planTier: sub.status === 'TRIALING' ? 'FREE_TRIAL' : (sub.planTier || 'NONE'),
       resource: 'COMPANIES',
       message: sub.status === 'TRIALING'
         ? 'Your 7-day free trial has expired. Corporate company registration is locked. Please choose a subscription plan to continue.'
         : 'Subscription has expired or is suspended due to unpaid renewal. Please renew your plan to add corporate accounts.',
+    };
+  }
+
+  // Active Free Trial baseline evaluation profile
+  if (isTenantInActiveFreeTrial(sub)) {
+    const max = sub.companyQuota || TRIAL_BASELINE_LIMITS.companies;
+    const allowed = currentCount < max;
+    return {
+      allowed,
+      current: currentCount,
+      max,
+      isUnlimited: false,
+      planTier: 'FREE_TRIAL',
+      resource: 'COMPANIES',
+      recommendedPlan: 'PRO',
+      message: allowed
+        ? undefined
+        : `Free trial corporate client limit reached (${currentCount}/${max}). Choose a subscription plan to add more.`,
     };
   }
 
@@ -788,11 +902,29 @@ export const checkUserQuota = async (tenantId: string): Promise<QuotaCheckResult
       allowed: false,
       current: currentCount,
       max: 0,
-      planTier: sub.planTier,
+      planTier: sub.status === 'TRIALING' ? 'FREE_TRIAL' : (sub.planTier || 'NONE'),
       resource: 'USERS',
       message: sub.status === 'TRIALING'
         ? 'Your 7-day free trial has expired. User registration is locked. Please choose a subscription plan to continue.'
         : 'Subscription has expired or is suspended due to unpaid renewal. Please renew your plan to register users.',
+    };
+  }
+
+  // Active Free Trial baseline evaluation profile
+  if (isTenantInActiveFreeTrial(sub)) {
+    const max = (sub as any).userQuota || TRIAL_BASELINE_LIMITS.users;
+    const allowed = currentCount < max;
+    return {
+      allowed,
+      current: currentCount,
+      max,
+      isUnlimited: false,
+      planTier: 'FREE_TRIAL',
+      resource: 'USERS',
+      recommendedPlan: 'PRO',
+      message: allowed
+        ? undefined
+        : `Free trial user registration limit reached (${currentCount}/${max}). Choose a subscription plan to add more.`,
     };
   }
 
@@ -1026,7 +1158,7 @@ export const checkPaymentModeQuota = async (tenantId: string): Promise<QuotaChec
 export const checkFeatureEntitlement = async (
   tenantId: string,
   featureKey: string
-): Promise<{ allowed: boolean; planTier: string; recommendedPlan: string; message?: string }> => {
+): Promise<{ allowed: boolean; planTier: string | null; recommendedPlan: string | null; message?: string }> => {
   const isRoot = tenantId === ROOT_TENANT_ID;
   if (isRoot) return { allowed: true, planTier: 'ENTERPRISE', recommendedPlan: 'ENTERPRISE' };
 
@@ -1072,7 +1204,7 @@ export const checkFeatureEntitlement = async (
 export const checkThemeEntitlement = async (
   tenantId: string,
   requestedLevel: 'STANDARD' | 'PRESETS' | 'CUSTOM'
-): Promise<{ allowed: boolean; planTier: string; allowedLevel: string; recommendedPlan: string; message?: string }> => {
+): Promise<{ allowed: boolean; planTier: string | null; allowedLevel: string; recommendedPlan: string | null; message?: string }> => {
   const isRoot = tenantId === ROOT_TENANT_ID;
   if (isRoot) return { allowed: true, planTier: 'ENTERPRISE', allowedLevel: 'CUSTOM', recommendedPlan: 'ENTERPRISE' };
 

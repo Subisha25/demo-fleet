@@ -313,8 +313,12 @@ const RegistrationsQueue: React.FC = () => {
                       )}
                     </td>
                     <td className="py-3.5 px-4">
-                      <div className="font-bold text-[#C04E24] uppercase">{req.requestedPlan}</div>
-                      <div className="text-[10px] text-[#5C5752] capitalize">{req.requestedBilling} Billing</div>
+                      <div className="font-bold text-[#C04E24] uppercase">
+                        {req.requestedPlan === 'FREE_TRIAL' || !req.requestedPlan ? 'FREE TRIAL (7 DAYS)' : req.requestedPlan}
+                      </div>
+                      <div className="text-[10px] text-[#5C5752] capitalize">
+                        {req.requestedPlan === 'FREE_TRIAL' || !req.requestedPlan ? '₹0 Upfront • Full Access' : `${req.requestedBilling} Billing`}
+                      </div>
                       {req.fleetSize && (
                         <div className="text-[10px] text-slate-400">{req.fleetSize} vehicles reported</div>
                       )}
@@ -431,8 +435,10 @@ const RegistrationsQueue: React.FC = () => {
                   <div className="font-semibold text-slate-800">{selectedReq.city}, {selectedReq.state}</div>
                 </div>
                 <div>
-                  <span className="text-slate-400">Plan & Billing</span>
-                  <div className="font-bold text-emerald-700 uppercase">{selectedReq.requestedPlan} ({selectedReq.requestedBilling})</div>
+                  <span className="text-slate-400">Application Type</span>
+                  <div className="font-bold text-emerald-700 uppercase">
+                    {selectedReq.requestedPlan === 'FREE_TRIAL' || !selectedReq.requestedPlan ? '7-Day Free Trial (₹0 Upfront)' : `${selectedReq.requestedPlan} (${selectedReq.requestedBilling})`}
+                  </div>
                 </div>
                 <div className="col-span-2 bg-indigo-50/70 p-3 rounded-xl border border-indigo-100">
                   <span className="text-indigo-900 font-bold block mb-1">Preferred Demo Call Appointment</span>

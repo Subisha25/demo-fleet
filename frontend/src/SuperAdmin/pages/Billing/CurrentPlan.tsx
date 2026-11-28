@@ -84,39 +84,7 @@ const CurrentPlan: React.FC = () => {
         const sub = stats.subscription || {};
         const quotas = stats.quotas || {};
 
-        const planTier = (sub.planTier || sub.plan || 'PRO').toUpperCase() as 'BASIC' | 'PRO' | 'ENTERPRISE';
-        const billingCycle = (sub.billingCycle || 'MONTHLY').toUpperCase() as 'MONTHLY' | 'ANNUAL';
-
-        const tierDefaultLimits: Record<string, { vehicles: number; drivers: number; companies: number; trips: number }> = {
-          BASIC: { vehicles: 15, drivers: 15, companies: 3, trips: 100 },
-          PRO: { vehicles: 75, drivers: 75, companies: 20, trips: 250 },
-          ENTERPRISE: { vehicles: -1, drivers: -1, companies: -1, trips: -1 },
-        };
-
-        const resolvedQuotas = {
-          vehicles: quotas.vehicles || { current: 0, limit: tierDefaultLimits[planTier]?.vehicles || 75 },
-          drivers: quotas.drivers || { current: 0, limit: tierDefaultLimits[planTier]?.drivers || 75 },
-          companies: quotas.companies || { current: 0, limit: tierDefaultLimits[planTier]?.companies || 20 },
-          trips: quotas.trips || { current: 0, limit: tierDefaultLimits[planTier]?.trips || 250 },
-        };
-
-        const trialDetails = stats.trialDetails;
-        const isTrialing = (sub.status || '').toUpperCase() === 'TRIALING';
         const now = new Date();
-        const start = isTrialing && sub.trialStartDate
-          ? new Date(sub.trialStartDate)
-          : (sub.currentPeriodStart || sub.startDate ? new Date(sub.currentPeriodStart || sub.startDate) : new Date(now.getTime() - 7 * 86400000));
-        const end = isTrialing && (sub.trialEndsAt || trialDetails?.currentTrialExpiry)
-          ? new Date(sub.trialEndsAt || trialDetails.currentTrialExpiry)
-          : (sub.currentPeriodEnd || sub.endDate ? new Date(sub.currentPeriodEnd || sub.endDate) : new Date(now.getTime() + 7 * 86400000));
-
-        const totalMs = Math.max(1, end.getTime() - start.getTime());
-        const elapsedMs = Math.max(0, now.getTime() - start.getTime());
-        const daysTotal = Math.max(1, Math.round(totalMs / 86400000));
-        const daysElapsed = Math.min(daysTotal, Math.max(0, Math.round(elapsedMs / 86400000)));
-        const daysRemaining = trialDetails?.remainingDays ?? Math.max(0, Math.round((end.getTime() - now.getTime()) / 86400000));
-        const progressPercent = Math.min(100, Math.max(0, Math.round((daysElapsed / daysTotal) * 100)));
-
         const tierNames: Record<string, string> = {
           BASIC: 'Starter Mobility',
           PRO: 'Growth Fleet Pro',
@@ -129,9 +97,44 @@ const CurrentPlan: React.FC = () => {
           ENTERPRISE: { monthly: 549, annual: 5600 },
         };
 
-        const agreedPrice = billingCycle === 'ANNUAL'
-          ? tierPrices[planTier]?.annual || 3560
-          : tierPrices[planTier]?.monthly || 349;
+        const tierDefaultLimits: Record<string, { vehicles: number; drivers: number; companies: number; trips: number }> = {
+          BASIC: { vehicles: 15, drivers: 15, companies: 3, trips: 100 },
+          PRO: { vehicles: 75, drivers: 75, companies: 20, trips: 250 },
+          ENTERPRISE: { vehicles: -1, drivers: -1, companies: -1, trips: -1 },
+        };
+
+        const billingCycle = (sub.billingCycle || 'MONTHLY').toUpperCase() as 'MONTHLY' | 'ANNUAL';
+        const trialDetails = stats.trialDetails;
+        const isTrialing = (sub.status || '').toUpperCase() === 'TRIALING';
+        const rawTier = sub.planTier ? String(sub.planTier).toUpperCase() : '';
+        const hasPaidPlan = sub.status === 'ACTIVE' && ['BASIC', 'PRO', 'ENTERPRISE'].includes(rawTier);
+        const planTier = (hasPaidPlan ? rawTier : 'PRO') as 'BASIC' | 'PRO' | 'ENTERPRISE';
+
+        const resolvedQuotas = {
+          vehicles: quotas.vehicles || { current: 0, limit: tierDefaultLimits[planTier]?.vehicles || 75 },
+          drivers: quotas.drivers || { current: 0, limit: tierDefaultLimits[planTier]?.drivers || 75 },
+          companies: quotas.companies || { current: 0, limit: tierDefaultLimits[planTier]?.companies || 20 },
+          trips: quotas.trips || { current: 0, limit: tierDefaultLimits[planTier]?.trips || 250 },
+        };
+
+        const isAwaitingActivation = isTrialing && (!sub.trialStartDate || stats.trialDetails?.trialStatus === 'PENDING_ACTIVATION');
+        const planName = isTrialing
+          ? (isAwaitingActivation ? '7-Day Free Trial (Pending Activation)' : '7-Day Free Trial (Full Operational Access)')
+          : (hasPaidPlan ? (tierNames[planTier] || `${planTier} Plan`) : 'No Paid Plan Selected');
+        const agreedPrice = isTrialing ? 0 : (billingCycle === 'ANNUAL' ? tierPrices[planTier]?.annual || 3560 : tierPrices[planTier]?.monthly || 349);
+        const start = isTrialing && sub.trialStartDate
+          ? new Date(sub.trialStartDate)
+          : (sub.currentPeriodStart || sub.startDate ? new Date(sub.currentPeriodStart || sub.startDate) : (isAwaitingActivation ? null : new Date(now.getTime() - 7 * 86400000)));
+        const end = isTrialing && (sub.trialEndsAt || trialDetails?.currentTrialExpiry)
+          ? new Date(sub.trialEndsAt || trialDetails.currentTrialExpiry)
+          : (sub.currentPeriodEnd || sub.endDate ? new Date(sub.currentPeriodEnd || sub.endDate) : (isAwaitingActivation ? null : new Date(now.getTime() + 7 * 86400000)));
+
+        const totalMs = start && end ? Math.max(1, end.getTime() - start.getTime()) : 7 * 86400000;
+        const elapsedMs = start ? Math.max(0, now.getTime() - start.getTime()) : 0;
+        const daysTotal = Math.max(1, Math.round(totalMs / 86400000));
+        const daysElapsed = isAwaitingActivation ? 0 : Math.min(daysTotal, Math.max(0, Math.round(elapsedMs / 86400000)));
+        const daysRemaining = isAwaitingActivation ? 7 : (trialDetails?.remainingDays ?? (end ? Math.max(0, Math.round((end.getTime() - now.getTime()) / 86400000)) : 7));
+        const progressPercent = isAwaitingActivation ? 0 : Math.min(100, Math.max(0, Math.round((daysElapsed / daysTotal) * 100)));
 
         const defaultFeatures: Record<string, string[]> = {
           BASIC: [
@@ -161,14 +164,14 @@ const CurrentPlan: React.FC = () => {
 
         setData({
           planTier,
-          planName: tierNames[planTier] || `${planTier} Plan`,
+          planName,
           status: sub.isSuspended ? 'SUSPENDED' : sub.inGracePeriod ? 'PAST_DUE' : (sub.status || 'ACTIVE'),
           billingCycle,
           agreedPrice,
           currency: 'INR',
-          currentPeriodStart: start.toDateString(),
-          currentPeriodEnd: end.toDateString(),
-          nextRenewalDate: end.toDateString(),
+          currentPeriodStart: start ? start.toDateString() : 'Awaiting Account Activation',
+          currentPeriodEnd: end ? end.toDateString() : 'To be calculated after activation',
+          nextRenewalDate: end ? end.toDateString() : 'To be calculated after activation',
           daysTotal,
           daysElapsed,
           daysRemaining,
@@ -347,13 +350,20 @@ const CurrentPlan: React.FC = () => {
                   <h2 className="text-xl font-bold text-[#1C1A18]">{data.planName}</h2>
                   {getStatusBadge(data.status)}
                 </div>
-                <p className="text-xs text-[#7A7570] mt-1">
-                  Billing Cycle: <strong className="text-[#1C1A18]">{data.billingCycle}</strong> &bull; Agreed Price:{' '}
-                  <strong className="text-[#1C1A18]">
-                    ₹{data.agreedPrice.toLocaleString('en-IN')} {data.currency}
-                  </strong>{' '}
-                  / {data.billingCycle === 'ANNUAL' ? 'year' : 'month'}
-                </p>
+                {data.status === 'TRIALING' ? (
+                  <p className="text-xs text-[#7A7570] mt-1">
+                    Evaluation Period: <strong className="text-emerald-700 font-bold">7-Day Free Trial Active</strong> &bull; Selected Paid Plan:{' '}
+                    <strong className="text-[#1C1A18]">None (Choose plan upon trial completion)</strong>
+                  </p>
+                ) : (
+                  <p className="text-xs text-[#7A7570] mt-1">
+                    Billing Cycle: <strong className="text-[#1C1A18]">{data.billingCycle}</strong> &bull; Agreed Price:{' '}
+                    <strong className="text-[#1C1A18]">
+                      ₹{data.agreedPrice.toLocaleString('en-IN')} {data.currency}
+                    </strong>{' '}
+                    / {data.billingCycle === 'ANNUAL' ? 'year' : 'month'}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -403,8 +413,14 @@ const CurrentPlan: React.FC = () => {
                 <span className="px-3 py-1 bg-blue-100 text-blue-800 border border-blue-300 text-xs font-black rounded-full uppercase tracking-wider">
                   FREE TRIAL
                 </span>
-                <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-black rounded-full uppercase tracking-wider">
-                  TRIAL ACTIVE
+                <span className={`px-2.5 py-1 text-xs font-black rounded-full uppercase tracking-wider border ${
+                  data.trialDetails?.trialStatus === 'PENDING_ACTIVATION' || data.currentPeriodStart === 'Awaiting Account Activation'
+                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                    : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                }`}>
+                  {data.trialDetails?.trialStatus === 'PENDING_ACTIVATION' || data.currentPeriodStart === 'Awaiting Account Activation'
+                    ? 'PENDING ACTIVATION'
+                    : 'TRIAL ACTIVE'}
                 </span>
               </div>
             </div>
@@ -412,7 +428,15 @@ const CurrentPlan: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="bg-white p-3.5 rounded-lg border border-blue-100 shadow-2xs">
                 <span className="text-[10px] font-bold uppercase text-[#7A7570] tracking-wider block">Trial Status</span>
-                <span className="text-xs font-black text-emerald-700 mt-1 block">ACTIVE</span>
+                <span className={`text-xs font-black mt-1 block ${
+                  data.trialDetails?.trialStatus === 'PENDING_ACTIVATION' || data.currentPeriodStart === 'Awaiting Account Activation'
+                    ? 'text-amber-700'
+                    : 'text-emerald-700'
+                }`}>
+                  {data.trialDetails?.trialStatus === 'PENDING_ACTIVATION' || data.currentPeriodStart === 'Awaiting Account Activation'
+                    ? 'PENDING ACTIVATION'
+                    : 'ACTIVE'}
+                </span>
               </div>
               <div className="bg-white p-3.5 rounded-lg border border-blue-100 shadow-2xs">
                 <span className="text-[10px] font-bold uppercase text-[#7A7570] tracking-wider block">Start Date</span>

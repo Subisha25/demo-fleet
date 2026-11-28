@@ -235,6 +235,7 @@ export const verifySubscriptionPayment = async (req: Request, res: Response) => 
     await sub.update({
       status: 'ACTIVE',
       planTier: invoice.planTier,
+      agreedPrice: invoice.baseAmount,
       vehicleQuota: limits.vehicles,
       driverQuota: limits.drivers,
       companyQuota: limits.companies,
@@ -798,20 +799,22 @@ export const extendTenantTrial = async (req: Request, res: Response) => {
     }
 
     const now = new Date();
-    const existingExpiry = sub.trialEndsAt
+    const previousExpiry = sub.trialEndsAt
       ? new Date(sub.trialEndsAt)
-      : (sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : now);
+      : (sub.currentPeriodEnd
+        ? new Date(sub.currentPeriodEnd)
+        : (sub.trialStartDate
+          ? new Date(new Date(sub.trialStartDate).getTime() + (sub.trialDurationDays || 7) * 24 * 60 * 60 * 1000)
+          : now));
 
-    // Active trial: extend from existing expiry date
-    // Already expired trial: calculate new expiry from now
-    const baseTime = existingExpiry.getTime() < now.getTime() ? now.getTime() : existingExpiry.getTime();
-    const newExpiry = new Date(baseTime + days * 24 * 60 * 60 * 1000);
+    // Authoritative Rule: New effective expiry = previous effective expiry + approved extension duration
+    const newExpiry = new Date(previousExpiry.getTime() + days * 24 * 60 * 60 * 1000);
 
     const historyEntry = {
       extendedBy: (req as any).user?.username || (req as any).user?.userId || 'SuperAdmin',
       extendedAt: now,
       daysAdded: days,
-      previousExpiry: existingExpiry,
+      previousExpiry: previousExpiry,
       newExpiry,
       reason: reason ? String(reason).trim() : 'Free trial extension granted by SuperAdmin',
     };
@@ -834,7 +837,7 @@ export const extendTenantTrial = async (req: Request, res: Response) => {
       data: {
         tenantId,
         fleetName: tenant.name,
-        previousExpiry: existingExpiry,
+        previousExpiry: previousExpiry,
         newExpiry,
         daysAdded: days,
         originalTrialDays: 7,

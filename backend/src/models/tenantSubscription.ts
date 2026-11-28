@@ -34,11 +34,11 @@ export class TenantSubscription extends Model {
   tenant!: Tenant;
 
   @Column({
-    type: DataType.ENUM('BASIC', 'PRO', 'ENTERPRISE'),
-    defaultValue: 'PRO',
-    allowNull: false,
+    type: DataType.STRING(50),
+    defaultValue: null,
+    allowNull: true,
   })
-  planTier!: 'BASIC' | 'PRO' | 'ENTERPRISE';
+  planTier!: 'BASIC' | 'PRO' | 'ENTERPRISE' | 'FREE_TRIAL' | null;
 
   @Column({
     type: DataType.ENUM('TRIALING', 'ACTIVE', 'PAST_DUE', 'SUSPENDED', 'CANCELED'),

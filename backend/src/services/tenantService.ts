@@ -27,7 +27,7 @@ import { Pickuparea } from '../models/pickuparea';
 import { PaymentMode } from '../models/paymentmode';
 import { VehicleType } from '../models/vehicleType';
 import { VehicleMaster } from '../models/vehicleMaster';
-import { PLAN_LIMITS, PLAN_CATALOG, getOrCreateSubscription, getTenantEntitlementsSummary, getPlanDefinition } from './quotaService';
+import { PLAN_LIMITS, TRIAL_BASELINE_LIMITS, PLAN_CATALOG, getOrCreateSubscription, getTenantEntitlementsSummary, getPlanDefinition } from './quotaService';
 import { generatePlanSummaryPDF } from './planSummaryPdfService';
 import { sendNotification } from './notificationService';
 import { generateUniqueFleetSlug, getFleetLoginUrl } from './slugService';
@@ -95,8 +95,9 @@ export const getAllTenants = async (req: Request, res: Response) => {
         const demoCall = calculateDemoCallStatus(reg?.demoCallDate, reg?.demoCallTime);
 
         const now = new Date();
-        const trialStartDate = sub.trialStartDate || sub.currentPeriodStart || plain.createdAt;
-        const trialEndsAt = sub.trialEndsAt || sub.currentPeriodEnd;
+        const isAwaitingActivation = sub.status === 'TRIALING' && !sub.trialStartDate;
+        const trialStartDate = sub.trialStartDate || null;
+        const trialEndsAt = sub.trialEndsAt || null;
         const originalTrialDays = 7;
         const totalTrialDays = Number(sub.trialDurationDays) || 7;
         const extendedTrialDays = Math.max(0, totalTrialDays - originalTrialDays);
@@ -104,11 +105,13 @@ export const getAllTenants = async (req: Request, res: Response) => {
         const remainingTrialMs = trialEndsAt
           ? Math.max(0, new Date(trialEndsAt).getTime() - now.getTime())
           : 0;
-        const remainingTrialDays = Math.ceil(remainingTrialMs / (24 * 60 * 60 * 1000));
+        const remainingTrialDays = isAwaitingActivation ? 7 : Math.ceil(remainingTrialMs / (24 * 60 * 60 * 1000));
 
         let trialStatus = 'TRIAL_ACTIVE';
         if (sub.status === 'TRIALING') {
-          if (trialEndsAt && new Date(trialEndsAt).getTime() < now.getTime()) {
+          if (isAwaitingActivation) {
+            trialStatus = 'PENDING_ACTIVATION';
+          } else if (trialEndsAt && new Date(trialEndsAt).getTime() < now.getTime()) {
             trialStatus = 'TRIAL_EXPIRED';
           } else {
             trialStatus = 'TRIAL_ACTIVE';
@@ -120,8 +123,8 @@ export const getAllTenants = async (req: Request, res: Response) => {
         }
 
         const isPaid = !!lastPaidInvoice && sub.status === 'ACTIVE';
-        const actualPlanDisplay = isPaid ? `${sub.planTier || 'PRO'} (${sub.billingCycle || 'MONTHLY'})` : 'None (Free Trial)';
-        const paymentStatusDisplay = isPaid ? 'PAID' : (sub.status === 'TRIALING' ? (remainingTrialDays > 0 ? 'TRIAL' : 'EXPIRED') : 'PENDING');
+        const actualPlanDisplay = isPaid ? `${sub.planTier || 'PRO'} (${sub.billingCycle || 'MONTHLY'})` : (isAwaitingActivation ? 'None (Awaiting Activation)' : 'None (Free Trial)');
+        const paymentStatusDisplay = isPaid ? 'PAID' : (sub.status === 'TRIALING' ? (isAwaitingActivation ? 'PENDING_ACTIVATION' : (remainingTrialDays > 0 ? 'TRIAL' : 'EXPIRED')) : 'PENDING');
 
         return {
           ...plain,
@@ -1291,7 +1294,7 @@ export const getFleetDashboardOverview = async (req: Request, res: Response) => 
     }
 
     const sub = tenant?.subscription || (await getOrCreateSubscription(targetTenantId));
-    const limits = PLAN_LIMITS[sub.planTier || 'PRO'];
+    const limits = sub.status === 'TRIALING' ? TRIAL_BASELINE_LIMITS : ((PLAN_LIMITS as any)[sub.planTier || 'PRO'] || PLAN_LIMITS.PRO);
 
     // Subscription Days & Alerts Calculation
     const now = new Date();
@@ -1337,17 +1340,26 @@ export const getFleetDashboardOverview = async (req: Request, res: Response) => 
     const originalTrialDays = 7;
     const totalTrialDays = sub.trialDurationDays || 7;
     const extendedTrialDays = Math.max(0, totalTrialDays - originalTrialDays);
+    const isAwaitingActivation = sub.status === 'TRIALING' && !sub.trialStartDate;
     const trialStart = sub.trialStartDate ? new Date(sub.trialStartDate) : null;
     const trialEnd = sub.trialEndsAt ? new Date(sub.trialEndsAt) : (sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null);
     const originalTrialExpiry = trialStart ? new Date(trialStart.getTime() + 7 * 24 * 60 * 60 * 1000) : null;
     const remainingTrialMs = trialEnd ? Math.max(0, trialEnd.getTime() - now.getTime()) : 0;
-    const remainingTrialDays = trialEnd ? Math.ceil(remainingTrialMs / (24 * 60 * 60 * 1000)) : 0;
-    const trialStatus = sub.status === 'TRIALING'
-      ? (remainingTrialMs > 0 ? 'TRIAL_ACTIVE' : 'TRIAL_EXPIRED')
-      : sub.status;
+    const remainingTrialDays = isAwaitingActivation ? 7 : (trialEnd ? Math.ceil(remainingTrialMs / (24 * 60 * 60 * 1000)) : 0);
+    let trialStatus: string = sub.status;
+    if (sub.status === 'TRIALING') {
+      if (isAwaitingActivation) {
+        trialStatus = 'PENDING_ACTIVATION';
+      } else if (remainingTrialMs > 0) {
+        trialStatus = 'TRIAL_ACTIVE';
+      } else {
+        trialStatus = 'TRIAL_EXPIRED';
+      }
+    }
 
     const trialDetails = {
       trialStatus,
+      isAwaitingActivation,
       originalTrialDays,
       extendedTrialDays,
       totalTrialDays,
@@ -1388,11 +1400,14 @@ export const getFleetDashboardOverview = async (req: Request, res: Response) => 
             brandingTokens: tenant?.brandingTokens,
           },
         subscription: {
-          planTier: isAllFleets ? 'ENTERPRISE' : sub.planTier,
+          planTier: isAllFleets ? 'ENTERPRISE' : (sub.status === 'TRIALING' ? null : sub.planTier),
           status: isSuspended ? 'SUSPENDED' : isGracePeriod ? 'PAST_DUE' : sub.status,
           currentPeriodStart: sub.currentPeriodStart,
           currentPeriodEnd: sub.currentPeriodEnd,
+          trialStartDate: sub.trialStartDate,
+          trialEndsAt: sub.trialEndsAt,
           billingCycle: sub.billingCycle || 'MONTHLY',
+          agreedPrice: sub.status === 'TRIALING' ? 0 : sub.agreedPrice,
           daysRemaining,
           isRenewalWarning: isAllFleets ? false : isRenewalWarning,
           isGracePeriod: isAllFleets ? false : isGracePeriod,

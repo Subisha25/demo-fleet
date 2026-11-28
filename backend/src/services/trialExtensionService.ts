@@ -57,6 +57,13 @@ export const requestTrialExtension = async (req: Request, res: Response) => {
       });
     }
 
+    if (sub.status === 'TRIALING' && !sub.trialStartDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Your account is pending activation. The 7-day free trial begins once you activate your account by setting your password.',
+      });
+    }
+
     // Check if there is already an active PENDING request
     const existingPending = await TrialExtensionRequest.findOne({
       where: {
@@ -273,6 +280,7 @@ export const getSuperAdminTrialManagementOverview = async (req: Request, res: Re
 
     const overview = tenants.map((t: any) => {
       const sub = t.subscription;
+      const isAwaitingActivation = sub?.status === 'TRIALING' && !sub?.trialStartDate;
       const trialEnd = sub?.trialEndsAt ? new Date(sub.trialEndsAt) : (sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null);
       const isTrialValid = trialEnd ? trialEnd.getTime() >= now.getTime() : false;
       const isTrialing = sub?.status === 'TRIALING';
@@ -282,7 +290,7 @@ export const getSuperAdminTrialManagementOverview = async (req: Request, res: Re
       const extendedDays = Math.max(0, totalDays - originalDays);
 
       const remainingMs = trialEnd ? Math.max(0, trialEnd.getTime() - now.getTime()) : 0;
-      const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+      const remainingDays = isAwaitingActivation ? 7 : Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
 
       const tenantRequests = allRequests.filter((r) => r.tenantId === t.tenantId);
       const pendingRequest = tenantRequests.find((r) => r.status === 'PENDING') || null;
@@ -290,6 +298,8 @@ export const getSuperAdminTrialManagementOverview = async (req: Request, res: Re
       let displayStatus = 'UNKNOWN';
       if (sub?.status === 'ACTIVE') {
         displayStatus = 'PAID_ACTIVE';
+      } else if (isAwaitingActivation) {
+        displayStatus = 'PENDING_ACTIVATION';
       } else if (isTrialing && isTrialValid) {
         displayStatus = 'TRIAL_ACTIVE';
       } else if (isTrialing && !isTrialValid) {
@@ -309,16 +319,18 @@ export const getSuperAdminTrialManagementOverview = async (req: Request, res: Re
         contactEmail: t.contactEmail,
         contactPhone: t.contactPhone,
         registeredAt: t.createdAt,
-        planTier: sub?.planTier || 'PRO',
-        status: sub?.status || 'TRIALING',
+        planTier: isAwaitingActivation ? 'FREE_TRIAL' : (sub?.planTier || 'FREE_TRIAL'),
+        status: isAwaitingActivation ? 'PENDING_ACTIVATION' : (sub?.status || 'TRIALING'),
         displayStatus,
-        trialStartDate: sub?.trialStartDate || t.createdAt,
+        trialStatusText: isAwaitingActivation ? 'Awaiting Account Activation' : (displayStatus === 'TRIAL_ACTIVE' ? 'Active' : (displayStatus === 'TRIAL_EXPIRED' ? 'Expired' : displayStatus)),
+        trialStartDate: sub?.trialStartDate || null,
         trialEndsAt: trialEnd,
         trialDurationDays: totalDays,
         originalTrialDays: originalDays,
         extendedTrialDays: extendedDays,
-        remainingDays: isTrialValid ? remainingDays : 0,
-        isTrialValid,
+        remainingDays: isAwaitingActivation ? 7 : (isTrialValid ? remainingDays : 0),
+        isTrialValid: isAwaitingActivation ? false : isTrialValid,
+        isAwaitingActivation,
         hasPendingRequest: !!pendingRequest,
         pendingRequest: pendingRequest ? {
           requestId: pendingRequest.requestId,
@@ -389,6 +401,13 @@ export const approveTrialExtensionRequest = async (req: Request, res: Response) 
       return res.status(404).json({ success: false, message: 'Subscription record not found.' });
     }
 
+    if (sub.status === 'TRIALING' && !sub.trialStartDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot approve trial extension for an account that is awaiting activation. The 7-day trial starts upon setting the password.',
+      });
+    }
+
     // Determine approved days (either customized or the originally requested days)
     const days = customApprovedDays ? parseInt(String(customApprovedDays), 10) : request.requestedDays;
     if (!days || isNaN(days) || days <= 0 || days > 365) {
@@ -399,14 +418,16 @@ export const approveTrialExtensionRequest = async (req: Request, res: Response) 
     }
 
     const now = new Date();
-    const existingExpiry = sub.trialEndsAt
+    const previousExpiry = sub.trialEndsAt
       ? new Date(sub.trialEndsAt)
-      : (sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : now);
+      : (sub.currentPeriodEnd
+        ? new Date(sub.currentPeriodEnd)
+        : (sub.trialStartDate
+          ? new Date(new Date(sub.trialStartDate).getTime() + (sub.trialDurationDays || 7) * 24 * 60 * 60 * 1000)
+          : now));
 
-    // If existing trial is still active, extend from existing expiry date
-    // If trial is already expired, extend from right now!
-    const baseTime = existingExpiry.getTime() < now.getTime() ? now.getTime() : existingExpiry.getTime();
-    const newExpiry = new Date(baseTime + days * 24 * 60 * 60 * 1000);
+    // Authoritative Rule: New effective expiry = previous effective expiry + approved extension duration
+    const newExpiry = new Date(previousExpiry.getTime() + days * 24 * 60 * 60 * 1000);
 
     const reviewer = (req as any).user?.username || (req as any).user?.userId || 'SuperAdmin';
 
@@ -416,7 +437,7 @@ export const approveTrialExtensionRequest = async (req: Request, res: Response) 
       status: 'APPROVED',
       reviewedBy: reviewer,
       reviewedAt: now,
-      previousExpiry: existingExpiry,
+      previousExpiry: previousExpiry,
       newExpiry,
       extensionType: 'REQUEST_APPROVED',
       adminNotes: adminNotes ? String(adminNotes).trim() : 'Extension request approved by SuperAdmin',
@@ -429,7 +450,7 @@ export const approveTrialExtensionRequest = async (req: Request, res: Response) 
       extendedBy: reviewer,
       extendedAt: now,
       daysAdded: days,
-      previousExpiry: existingExpiry,
+      previousExpiry: previousExpiry,
       newExpiry,
       reason: request.reason,
       adminNotes: adminNotes || '',
@@ -449,6 +470,7 @@ export const approveTrialExtensionRequest = async (req: Request, res: Response) 
     try {
       if (tenant.contactEmail && tenant.contactEmail.includes('@')) {
         const formattedNewExpiry = newExpiry.toLocaleString('en-IN', {
+          timeZone: 'Asia/Kolkata',
           day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true,
         });
 
@@ -614,13 +636,24 @@ export const manualExtendTrial = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: 'Subscription record not found for tenant.' });
     }
 
-    const now = new Date();
-    const existingExpiry = sub.trialEndsAt
-      ? new Date(sub.trialEndsAt)
-      : (sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : now);
+    if (sub.status === 'TRIALING' && !sub.trialStartDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot extend trial before account activation. The 7-day free trial will automatically begin when the Fleet Admin sets their password.',
+      });
+    }
 
-    const baseTime = existingExpiry.getTime() < now.getTime() ? now.getTime() : existingExpiry.getTime();
-    const newExpiry = new Date(baseTime + days * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const previousExpiry = sub.trialEndsAt
+      ? new Date(sub.trialEndsAt)
+      : (sub.currentPeriodEnd
+        ? new Date(sub.currentPeriodEnd)
+        : (sub.trialStartDate
+          ? new Date(new Date(sub.trialStartDate).getTime() + (sub.trialDurationDays || 7) * 24 * 60 * 60 * 1000)
+          : now));
+
+    // Authoritative Rule: New effective expiry = previous effective expiry + approved extension duration
+    const newExpiry = new Date(previousExpiry.getTime() + days * 24 * 60 * 60 * 1000);
     const reviewer = (req as any).user?.username || (req as any).user?.userId || 'SuperAdmin';
     const extensionReason = reason ? String(reason).trim() : (adminNotes ? String(adminNotes).trim() : 'Free trial extension granted directly by SuperAdmin');
 
@@ -635,7 +668,7 @@ export const manualExtendTrial = async (req: Request, res: Response) => {
       requestedAt: now,
       reviewedBy: reviewer,
       reviewedAt: now,
-      previousExpiry: existingExpiry,
+      previousExpiry: previousExpiry,
       newExpiry,
       extensionType: 'MANUAL_SUPERADMIN',
       adminNotes: extensionReason,
@@ -648,7 +681,7 @@ export const manualExtendTrial = async (req: Request, res: Response) => {
       extendedBy: reviewer,
       extendedAt: now,
       daysAdded: days,
-      previousExpiry: existingExpiry,
+      previousExpiry: previousExpiry,
       newExpiry,
       reason: extensionReason,
       extensionType: 'MANUAL_SUPERADMIN',
@@ -667,6 +700,7 @@ export const manualExtendTrial = async (req: Request, res: Response) => {
     try {
       if (tenant.contactEmail && tenant.contactEmail.includes('@')) {
         const formattedNewExpiry = newExpiry.toLocaleString('en-IN', {
+          timeZone: 'Asia/Kolkata',
           day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true,
         });
 
@@ -705,7 +739,7 @@ export const manualExtendTrial = async (req: Request, res: Response) => {
       data: {
         tenantId,
         fleetName: tenant.name,
-        previousExpiry: existingExpiry,
+        previousExpiry: previousExpiry,
         newExpiry,
         daysAdded: days,
         originalTrialDays: 7,

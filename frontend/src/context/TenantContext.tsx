@@ -161,14 +161,14 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       code: 'FL',
       subdomain: '',
       status: 'ACTIVE',
-      planTier: 'PRO',
+      planTier: 'FREE_TRIAL' as any,
       brandingTokens: {
         primaryColor: '#7C3AED',
         secondaryColor: '#0B0B0F',
         portalTitle: userFleetName || 'Fleet Operations Portal',
       },
       subscription: {
-        planTier: 'PRO',
+        planTier: 'FREE_TRIAL' as any,
         status: 'TRIALING',
         vehicleQuota: 75,
         driverQuota: 75,

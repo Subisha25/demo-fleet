@@ -70,11 +70,11 @@ export class Tenant extends Model {
   status!: 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'SUSPENDED' | 'CANCELED';
 
   @Column({
-    type: DataType.ENUM('BASIC', 'PRO', 'ENTERPRISE'),
-    defaultValue: 'PRO',
-    allowNull: false,
+    type: DataType.STRING(50),
+    defaultValue: null,
+    allowNull: true,
   })
-  planTier!: 'BASIC' | 'PRO' | 'ENTERPRISE';
+  planTier!: 'BASIC' | 'PRO' | 'ENTERPRISE' | 'FREE_TRIAL' | null;
 
   @Column({
     type: DataType.STRING,

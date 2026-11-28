@@ -113,7 +113,7 @@ export const STANDARD_DLT_TEMPLATES: Array<TemplateMappingItem & { templateCode:
 export async function isTenantEligibleForSms(tenantId: string): Promise<{
   eligible: boolean;
   reason?: string;
-  planTier?: string;
+  planTier?: string | null;
   subscriptionStatus?: string;
 }> {
   if (tenantId === ROOT_TENANT_ID) {
@@ -176,7 +176,7 @@ export async function getTenantSmsConfig(tenantId: string): Promise<{
     subscriptionEligibility: {
       eligible: boolean;
       reason?: string;
-      planTier?: string;
+      planTier?: string | null;
       subscriptionStatus?: string;
     };
   };

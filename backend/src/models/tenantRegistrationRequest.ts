@@ -150,11 +150,11 @@ export class TenantRegistrationRequest extends Model {
   state!: string;
 
   @Column({
-    type: DataType.ENUM('BASIC', 'PRO', 'ENTERPRISE'),
-    defaultValue: 'PRO',
-    allowNull: false,
+    type: DataType.STRING(50),
+    defaultValue: 'FREE_TRIAL',
+    allowNull: true,
   })
-  requestedPlanTier!: 'BASIC' | 'PRO' | 'ENTERPRISE';
+  requestedPlanTier!: 'BASIC' | 'PRO' | 'ENTERPRISE' | 'FREE_TRIAL' | null;
 
   @Column({
     type: DataType.ENUM('MONTHLY', 'ANNUAL'),

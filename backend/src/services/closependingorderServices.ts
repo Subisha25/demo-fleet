@@ -3099,7 +3099,7 @@ export const getMonthlyInvoiceDetailsById = async (req: Request, res: Response) 
 
 export const createAppInvoice = async (req: any, res: Response) => {
   try {
-    const bookingId = req.body;
+    const bookingId = req.body?.bookingId || req.body;
     if (req.role === ROLES.USER) {
       return res.status(403).json({ message: 'Not Authorized' });
     }
@@ -3113,7 +3113,12 @@ export const createAppInvoice = async (req: any, res: Response) => {
       });
     }
 
-    const booking = await Booking.findByPk(bookingId);
+    const booking = await Booking.findByPk(bookingId, {
+      include: [
+        { model: User, as: 'user', attributes: ['userId', 'companyId'], required: false },
+        { model: Company, as: 'company', attributes: ['companyId', 'companyName'], required: false },
+      ],
+    });
     if (!booking) {
       return res.status(404).json({
         success: false,
@@ -3121,6 +3126,12 @@ export const createAppInvoice = async (req: any, res: Response) => {
       });
     }
     assertTenantOwnership(booking, 'Booking');
+
+    let resolvedCompanyId = booking.companyId || (booking as any).user?.companyId || (booking as any).company?.companyId || req.body?.companyId;
+    if (!resolvedCompanyId && booking.userId) {
+      const u = await User.findByPk(booking.userId);
+      resolvedCompanyId = u?.companyId;
+    }
 
     const payment = await Payment.create({
       paymentMode: paymentMode.paymentmodeId,
@@ -3148,7 +3159,7 @@ export const createAppInvoice = async (req: any, res: Response) => {
       paymentId: payment.paymentId,
       userId: booking.userId,
       vehicleTypeId: booking.vehicleTypeId,
-      companyId: booking.user?.companyId,
+      companyId: resolvedCompanyId,
       tenantId: (booking as any).tenantId || ROOT_TENANT_ID,
       invoiceStatus: ORDER.STATUS.PENDING,
       startDate,

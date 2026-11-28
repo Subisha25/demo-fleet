@@ -110,7 +110,7 @@ export default function FleetRegistration() {
     businessPhone: '',
     billingFooterText: '',
     logoUrl: '',
-    requestedPlanTier: 'PRO' as 'BASIC' | 'PRO' | 'ENTERPRISE',
+    requestedPlanTier: 'FREE_TRIAL' as any,
     billingCycle: 'MONTHLY' as 'MONTHLY' | 'ANNUAL',
     fleetSize: '16-75',
     demoCallDate: todayStr,

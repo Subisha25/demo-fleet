@@ -63,13 +63,14 @@ const Header: React.FC = () => {
   // Free Trial Breakdown Calculation for Badge
   const sub = currentTenant?.subscription;
   const isTrial = sub?.status === 'TRIALING';
+  const isAwaitingActivation = isTrial && !sub?.trialStartDate;
   let trialRemainingDays = 7;
   let trialExtendedDays = 0;
   let trialEffectiveEndStr = '';
   let trialStartStr = '';
   let isTrialActuallyExpired = false;
 
-  if (isTrial) {
+  if (isTrial && !isAwaitingActivation) {
     const trialEnd = sub?.trialEndsAt ? new Date(sub.trialEndsAt) : (sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null);
     const trialStart = sub?.trialStartDate ? new Date(sub.trialStartDate) : null;
     const now = new Date();
@@ -211,7 +212,22 @@ const Header: React.FC = () => {
             </span>
           </div>
         ) : isTrial ? (
-          isTrialActuallyExpired ? (
+          isAwaitingActivation ? (
+            <div
+              className="flex items-center gap-1.5 flex-wrap"
+              title="Free Trial Not Started | Starts automatically after password setup & activation | 7 Days Available"
+            >
+              <span className="px-2.5 py-0.5 text-[11px] font-black rounded-full uppercase tracking-wider shadow-sm border bg-blue-100 text-blue-800 border-blue-300">
+                FREE TRIAL
+              </span>
+              <span className="px-2 py-0.5 text-[10px] font-black rounded-full uppercase tracking-wider border bg-amber-100 text-amber-800 border-amber-300">
+                PENDING ACTIVATION
+              </span>
+              <span className="px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider border bg-gray-100 text-gray-700 border-gray-300">
+                7 Days Available
+              </span>
+            </div>
+          ) : isTrialActuallyExpired ? (
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-0.5 text-[11px] font-extrabold rounded-full uppercase tracking-wider shadow-sm border bg-rose-50 text-rose-700 border-rose-300">
                 TRIAL EXPIRED
@@ -226,7 +242,7 @@ const Header: React.FC = () => {
           ) : (
             <div
               className="flex items-center gap-1.5 flex-wrap"
-              title={`Free Trial Active | Start: ${trialStartStr || 'On Approval'} | Duration: ${sub?.trialDurationDays || 7} Days | Ends: ${trialEffectiveEndStr || '7 Days'}`}
+              title={`Free Trial Active | Start: ${trialStartStr || 'On Activation'} | Duration: ${sub?.trialDurationDays || 7} Days | Ends: ${trialEffectiveEndStr || '7 Days'}`}
             >
               <span className="px-2.5 py-0.5 text-[11px] font-black rounded-full uppercase tracking-wider shadow-sm border bg-blue-100 text-blue-800 border-blue-300">
                 FREE TRIAL
