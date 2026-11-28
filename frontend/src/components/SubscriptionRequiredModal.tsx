@@ -23,7 +23,7 @@ export const SubscriptionRequiredModal: React.FC<SubscriptionModalProps> = ({
   resource,
   current,
   limit,
-  planTier = 'PRO',
+  planTier = 'FREE_TRIAL',
 }) => {
   const navigate = useNavigate();
 

@@ -67,7 +67,7 @@ export const SubscriptionProtectedRoute = ({ children }: { children: JSX.Element
   }, [isAuthenticated, role]);
 
   if (!isAuthenticated && !isDemo) {
-    return <Navigate to="/adminlogin" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   if (role === 'superadmin' || isDemo) {
@@ -112,33 +112,36 @@ export const SubscriptionProtectedRoute = ({ children }: { children: JSX.Element
 
 const PrivateRoute = ({ children }: { children: JSX.Element }) => {
   const { isAuthenticated } = useAuth();
+  const token = localStorage.getItem('token');
   const isDemo = localStorage.getItem('role') === 'demo' || localStorage.getItem('isDemoMode') === 'true' || localStorage.getItem('isDemoView') === 'true';
-  const location = useLocation();
 
-  if (isAuthenticated || isDemo) {
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted && !localStorage.getItem('token') && !isDemo) {
+        window.location.href = '/login';
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, [isDemo]);
+
+  if ((isAuthenticated && !!token) || isDemo) {
     return <SubscriptionProtectedRoute>{children}</SubscriptionProtectedRoute>;
   }
 
-  const isProtectedRoute = protectedPrefixes.some((prefix) =>
-    location.pathname.toLowerCase().startsWith(prefix.toLowerCase())
-  );
-
-  return isProtectedRoute ? (
-    <Navigate to="/adminlogin" replace />
-  ) : (
-    <Navigate to="/" replace />
-  );
+  return <Navigate to="/login" replace />;
 };
 
 export const SuperAdminRoute = ({ children }: { children: JSX.Element }) => {
   const { isAuthenticated } = useAuth();
-  const role = localStorage.getItem('role');
+  const token = localStorage.getItem('token');
+  const role = (localStorage.getItem('role') || '').toLowerCase();
 
-  if (!isAuthenticated) {
-    return <Navigate to="/adminlogin" replace />;
+  if (!isAuthenticated || !token) {
+    return <Navigate to="/login" replace />;
   }
 
-  if (role !== 'superadmin') {
+  if (role !== 'superadmin' && role !== 'platform_admin') {
     return <Navigate to="/dashboard" replace />;
   }
 

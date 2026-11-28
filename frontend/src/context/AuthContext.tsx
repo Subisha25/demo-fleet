@@ -19,6 +19,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setIsAuthenticated(false);
     localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('username');
+    localStorage.removeItem('companyId');
+    localStorage.removeItem('fleetName');
+    localStorage.removeItem('tenantName');
+    localStorage.removeItem('tenantId');
+    localStorage.removeItem('selectedTenantId');
+    localStorage.removeItem('user');
+    localStorage.removeItem('isDemoMode');
+    localStorage.removeItem('isDemoView');
+    localStorage.removeItem('inspectingTenantId');
+    sessionStorage.clear();
+    if (typeof document !== 'undefined') {
+      document.title = 'CABZ | Smart Fleet Mobility';
+      document.documentElement.style.setProperty('--primary-tenant-color', '#5B3DF5');
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('cabz:auth_logout'));
+    }
   };
 
   return (

@@ -1017,6 +1017,9 @@ export const verifyActivationToken = async (req: Request, res: Response) => {
       });
     }
 
+    const hasPaidPlan = Boolean(record.tenant?.planTier && ['BASIC', 'PRO', 'ENTERPRISE'].includes(record.tenant.planTier));
+    const effectivePlan = hasPaidPlan ? record.tenant!.planTier : 'FREE TRIAL';
+
     return res.status(200).json({
       success: true,
       valid: true,
@@ -1027,7 +1030,14 @@ export const verifyActivationToken = async (req: Request, res: Response) => {
         tenantName: record.tenant?.name || 'Fleet Operator',
         fleetName: record.tenant?.name || 'Fleet Operator',
         businessCode: record.tenant?.code || '',
-        plan: record.tenant?.planTier || 'PRO',
+        plan: effectivePlan,
+        planTier: hasPaidPlan ? record.tenant!.planTier : 'FREE_TRIAL',
+        isFreeTrial: !hasPaidPlan,
+        trialDuration: '7 Days',
+        trialDurationDays: 7,
+        startCondition: 'Starts upon account activation',
+        upfrontPayment: '₹0 / Free',
+        accessLevel: 'Full Operational Access',
         billingCycle: 'MONTHLY',
         expiresAt: record.expiresAt,
       },

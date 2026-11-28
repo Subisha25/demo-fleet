@@ -98,8 +98,9 @@ export async function evaluateTenantSubscriptionLock(
   }
 
   const sub = await getOrCreateSubscription(tenantId);
-  const planTier = (sub.planTier || 'PRO') as 'BASIC' | 'PRO' | 'ENTERPRISE';
-  const plan = PLAN_CATALOG[planTier] || PLAN_CATALOG.PRO;
+  const isPaidTier = Boolean(sub.planTier && ['BASIC', 'PRO', 'ENTERPRISE'].includes(sub.planTier));
+  const planTier = (isPaidTier ? sub.planTier! : 'BASIC') as 'BASIC' | 'PRO' | 'ENTERPRISE';
+  const plan = PLAN_CATALOG[planTier] || PLAN_CATALOG.BASIC;
   const billingCycle = (sub.billingCycle === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY') as 'MONTHLY' | 'ANNUAL';
 
   const rawBase = billingCycle === 'ANNUAL'
@@ -248,7 +249,7 @@ export async function evaluateTenantSubscriptionLock(
         isLocked: false,
         lockReason: 'NONE',
         subscriptionStatus: 'ACTIVE_PAID',
-        planTier: (sub.planTier || 'PRO') as any,
+        planTier: (sub.planTier || 'BASIC') as any,
         billingCycle,
         payableAmount,
         baseAmount,

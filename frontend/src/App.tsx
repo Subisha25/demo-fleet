@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop';
+import RouteBrandingSync from './components/RouteBrandingSync';
 import { AuthProvider } from './context/AuthContext';
 import { TenantProvider } from './context/TenantContext';
 import PrivateRoute, { SuperAdminRoute } from './routes/PrivateRoutes';
@@ -626,6 +627,7 @@ const App: React.FC = () => {
       <TenantProvider>
         <BrowserRouter>
           <ScrollToTop />
+          <RouteBrandingSync />
           <Routes>
           {/* Public Website Routes & Aliases */}
           <Route path="/" element={<HomePage />} />

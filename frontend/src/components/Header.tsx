@@ -45,7 +45,12 @@ const Header: React.FC = () => {
   const isSuperAdmin = role === 'superadmin';
   const isDemo = localStorage.getItem('isDemoView') === 'true' || localStorage.getItem('isDemoMode') === 'true' || role === 'demo';
 
-  const fleetName = currentTenant?.displayName || currentTenant?.name || 'Fleet Mobility Portal';
+  const rawFleetName = currentTenant?.displayName || currentTenant?.name || localStorage.getItem('fleetName') || '';
+  const fleetName = isSuperAdmin
+    ? 'CABZ SaaS'
+    : (rawFleetName && rawFleetName !== 'CABZ Primary'
+        ? rawFleetName
+        : (localStorage.getItem('fleetName') || 'Fleet Mobility Portal'));
   const fleetLogo = currentTenant?.brandingTokens?.logoUrl || currentTenant?.logoUrl;
   const getFleetInitials = (name?: string, code?: string) => {
     if (code && code.trim().length > 0 && code !== 'FF' && code !== 'CZ' && code !== 'ALL') {
@@ -152,7 +157,7 @@ const Header: React.FC = () => {
 
   const confirmLogout = () => {
     logout();
-    navigate('/adminlogin');
+    navigate('/login');
     setShowConfirm(false);
   };
 

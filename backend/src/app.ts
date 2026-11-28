@@ -117,6 +117,7 @@ app.use('/api/tenants', tenantRoutes);
 app.use('/api/subscriptions', tenantRoutes);
 app.use('/api/public', tenantRoutes);
 app.use('/api/admin', tenantRoutes);
+app.use('/api', tenantRoutes);
 app.use('/api/emp', requireSubscriptionAccess, empRoutes);
 app.use('/api/user', requireSubscriptionAccess, userRoutes);
 app.use('/api/vendor', requireSubscriptionAccess, vendorRoutes);

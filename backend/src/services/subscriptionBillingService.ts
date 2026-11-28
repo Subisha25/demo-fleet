@@ -448,7 +448,7 @@ export const getSubscriptionRevenueSummary = async (req: Request, res: Response)
 
     for (const inv of paidInvoices) {
       const amount = Number(inv.totalAmount) || 0;
-      const tier = (inv.planTier || 'PRO') as 'BASIC' | 'PRO' | 'ENTERPRISE';
+      const tier = (inv.planTier || 'BASIC') as 'BASIC' | 'PRO' | 'ENTERPRISE';
       const cycle = inv.billingCycle === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY';
       const paidDate = inv.paidAt || inv.createdAt;
 

@@ -373,9 +373,9 @@ const Sidebar: React.FC = () => {
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-950/70 text-purple-300 border border-purple-700/50 uppercase tracking-wider">
                 Platform Admin
               </span>
-            ) : currentTenant?.subscription?.status === 'ACTIVE' ? (
+            ) : currentTenant?.subscription?.status === 'ACTIVE' && currentTenant?.planTier && ['BASIC', 'PRO', 'ENTERPRISE'].includes(currentTenant.planTier) ? (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-950/70 text-purple-300 border border-purple-700/50 uppercase tracking-wider">
-                {`${currentTenant?.planTier || 'PRO'} Plan`}
+                {`${currentTenant.planTier} Plan`}
               </span>
             ) : currentTenant?.subscription?.status === 'PAST_DUE' ? (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-950/70 text-rose-300 border border-rose-700/50 uppercase tracking-wider">

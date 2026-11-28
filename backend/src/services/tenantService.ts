@@ -123,7 +123,7 @@ export const getAllTenants = async (req: Request, res: Response) => {
         }
 
         const isPaid = !!lastPaidInvoice && sub.status === 'ACTIVE';
-        const actualPlanDisplay = isPaid ? `${sub.planTier || 'PRO'} (${sub.billingCycle || 'MONTHLY'})` : (isAwaitingActivation ? 'None (Awaiting Activation)' : 'None (Free Trial)');
+        const actualPlanDisplay = isPaid ? `${sub.planTier || 'BASIC'} (${sub.billingCycle || 'MONTHLY'})` : (isAwaitingActivation ? 'None (Awaiting Activation)' : 'None (Free Trial)');
         const paymentStatusDisplay = isPaid ? 'PAID' : (sub.status === 'TRIALING' ? (isAwaitingActivation ? 'PENDING_ACTIVATION' : (remainingTrialDays > 0 ? 'TRIAL' : 'EXPIRED')) : 'PENDING');
 
         return {
@@ -131,7 +131,7 @@ export const getAllTenants = async (req: Request, res: Response) => {
           subscription: {
             ...sub,
             billingCycle: sub.billingCycle || 'MONTHLY',
-            agreedPrice: sub.agreedPrice || (sub.planTier === 'ENTERPRISE' ? 549 : sub.planTier === 'PRO' ? 349 : 299),
+            agreedPrice: isPaid ? (sub.agreedPrice || (sub.planTier === 'ENTERPRISE' ? 549 : sub.planTier === 'PRO' ? 349 : 299)) : 0,
             currency: sub.currency || 'INR',
             trialStartDate,
             trialEndsAt,
@@ -789,25 +789,59 @@ export const getCurrentTenantProfile = async (req: Request, res: Response) => {
     });
 
     if (!tenant) {
-      // Seed root tenant on the fly if not yet in database
-      tenant = await Tenant.create({
-        tenantId: ROOT_TENANT_ID,
-        name: 'CABZ Primary',
-        code: 'CZ',
-        subdomain: 'cabz',
-        status: 'ACTIVE',
-        planTier: 'PRO',
-        contactEmail: 'admin@cabz.com',
-        brandingTokens: {
-          primaryColor: '#0284c7',
-          portalTitle: 'CABZ Enterprise Mobility',
-        },
-      });
-      await getOrCreateSubscription(ROOT_TENANT_ID);
-      tenant = await Tenant.findByPk(ROOT_TENANT_ID, {
-        include: [{ model: TenantSubscription }],
-      });
+      if (tenantId === ROOT_TENANT_ID) {
+        // Seed root tenant on the fly if not yet in database
+        tenant = await Tenant.create({
+          tenantId: ROOT_TENANT_ID,
+          name: 'CABZ Primary',
+          code: 'CZ',
+          subdomain: 'cabz',
+          status: 'ACTIVE',
+          planTier: 'PRO',
+          contactEmail: 'admin@cabz.com',
+          brandingTokens: {
+            primaryColor: '#0284c7',
+            portalTitle: 'CABZ Enterprise Mobility',
+          },
+        });
+        await getOrCreateSubscription(ROOT_TENANT_ID);
+        tenant = await Tenant.findByPk(ROOT_TENANT_ID, {
+          include: [{ model: TenantSubscription }],
+        });
+      } else {
+        return res.status(404).json({ success: false, message: 'Tenant not found.' });
+      }
     }
+
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: 'Tenant profile not found.' });
+    }
+
+    // Lookup corresponding registration request to enrich actual submitted details
+    const reg = await TenantRegistrationRequest.findOne({
+      where: {
+        [Op.or]: [
+          { tenantId: tenant.tenantId },
+          ...(tenant.code ? [{ businessCode: tenant.code }] : []),
+          ...(tenant.contactEmail ? [{ contactEmail: tenant.contactEmail }] : []),
+        ],
+      },
+      order: [['createdAt', 'DESC']],
+    });
+
+    const tenantObj: any = tenant.toJSON ? tenant.toJSON() : { ...tenant };
+    tenantObj.businessCode = tenantObj.code;
+    tenantObj.ownerName = reg?.ownerName || (tenantObj.brandingTokens as any)?.ownerName || '';
+    if (!tenantObj.legalName && reg?.legalName) tenantObj.legalName = reg.legalName;
+    if (!tenantObj.displayName && reg?.displayName) tenantObj.displayName = reg.displayName;
+    if (!tenantObj.registeredAddress && reg?.registeredAddress) tenantObj.registeredAddress = reg.registeredAddress;
+    if (!tenantObj.gstin && reg?.gstin) tenantObj.gstin = reg.gstin;
+    if (!tenantObj.panNumber && reg?.panNumber) tenantObj.panNumber = reg.panNumber;
+    if (!tenantObj.sacCode && reg?.sacCode) tenantObj.sacCode = reg.sacCode;
+    if (!tenantObj.city && reg?.city) tenantObj.city = reg.city;
+    if (!tenantObj.state && reg?.state) tenantObj.state = reg.state;
+    if (!tenantObj.pinCode && reg?.pinCode) tenantObj.pinCode = reg.pinCode;
+    if (!tenantObj.logoUrl && reg?.logoUrl) tenantObj.logoUrl = reg.logoUrl;
 
     // Fetch monthly telemetry metrics
     const now = new Date();
@@ -818,15 +852,219 @@ export const getCurrentTenantProfile = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
-      tenant,
+      tenant: tenantObj,
       data: {
-        tenant,
+        tenant: tenantObj,
         billingMonth,
         usage: usageMeters,
       },
     });
   } catch (error) {
     console.error('Error fetching tenant profile:', error);
+    return res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
+/**
+ * Update authenticated tenant profile details.
+ * Allows Fleet Admin to edit display name, legal registered name, contact info,
+ * tax/legal identifiers (GSTIN, PAN, SAC), and address.
+ * Strictly prevents modifications to tenantId, planTier, subscription status, or trial dates.
+ */
+export const updateCurrentTenantProfile = async (req: Request, res: Response) => {
+  try {
+    const ctx = getTenantContext();
+    const tenantId = (req as any).tenantId || ctx?.tenantId;
+    const isDemo = tenantId === 'demo-tenant' || (req as any).role === 'demo' || req.headers['x-demo-mode'] === 'true';
+
+    if (!tenantId) {
+      return res.status(401).json({ success: false, message: 'Unauthenticated tenant request.' });
+    }
+
+    if (isDemo) {
+      return res.status(403).json({
+        success: false,
+        code: 'DEMO_MODE_READ_ONLY',
+        message: 'Demo Preview is read-only. Profile editing is unavailable.',
+      });
+    }
+
+    const tenant = await Tenant.findByPk(tenantId, {
+      include: [{ model: TenantSubscription }],
+    });
+
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: 'Tenant not found.' });
+    }
+
+    const {
+      displayName,
+      legalName,
+      ownerName,
+      contactEmail,
+      contactPhone,
+      businessEmail,
+      businessPhone,
+      registeredAddress,
+      gstin,
+      panNumber,
+      sacCode,
+      city,
+      state,
+      pinCode,
+      website,
+      billingFooterText,
+      logoUrl,
+    } = req.body;
+
+    // Validation
+    if (contactPhone && String(contactPhone).replace(/\D/g, '').length < 10) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid 10-digit contact mobile number.' });
+    }
+    if (businessPhone && String(businessPhone).replace(/\D/g, '').length < 10) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid 10-digit business phone number.' });
+    }
+    const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    if (gstin && typeof gstin === 'string' && gstin.trim() !== '') {
+      if (!GSTIN_REGEX.test(gstin.trim().toUpperCase())) {
+        return res.status(400).json({ success: false, message: 'Invalid GSTIN format. Expected 15-character Indian GSTIN.' });
+      }
+    }
+    const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    if (panNumber && typeof panNumber === 'string' && panNumber.trim() !== '') {
+      if (!PAN_REGEX.test(panNumber.trim().toUpperCase())) {
+        return res.status(400).json({ success: false, message: 'Invalid PAN format. Expected 10-character alphanumeric PAN.' });
+      }
+    }
+    const SAC_REGEX = /^[0-9]{6}$/;
+    if (sacCode && typeof sacCode === 'string' && sacCode.trim() !== '') {
+      if (!SAC_REGEX.test(sacCode.trim())) {
+        return res.status(400).json({ success: false, message: 'Invalid SAC code. Expected 6 digits (e.g. 996609).' });
+      }
+    }
+    if (pinCode && typeof pinCode === 'string' && pinCode.trim() !== '') {
+      if (!/^[0-9]{6}$/.test(pinCode.trim())) {
+        return res.status(400).json({ success: false, message: 'Invalid PIN code. Expected 6 digits.' });
+      }
+    }
+
+    // Apply updates to Tenant model
+    if (displayName !== undefined && String(displayName).trim() !== '') {
+      tenant.displayName = String(displayName).trim();
+    }
+    if (legalName !== undefined) {
+      tenant.legalName = String(legalName).trim();
+    }
+    if (contactEmail !== undefined && String(contactEmail).trim() !== '') {
+      tenant.contactEmail = String(contactEmail).trim();
+    }
+    if (contactPhone !== undefined && String(contactPhone).trim() !== '') {
+      tenant.contactPhone = String(contactPhone).replace(/\D/g, '').slice(-10);
+    }
+    if (businessEmail !== undefined) {
+      tenant.businessEmail = String(businessEmail).trim();
+    }
+    if (businessPhone !== undefined) {
+      tenant.businessPhone = String(businessPhone).replace(/\D/g, '').slice(-10);
+    }
+    if (registeredAddress !== undefined) {
+      tenant.registeredAddress = String(registeredAddress).trim();
+    }
+    if (gstin !== undefined) {
+      tenant.gstin = String(gstin).trim().toUpperCase();
+    }
+    if (panNumber !== undefined) {
+      tenant.panNumber = String(panNumber).trim().toUpperCase();
+    }
+    if (sacCode !== undefined) {
+      tenant.sacCode = String(sacCode).trim();
+    }
+    if (city !== undefined) {
+      tenant.city = String(city).trim();
+    }
+    if (state !== undefined) {
+      tenant.state = String(state).trim();
+    }
+    if (pinCode !== undefined) {
+      tenant.pinCode = String(pinCode).trim();
+    }
+    if (website !== undefined) {
+      tenant.website = String(website).trim();
+    }
+    if (billingFooterText !== undefined) {
+      tenant.billingFooterText = String(billingFooterText).trim();
+    }
+    if (logoUrl !== undefined) {
+      tenant.logoUrl = String(logoUrl).trim();
+    }
+
+    // Update branding tokens
+    const currentTokens = tenant.brandingTokens || {};
+    tenant.brandingTokens = {
+      ...currentTokens,
+      displayName: tenant.displayName || currentTokens.displayName,
+      legalName: tenant.legalName || currentTokens.legalName,
+      logoUrl: tenant.logoUrl || currentTokens.logoUrl,
+      ownerName: ownerName !== undefined ? String(ownerName).trim() : (currentTokens as any)?.ownerName,
+      registeredAddress: tenant.registeredAddress || currentTokens.registeredAddress,
+      gstin: tenant.gstin || currentTokens.gstin,
+      panNumber: tenant.panNumber || currentTokens.panNumber,
+      sacCode: tenant.sacCode || currentTokens.sacCode,
+      city: tenant.city || currentTokens.city,
+      state: tenant.state || currentTokens.state,
+      pinCode: tenant.pinCode || currentTokens.pinCode,
+      businessEmail: tenant.businessEmail || currentTokens.businessEmail,
+      businessPhone: tenant.businessPhone || currentTokens.businessPhone,
+      website: tenant.website || currentTokens.website,
+    };
+
+    await tenant.save();
+
+    // Sync with corresponding TenantRegistrationRequest
+    const reg = await TenantRegistrationRequest.findOne({
+      where: {
+        [Op.or]: [
+          { tenantId: tenant.tenantId },
+          ...(tenant.code ? [{ businessCode: tenant.code }] : []),
+          ...(tenant.contactEmail ? [{ contactEmail: tenant.contactEmail }] : []),
+        ],
+      },
+      order: [['createdAt', 'DESC']],
+    });
+
+    if (reg) {
+      if (ownerName !== undefined && String(ownerName).trim() !== '') reg.ownerName = String(ownerName).trim();
+      if (displayName !== undefined && String(displayName).trim() !== '') reg.displayName = String(displayName).trim();
+      if (legalName !== undefined) reg.legalName = String(legalName).trim();
+      if (contactEmail !== undefined && String(contactEmail).trim() !== '') reg.contactEmail = String(contactEmail).trim();
+      if (contactPhone !== undefined && String(contactPhone).trim() !== '') reg.contactPhone = String(contactPhone).replace(/\D/g, '').slice(-10);
+      if (registeredAddress !== undefined) reg.registeredAddress = String(registeredAddress).trim();
+      if (gstin !== undefined) reg.gstin = String(gstin).trim().toUpperCase();
+      if (panNumber !== undefined) reg.panNumber = String(panNumber).trim().toUpperCase();
+      if (sacCode !== undefined) reg.sacCode = String(sacCode).trim();
+      if (city !== undefined) reg.city = String(city).trim();
+      if (state !== undefined) reg.state = String(state).trim();
+      if (pinCode !== undefined) reg.pinCode = String(pinCode).trim();
+      if (logoUrl !== undefined) reg.logoUrl = String(logoUrl).trim();
+      await reg.save();
+    }
+
+    // Build fresh enriched object
+    const freshTenant = await Tenant.findByPk(tenantId, {
+      include: [{ model: TenantSubscription }],
+    });
+    const freshObj: any = freshTenant ? (freshTenant.toJSON ? freshTenant.toJSON() : freshTenant) : tenant.toJSON();
+    freshObj.businessCode = freshObj.code;
+    freshObj.ownerName = ownerName !== undefined ? String(ownerName).trim() : (reg?.ownerName || (freshObj.brandingTokens as any)?.ownerName || '');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Fleet profile updated successfully.',
+      tenant: freshObj,
+      data: freshObj,
+    });
+  } catch (error: any) {
+    console.error('Error updating tenant profile:', error);
     return res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };
@@ -1294,7 +1532,7 @@ export const getFleetDashboardOverview = async (req: Request, res: Response) => 
     }
 
     const sub = tenant?.subscription || (await getOrCreateSubscription(targetTenantId));
-    const limits = sub.status === 'TRIALING' ? TRIAL_BASELINE_LIMITS : ((PLAN_LIMITS as any)[sub.planTier || 'PRO'] || PLAN_LIMITS.PRO);
+    const limits = sub.status === 'TRIALING' ? TRIAL_BASELINE_LIMITS : ((PLAN_LIMITS as any)[sub.planTier || 'BASIC'] || PLAN_LIMITS.BASIC);
 
     // Subscription Days & Alerts Calculation
     const now = new Date();

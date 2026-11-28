@@ -11,6 +11,13 @@ interface TokenVerificationData {
   adminName: string;
   email: string;
   plan: string;
+  planTier?: string;
+  isFreeTrial?: boolean;
+  trialDuration?: string;
+  trialDurationDays?: number;
+  startCondition?: string;
+  upfrontPayment?: string;
+  accessLevel?: string;
   billingCycle: string;
 }
 
@@ -193,26 +200,51 @@ export default function ActivateAccount() {
             {!verifying && !verificationError && !activationSuccess && tenantInfo && (
               <form onSubmit={handleSubmit} className="space-y-5">
                 {/* Operator Profile Preview */}
-                <div className="bg-[#F7F7FB] p-4 rounded-2xl border border-[#E5E7EB]">
-                  <div className="text-xs font-bold text-[#7A7570] uppercase tracking-wider mb-2">
-                    Verified Fleet Application
+                <div className="bg-[#F7F7FB] p-5 rounded-2xl border border-[#E5E7EB] shadow-xs">
+                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#E5E7EB]">
+                    <div className="text-xs font-bold text-[#7A7570] uppercase tracking-wider">
+                      Verified Fleet Application
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      7-Day Free Trial
+                    </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
-                      <span className="text-[#5C5752]">Fleet Name:</span>
-                      <p className="font-semibold text-[#17171D]">{tenantInfo.fleetName}</p>
+                      <span className="text-[#5C5752] block text-[11px]">Fleet Name:</span>
+                      <p className="font-semibold text-[#17171D] truncate">{tenantInfo.fleetName}</p>
                     </div>
                     <div>
-                      <span className="text-[#5C5752]">Business Code:</span>
+                      <span className="text-[#5C5752] block text-[11px]">Business Code:</span>
                       <p className="font-mono font-bold text-[#5B3DF5]">{tenantInfo.businessCode}</p>
                     </div>
                     <div>
-                      <span className="text-[#5C5752]">Administrator:</span>
+                      <span className="text-[#5C5752] block text-[11px]">Administrator:</span>
                       <p className="font-semibold text-[#17171D]">{tenantInfo.adminName}</p>
                     </div>
                     <div>
-                      <span className="text-[#5C5752]">Selected Plan:</span>
-                      <p className="font-semibold uppercase text-emerald-700">{tenantInfo.plan}</p>
+                      <span className="text-[#5C5752] block text-[11px]">Selected Plan:</span>
+                      <p className="font-extrabold uppercase text-emerald-700">
+                        {tenantInfo.isFreeTrial === false && tenantInfo.plan && ['BASIC', 'PRO', 'ENTERPRISE'].includes(tenantInfo.plan)
+                          ? tenantInfo.plan
+                          : 'FREE TRIAL'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[#5C5752] block text-[11px]">Trial Duration:</span>
+                      <p className="font-semibold text-[#17171D]">{tenantInfo.trialDuration || '7 Days'}</p>
+                    </div>
+                    <div>
+                      <span className="text-[#5C5752] block text-[11px]">Start Condition:</span>
+                      <p className="font-semibold text-indigo-700">{tenantInfo.startCondition || 'Starts upon account activation'}</p>
+                    </div>
+                    <div>
+                      <span className="text-[#5C5752] block text-[11px]">Upfront Payment:</span>
+                      <p className="font-extrabold text-emerald-600">{tenantInfo.upfrontPayment || '₹0 / Free'}</p>
+                    </div>
+                    <div>
+                      <span className="text-[#5C5752] block text-[11px]">Access Level:</span>
+                      <p className="font-semibold text-emerald-800">{tenantInfo.accessLevel || 'Full Operational Access'}</p>
                     </div>
                   </div>
                 </div>

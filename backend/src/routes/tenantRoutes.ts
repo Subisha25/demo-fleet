@@ -5,6 +5,7 @@ import {
   getTenantById,
   updateTenantSubscription,
   getCurrentTenantProfile,
+  updateCurrentTenantProfile,
   getCurrentTenantEntitlements,
   updateCurrentTenantBranding,
   getSubscriptionPlans,
@@ -161,6 +162,8 @@ router.get('/admin/subscription-lifecycle/status', authMiddleware, requireSuperA
 // TENANT PROFILE, DASHBOARD STATS & BRANDING (Authenticated Staff)
 // =============================================================================
 router.get('/current/profile', authMiddleware, getCurrentTenantProfile);
+router.put('/current/profile', authMiddleware, updateCurrentTenantProfile);
+router.post('/current/profile', authMiddleware, updateCurrentTenantProfile);
 router.get('/current/subscription-lock-status', authMiddleware, getSubscriptionLockStatus);
 router.get('/current/entitlements', authMiddleware, getCurrentTenantEntitlements);
 router.put('/current/branding', authMiddleware, requireThemeCustomization, updateCurrentTenantBranding);

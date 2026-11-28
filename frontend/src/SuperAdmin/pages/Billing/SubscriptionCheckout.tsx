@@ -192,7 +192,9 @@ const SubscriptionCheckout: React.FC = () => {
   };
 
   const subscriptionStatus = currentTenant?.subscription?.status || "ACTIVE";
-  const planTier = currentTenant?.planTier || "PRO";
+  const isTrial = subscriptionStatus === "TRIALING";
+  const hasPaidPlan = Boolean(currentTenant?.planTier && ['BASIC', 'PRO', 'ENTERPRISE'].includes(currentTenant.planTier));
+  const planTier = isTrial ? "FREE TRIAL" : (hasPaidPlan ? currentTenant!.planTier : "NO PAID PLAN");
   const vehicleQuota = currentTenant?.subscription?.vehicleQuota || 75;
   const driverQuota = currentTenant?.subscription?.driverQuota || 75;
 

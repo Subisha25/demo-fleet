@@ -141,7 +141,7 @@ axiosInstance.interceptors.response.use(
                 isLocked: data.isLocked ?? (data.code === 'SUBSCRIPTION_PAYMENT_REQUIRED' || data.code === 'SUBSCRIPTION_EXPIRED' || data.code === 'SUBSCRIPTION_LOCKED'),
                 lockReason: data.lockReason || (data.code === 'SUBSCRIPTION_EXPIRED' ? 'EXPIRED' : 'PAYMENT_PENDING'),
                 subscriptionStatus: data.subscriptionStatus || (data.code === 'SUBSCRIPTION_EXPIRED' ? 'EXPIRED' : 'PENDING_PAYMENT'),
-                planTier: data.planTier || 'PRO',
+                planTier: data.planTier || null,
                 billingCycle: data.billingCycle || 'MONTHLY',
                 payableAmount: data.payableAmount,
                 baseAmount: data.baseAmount,

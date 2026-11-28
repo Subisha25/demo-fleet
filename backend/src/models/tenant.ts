@@ -187,6 +187,7 @@ export class Tenant extends Model {
     logoUrl?: string;
     faviconUrl?: string;
     portalTitle?: string;
+    ownerName?: string;
     legalName?: string;
     displayName?: string;
     registeredAddress?: string;

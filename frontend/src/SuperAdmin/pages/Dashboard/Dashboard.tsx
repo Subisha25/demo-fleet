@@ -365,7 +365,7 @@ const Dashboard: React.FC = () => {
   }, [isTrialTenant, trialData, sub, currentTenant]);
 
   const activeTenantName = fleetOverview?.tenant?.name || currentTenant?.name || 'Active Fleet';
-  const effectivePlan = fleetOverview?.subscription?.planTier || sub?.planTier || currentTenant?.planTier || 'PRO';
+  const effectivePlan = fleetOverview?.subscription?.planTier || sub?.planTier || currentTenant?.planTier || (isTrialTenant ? 'FREE TRIAL' : 'BASIC');
 
   const dashboardTitle = isSuperAdmin
     ? (isAllFleets

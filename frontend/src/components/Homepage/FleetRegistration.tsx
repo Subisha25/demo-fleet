@@ -165,7 +165,7 @@ export default function FleetRegistration() {
     setFormData((prev) => {
       let updated = { ...prev };
       if (planParam && PLANS[planParam]) {
-        updated.requestedPlanTier = planParam as any;
+        updated.requestedPlanTier = 'FREE_TRIAL' as any;
         updated.fleetSize = planParam === 'BASIC' ? '1-15' : planParam === 'PRO' ? '16-75' : '76+';
       }
       if (validBilling) {

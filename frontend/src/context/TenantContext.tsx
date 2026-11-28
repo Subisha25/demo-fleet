@@ -54,6 +54,7 @@ interface TenantContextType {
   fleetChangeVersion: number;
   switchTenant: (tenantId: string) => void;
   refreshTenant: () => Promise<void>;
+  resetTenant: () => void;
   loadAllTenants: () => Promise<void>;
 }
 
@@ -182,18 +183,63 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [loading, setLoading] = useState<boolean>(true);
   const [fleetChangeVersion, setFleetChangeVersion] = useState<number>(0);
 
+  const isPublicRoute = (pathname?: string): boolean => {
+    const p = (pathname || (typeof window !== 'undefined' ? window.location.pathname : '') || '').toLowerCase();
+    return (
+      p === '' ||
+      p === '/' ||
+      p.startsWith('/register') ||
+      p.startsWith('/pricing') ||
+      p.startsWith('/about') ||
+      p.startsWith('/services') ||
+      p.startsWith('/contact') ||
+      p.startsWith('/portfolio') ||
+      p.startsWith('/book') ||
+      p.startsWith('/login') ||
+      p.startsWith('/adminlogin') ||
+      p.startsWith('/forgetpasword') ||
+      p.startsWith('/forgot-password') ||
+      p.startsWith('/activate') ||
+      p.startsWith('/demo') ||
+      p.startsWith('/terms') ||
+      p.startsWith('/privacy')
+    );
+  };
+
   const applyBranding = (tenant: TenantInfo) => {
+    if (typeof window !== 'undefined' && isPublicRoute(window.location.pathname)) {
+      document.title = 'CABZ | Smart Fleet Mobility';
+      document.documentElement.style.setProperty('--primary-tenant-color', '#5B3DF5');
+      return;
+    }
     const primary = tenant.brandingTokens?.primaryColor || '#7C3AED';
     const title = tenant.brandingTokens?.portalTitle || tenant.displayName || tenant.name;
     document.documentElement.style.setProperty('--primary-tenant-color', primary);
     if (tenant.tenantId === 'all' || !tenant.tenantId || tenant.tenantId === 'e7b8a1c0-0000-0000-0000-000000000001') {
       document.title = 'CABZ | Smart Fleet Mobility';
-    } else if (title && title !== 'CABZ') {
+    } else if (title && title !== 'CABZ Primary' && title !== 'CABZ') {
       document.title = `${title} — CABZ`;
     } else {
       document.title = 'CABZ | Smart Fleet Mobility';
     }
   };
+
+  const resetTenant = () => {
+    setCurrentTenant(null);
+    setSelectedFleet('all');
+    if (typeof document !== 'undefined') {
+      document.title = 'CABZ | Smart Fleet Mobility';
+      document.documentElement.style.setProperty('--primary-tenant-color', '#5B3DF5');
+    }
+  };
+
+  useEffect(() => {
+    const handleAuthLogout = () => {
+      resetTenant();
+    };
+    window.addEventListener('cabz:auth_logout', handleAuthLogout);
+    return () => window.removeEventListener('cabz:auth_logout', handleAuthLogout);
+  }, []);
 
   const refreshTenant = async () => {
     try {
@@ -221,6 +267,7 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         if (res.data.tenant.name) {
           localStorage.setItem('fleetName', res.data.tenant.displayName || res.data.tenant.name);
         }
+        setFleetChangeVersion((prev) => prev + 1);
       }
     } catch (err) {
       // Fallback
@@ -232,11 +279,20 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           displayName: fallbackName,
           code: 'FL',
           subdomain: '',
-          status: 'ACTIVE',
-          planTier: 'PRO',
+          status: 'TRIALING',
+          planTier: 'FREE_TRIAL' as any,
           brandingTokens: {
             primaryColor: '#7C3AED',
             portalTitle: fallbackName,
+          },
+          subscription: {
+            planTier: 'FREE_TRIAL' as any,
+            status: 'TRIALING',
+            vehicleQuota: 75,
+            driverQuota: 75,
+            companyQuota: 20,
+            monthlyTripQuota: 2500,
+            allowOverage: false,
           },
         };
         setCurrentTenant(fallbackTenant);
@@ -337,6 +393,7 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         fleetChangeVersion,
         switchTenant,
         refreshTenant,
+        resetTenant,
         loadAllTenants,
       }}
     >
